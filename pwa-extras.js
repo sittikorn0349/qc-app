@@ -17,7 +17,7 @@
   var UA=navigator.userAgent,inApp=/Line\/|FBAN|FBAV|Instagram|MicroMessenger|; wv\)/i.test(UA),isFile=location.protocol==='file:';
   var card=document.createElement('section');card.className='card noprint';card.id='qc-installcard';card.hidden=true;card.setAttribute('aria-label','ติดตั้งแอป');
   card.style.cssText='display:grid;gap:8px';
-  var ititle=document.createElement('b');ititle.textContent='ติดตั้งแอปลงหน้าจอมือถือ';
+  var ititle=document.createElement('b');ititle.textContent='ติดตั้งแอปลงหน้าจอ';
   var ibody=document.createElement('div');ibody.id='qc-hint';ibody.style.cssText='line-height:1.6';
   var iacts=document.createElement('div');iacts.style.cssText='display:flex;flex-wrap:wrap;gap:8px';
   var inst=document.createElement('button');inst.type='button';inst.className='btn primary';inst.id='qc-install';inst.hidden=true;inst.textContent='ติดตั้งแอปลงหน้าจอ';
@@ -33,7 +33,13 @@
   });
   inst.addEventListener('click',function(){if(!deferred)return;deferred.prompt();deferred.userChoice.finally(function(){deferred=null;render()})});
   window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferred=e;render()});
-  window.addEventListener('appinstalled',function(){deferred=null;render()});
+  window.addEventListener('appinstalled',function(){
+    deferred=null;
+    try{
+      if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
+    }catch(e){}
+    render();
+  });
   function renderInstall(){
     var show=!standalone&&!dismissed();
     card.hidden=!show;if(!show)return;
@@ -42,6 +48,8 @@
     if(inApp){hint.textContent='คุณเปิดอยู่ในแอป LINE/Facebook ซึ่งติดตั้งลงหน้าจอไม่ได้ ให้คัดลอกลิงก์แล้วไปเปิดใน '+(isIOS?'Safari':'Chrome')+' ก่อน';return}
     if(deferred){hint.textContent='กดปุ่มด้านล่าง แล้วกด “ติดตั้ง” ไอคอน “ตรวจงาน” จะขึ้นบนหน้าจอ';return}
     if(isIOS){hint.textContent='iPhone/iPad (ต้องใช้ Safari): 1) กดปุ่มแชร์ (สี่เหลี่ยมมีลูกศรขึ้น) 2) เลื่อนลงแล้วเลือก “เพิ่มไปยังหน้าจอโฮม” 3) กด “เพิ่ม” ไอคอน “ตรวจงาน” จะขึ้นบนหน้าจอ';return}
+    var desktop=/Windows|Macintosh|Linux/i.test(navigator.platform||navigator.userAgent)&&!/Android|Mobile/i.test(navigator.userAgent);
+    if(desktop){hint.textContent='Desktop: เปิดจากลิงก์ https แล้วกดปุ่ม “ติดตั้งแอปลงหน้าจอ” หรือใช้เมนู Chrome/Edge และเลือก “ติดตั้ง...” หรือ “ติดตั้งแบบแอป...” แอปจะมีหน้าต่างและไอคอนของตัวเอง';return}
     hint.textContent='Android: แตะเมนู ⋮ ของ Chrome มุมขวาบน แล้วเลือก “ติดตั้งแอป” หรือ “เพิ่มลงหน้าจอหลัก” (ถ้าเพิ่งเปิดหน้านี้ รอสักครู่หรือรีเฟรชแล้วปุ่มติดตั้งจะขึ้นเอง) ไอคอนอาจอยู่ในลิ้นชักแอป ให้กดค้างลากมาวางหน้าจอได้';
   }
   function ago(t){var d=Math.floor((Date.now()-t)/DAY);return d<=0?'วันนี้':d+' วันก่อน'}
