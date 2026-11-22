@@ -3,7 +3,7 @@
    buttons, so documents, hashes and the send/receive format are untouched. */
 (function(){
   'use strict';
-  var FORMS=[{id:'qc-inspection',name:'แบบฟอร์มตรวจงานก่อสร้าง'}];
+  var FORMS=[{id:'qc-inspection',name:'แบบฟอร์มตรวจงานก่อสร้าง',sub:'งาน QC ตามมาตรฐาน'},{id:'safety',name:'แบบตรวจความปลอดภัย',sub:'นั่งร้าน · ราวกันตก · ประชุมก่อนเริ่มงาน'}];
   var FORM_K='qc-form',CODE_K='qc-code',NAME_K='qc-sender-name';
   function $(s,r){return (r||document).querySelector(s)}
   function ls(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -166,11 +166,16 @@
     var fbtn=el('button',{type:'button',class:'qh-fbtn',id:'qh-fbtn','aria-haspopup':'listbox','aria-expanded':'false'},icon('plus'),fname,icon('chev'));
     var flist=el('ul',{class:'qh-flist',id:'qh-flist',role:'listbox','aria-label':'เลือกแบบฟอร์ม',hidden:true});
     FORMS.forEach(function(f){
-      var li=el('li',{role:'option','aria-selected':f.id===sel.id?'true':'false'},f.name+(f.id===sel.id?'  ✓':''));
-      li.addEventListener('click',function(){lsSet(FORM_K,f.id);fname.textContent=f.name;flist.hidden=true;fbtn.setAttribute('aria-expanded','false')});
+      var li=el('li',{role:'option','aria-selected':f.id===sel.id?'true':'false',tabindex:'0'},el('b',null,f.name+(f.id===sel.id?'  ✓':'')),f.sub?el('small',{style:'display:block;color:var(--muted);font-size:.78rem'},f.sub):null);
+      function pick(){
+        lsSet(FORM_K,f.id);sel=f;fname.textContent=f.name;flist.hidden=true;fbtn.setAttribute('aria-expanded','false');
+        [].forEach.call(flist.querySelectorAll('li[role=option]'),function(n,i){var on=FORMS[i].id===f.id;n.setAttribute('aria-selected',on?'true':'false');n.querySelector('b').textContent=FORMS[i].name+(on?'  ✓':'')});
+        var t=document.querySelector('#qh-t-new small');if(t)t.textContent=f.name.replace(/^แบบฟอร์ม/,'');
+      }
+      li.addEventListener('click',pick);li.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();pick()}});
       flist.appendChild(li);
     });
-    flist.appendChild(el('li',{class:'qh-note'},'ตอนนี้มีแบบฟอร์มเดียว แบบฟอร์มอื่นจะเพิ่มในรายการนี้ภายหลัง'));
+    flist.appendChild(el('li',{class:'qh-note'},'แบบตรวจความปลอดภัยแยกจากงาน QC: มีเช็กลิสต์ของตัวเอง และติดป้าย “ความปลอดภัย” ในคลังเอกสาร'));
     fbtn.addEventListener('click',function(e){e.stopPropagation();var o=flist.hidden;flist.hidden=!o;fbtn.setAttribute('aria-expanded',o?'true':'false')});
     document.addEventListener('click',function(e){if(!flist.hidden&&!flist.contains(e.target)){flist.hidden=true;fbtn.setAttribute('aria-expanded','false')}});
     var fp=el('div',{class:'qh-fp'},el('span',{class:'qh-lbl'},'แบบฟอร์ม'),fbtn,flist);

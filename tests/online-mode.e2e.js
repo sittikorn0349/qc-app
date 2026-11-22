@@ -22,6 +22,7 @@ const FAKE = `
   }
   function log(n,a){S.calls.push(n)}
   window.__fake={S:S,ME:ME,OTHER:OTHER,HM:HM,
+    addRequest:function(r){S.reqs=S.reqs||{};S.reqs[r.id]=Object.assign({status:'requested',result_note:'',result_photos:[],hold:true,loc:'',cat:'',next_step:'',note:'',inspection_id:null,created_at:now()},r)},
     fixedBy:function(sid,note){var it=S.items[sid];it.status='fixed';it.rres='';it.fixed_note=note||''},
     fire:function(){S.rt.forEach(function(cb){cb({})})},
     otherRecheck:function(sid,res,note){var it=S.items[sid];it.rres=res;it.rnote=note;it.rdate=today();it.rchk_at=now();it.status=status(it)},
@@ -60,6 +61,15 @@ const FAKE = `
     profileByEmail:function(){return Promise.resolve(null)},members:function(){return Promise.resolve([{user_id:ME,role:'foreman'},{user_id:OTHER,role:'pm'},{user_id:HM,role:'headman'}])},
     addMember:function(){return Promise.resolve(null)},removeMember:function(){return Promise.resolve(null)},
     createProject:function(){return Promise.reject(new Error('no'))},
+    requests:function(){return Promise.resolve(Object.values(S.reqs||{}).map(c))},
+    insertRequest:function(row){log('insertRequest');S.reqs=S.reqs||{};if(S.reqs[row.id])return Promise.reject(Object.assign(new Error('duplicate key'),{code:'23505'}));
+      if(row.inspector_id===ME)return Promise.reject(Object.assign(new Error('choose someone else to inspect'),{code:'P0001'}));
+      var r=c(row);r.status='requested';r.result_note='';r.result_photos=[];r.created_at=now();S.reqs[r.id]=r;return Promise.resolve(null)},
+    answerRequest:function(id,action,note,photos,at){log('answerRequest:'+action);var r=(S.reqs||{})[id];if(!r)return Promise.resolve('gone');
+      if(r.status!=='requested'&&r.status!=='accepted')return Promise.resolve('closed');
+      if(action==='accept')r.status='accepted';else if(action==='pass'||action==='fail'){r.status=action==='pass'?'passed':'failed';r.result_note=note||'';r.result_by=ME;r.result_at=now()}
+      else if(action==='cancel')r.status='cancelled';else if(action==='reschedule'){r.scheduled_at=at;r.status='requested'}
+      return Promise.resolve('ok')},
     lineStatus:function(){return Promise.resolve({linked:!!S.linked,oa:'@qcapp'})},lineLinkStart:function(){return Promise.resolve({code:'123456',oa:'@qcapp',linked:false})},lineUnlink:function(){S.linked=false;return Promise.resolve(null)},
     subscribe:function(p,cb){S.rt.push(cb);return function(){}}
   };
