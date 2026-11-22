@@ -139,6 +139,7 @@
       var tl=tiles[k];if(tl.need)tl.el.setAttribute('aria-disabled',has?'false':'true');
     });
     var n=libCount();tiles.lib.sub.textContent=n?n+' ฉบับ':'ยังไม่มี';
+    if(window.__qcForms&&tiles.forms)window.__qcForms.count().then(function(c){tiles.forms.sub.textContent=c?c+' ฉบับ':'แบบฟอร์มสำเร็จรูป / สร้างเอง'});
   }
 
   function tile(id,label,sub,ic,opts){
@@ -160,25 +161,6 @@
     wrap=$('.wrap');
     document.body.classList.add('qc-hub');
 
-    /* form picker */
-    var selId=ls(FORM_K),sel=FORMS.filter(function(f){return f.id===selId})[0]||FORMS[0];
-    var fname=el('span',{class:'qh-t'},sel.name);
-    var fbtn=el('button',{type:'button',class:'qh-fbtn',id:'qh-fbtn','aria-haspopup':'listbox','aria-expanded':'false'},icon('plus'),fname,icon('chev'));
-    var flist=el('ul',{class:'qh-flist',id:'qh-flist',role:'listbox','aria-label':'เลือกแบบฟอร์ม',hidden:true});
-    FORMS.forEach(function(f){
-      var li=el('li',{role:'option','aria-selected':f.id===sel.id?'true':'false',tabindex:'0'},el('b',null,f.name+(f.id===sel.id?'  ✓':'')),f.sub?el('small',{style:'display:block;color:var(--muted);font-size:.78rem'},f.sub):null);
-      function pick(){
-        lsSet(FORM_K,f.id);sel=f;fname.textContent=f.name;flist.hidden=true;fbtn.setAttribute('aria-expanded','false');
-        [].forEach.call(flist.querySelectorAll('li[role=option]'),function(n,i){var on=FORMS[i].id===f.id;n.setAttribute('aria-selected',on?'true':'false');n.querySelector('b').textContent=FORMS[i].name+(on?'  ✓':'')});
-        var t=document.querySelector('#qh-t-new small');if(t)t.textContent=f.name.replace(/^แบบฟอร์ม/,'');
-      }
-      li.addEventListener('click',pick);li.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();pick()}});
-      flist.appendChild(li);
-    });
-    flist.appendChild(el('li',{class:'qh-note'},'แบบตรวจความปลอดภัยแยกจากงาน QC: มีเช็กลิสต์ของตัวเอง และติดป้าย “ความปลอดภัย” ในคลังเอกสาร'));
-    fbtn.addEventListener('click',function(e){e.stopPropagation();var o=flist.hidden;flist.hidden=!o;fbtn.setAttribute('aria-expanded',o?'true':'false')});
-    document.addEventListener('click',function(e){if(!flist.hidden&&!flist.contains(e.target)){flist.hidden=true;fbtn.setAttribute('aria-expanded','false')}});
-    var fp=el('div',{class:'qh-fp'},el('span',{class:'qh-lbl'},'แบบฟอร์ม'),fbtn,flist);
 
     /* latest card */
     lastEls.t=el('div',{class:'qh-lt'});lastEls.s=el('div',{class:'qh-ls'});
@@ -190,8 +172,9 @@
 
     /* tiles */
     var grid=el('div',{class:'qh-grid',role:'group','aria-label':'เมนูหลัก'},
-      tile('new','ฉบับใหม่',sel.name.replace(/^แบบฟอร์ม/,''),'plus',{primary:true,run:function(){expectNav();click('#btn-new')}}),
+      tile('new','สร้างรายงาน','เลือกแบบฟอร์ม','plus',{primary:true,run:openPicker}),
       tile('lib','คลังเอกสาร','','folder',{run:openLib}),
+      tile('forms','รายงานแบบอื่น','แบบฟอร์มสำเร็จรูป / สร้างเอง','folder',{run:function(){if(window.__qcForms)window.__qcForms.library()}}),
       tile('send','ส่งเอกสาร','ไฟล์ ZIP','send',{need:true,run:function(){click('#btn-send')}}),
       tile('follow','ตรวจรอบใหม่','จากรายการค้าง','recheck',{need:true,run:function(){expectNav();click('#btn-follow')}}),
       tile('dup','ทำสำเนา','เป็นฉบับใหม่','copy',{need:true,run:function(){expectNav();click('#btn-dup')}}),
@@ -204,7 +187,7 @@
     home=el('div',{id:'qc-home',role:'main','aria-label':'หน้าแรก'},
       el('div',{class:'qh-in'},
         el('header',null,el('h1',{tabindex:'-1'},'ตรวจงานก่อสร้าง'),el('div',{class:'qh-sub'},'ข้อมูลเก็บในเครื่องนี้ · ใช้ได้โดยไม่ต้องมีอินเทอร์เน็ต')),
-        fp,last,msgEl,grid,slot));
+        last,msgEl,grid,slot));
     document.body.appendChild(home);
 
     /* form bar */
@@ -276,6 +259,34 @@
     var m=$('#qf-more');if(m)m.setAttribute('aria-expanded','false');
   }
 
+  /* ---------- "สร้างรายงาน": pick a form ---------- */
+  function openPicker(){
+    var F=window.__qcForms,nodes=[];
+    function grp(t){return el('div',{class:'qh-lbl',style:'margin:4px 0 -4px'},t)}
+    function original(f){
+      return big('plus',f.name,f.sub||'',function(){lsSet(FORM_K,f.id);closeSheet();expectNav();click('#btn-new')});
+    }
+    nodes.push(grp('แบบฟอร์มหลัก (ตรวจงานพร้อมตรวจซ้ำ)'));
+    FORMS.forEach(function(f){var b=original(f);b.setAttribute('data-form',f.id);nodes.push(b)});
+    if(F){
+      nodes.push(grp('แบบฟอร์มสำเร็จรูป'));
+      F.builtins.forEach(function(f){var b=big('plus',f.name,f.sub,function(){closeSheet();F.newDoc(f.id)});b.setAttribute('data-form',f.id);nodes.push(b)});
+      var cs=F.customs();
+      nodes.push(grp('แบบฟอร์มที่สร้างเอง'));
+      if(!cs.length)nodes.push(el('div',{class:'qh-kv'},'ยังไม่มี · สร้างจากวิเจ็ตสำเร็จรูป แล้วออกเป็น PDF ได้เหมือนแบบฟอร์มหลัก'));
+      cs.forEach(function(f){
+        var b=big('plus',f.name,(f.sub||'')+' · '+f.widgets.length+' ส่วน',function(){closeSheet();F.newDoc(f.id)});b.setAttribute('data-form',f.id);b.style.flex='1';
+        var ed=el('button',{type:'button',class:'btn','aria-label':'แก้แบบฟอร์ม '+f.name},'แก้');ed.addEventListener('click',function(){closeSheet();F.builder(f.id)});
+        nodes.push(el('div',{style:'display:flex;gap:8px;align-items:stretch'},b,ed));
+      });
+      var mk=el('button',{type:'button',class:'btn primary',id:'qh-build'},'+ สร้างแบบฟอร์มเอง');
+      mk.addEventListener('click',function(){closeSheet();F.builder(null)});
+      nodes.push(mk);
+    }
+    openSheet('สร้างรายงาน · เลือกแบบฟอร์ม',nodes);
+    var first=sheet&&sheet.querySelector('.qh-big');if(first)first.focus();
+  }
+
   /* ---------- sheets ---------- */
   function openSheet(title,nodes){
     closeSheet();
@@ -342,7 +353,7 @@
   function boot(){
     if(!$('.wrap')||!$('#status')){setTimeout(boot,50);return}
     build();
-    window.__qcHome={go:function(v){v==='form'?goForm():goHome()},view:function(){return view}};
+    window.__qcHome={go:function(v){v==='form'?goForm():goHome()},view:function(){return view},picker:openPicker};
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
