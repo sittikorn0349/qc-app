@@ -27,7 +27,7 @@ const BASE = 'http://localhost:8911/' + (process.argv[2] || '') ;
   ok(await S(() => !!document.querySelector('.qo-tb')), 'task button shown next to the status pill');
 
   console.log('\n[owner assigns an item with a due date]');
-  await page.click('button.qh-tile.primary'); await page.waitForTimeout(600);
+  await page.click('button.qh-tile.primary'); await page.click('#qh-sheet [data-form="qc-inspection"]'); await page.waitForTimeout(600);
   await page.fill('#m-project', 'Tower A'); await page.fill('#m-docno', 'QC-WF-001');
   const r0 = page.locator('.item').nth(0);
   await r0.locator('textarea[aria-label="ตำแหน่ง"]').fill('เสา C-3');

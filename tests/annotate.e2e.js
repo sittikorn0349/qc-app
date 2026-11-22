@@ -8,7 +8,7 @@ const BASE = 'http://localhost:8911/' + (process.argv[2] || '');
   const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   let pass = 0, fail = 0; const ok = (c, m) => { if (c) { pass++; console.log('  ✓', m); } else { fail++; console.log('  ✗', m); } };
   await page.goto(BASE + 'index.html', { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
-  const tile = page.locator('button.qh-tile.primary'); if (await tile.count()) { await tile.click(); await page.waitForTimeout(500); }
+  const tile = page.locator('button.qh-tile.primary'); if (await tile.count()) { await tile.click(); await page.click('#qh-sheet [data-form="qc-inspection"]'); await page.waitForTimeout(500); }
   const r0 = page.locator('.item').nth(0);
   await r0.getByLabel('+ เพิ่มรูป').setInputFiles('/tmp/qc-photo.jpg'); await page.waitForTimeout(500);
   const mark = page.locator('.dlg-back button:has-text("ขีดเขียน")');

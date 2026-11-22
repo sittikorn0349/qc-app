@@ -96,7 +96,7 @@ if (require.main === module) (async () => {
   ok(/Tower A/.test(await page.textContent('.qo-pill')), 'pill shows project name');
 
   console.log('\n[create + photo + sync]');
-  await page.click('button.qh-tile.primary'); await page.waitForTimeout(600);
+  await page.click('button.qh-tile.primary'); await page.click('#qh-sheet [data-form="qc-inspection"]'); await page.waitForTimeout(600);
   await page.fill('#m-project', 'Tower A'); await page.fill('#m-docno', 'QC-ON-001');
   const r0 = page.locator('.item').nth(0), r1 = page.locator('.item').nth(1);
   await r0.locator('textarea[aria-label="ตำแหน่ง"]').fill('เสา C-3');
