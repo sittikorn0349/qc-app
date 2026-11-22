@@ -1,24 +1,43 @@
 -- =====================================================================
--- QC App · Phase 1 schema (Foreman <-> Headman fix loop)
+-- QC App · Phase 1 schema
 --
--- Roles
---   org level  : profiles.org_role   ceo | admin | staff
---                ceo/admin read every project; admin manages projects
---   project    : project_members.role pm | foreman | headman | viewer
---                pm/foreman  : create & edit inspections and items
---                headman     : sees ONLY items assigned to them, can only
---                              report "fixed" (+ after photos) via RPC
---                viewer      : read only (owner / consultant)
+-- Ownership model ("each document is managed by whoever owns it")
+--   * Every inspection has one owner (inspections.owner_id).
+--     Only the owner edits its content: header, items, results,
+--     "before" photos, assignments, due dates; only the owner deletes it.
+--   * Every member of the same project (pm, foreman, headman, viewer)
+--     can SEE the document and can RECHECK items (pass / fail + note +
+--     after photos) through recheck_item(). Nothing else.
+--   * The assigned headman can also report "fixed" (+ after photos)
+--     through report_fixed(); a recheck still has to follow.
+--   * The project's PM can hand a document to another pm/foreman of the
+--     project with transfer_inspection().
+--   * Org level: ceo/admin read every project (read only). Only admin
+--     creates projects; admin or the project PM manages members.
+--   * Who may create a document: pm or foreman of the project.
 --
--- Item workflow (inspection_items.status)
---   res = fix|bad  ->  open -> assigned -> fixed -> approved
---                                  ^          |
---                                  +- rejected <-+
---   Legacy form fields stay authoritative-compatible:
---   rres='ok' <-> approved, rres='bad' <-> rejected.
+-- Offline conflict rules (enforced here, client syncs through these paths)
+--   1. Owner edits from two devices -> plain column updates, the later
+--      write per field wins (client sends only the fields it changed).
+--   2. Owner edits an item while someone else rechecks it -> different
+--      columns, both survive.
+--   3. Two people recheck the same item -> recheck_item() takes the
+--      recheck state the client last saw (p_seen_at). If someone else got
+--      there first, the late result is NOT applied; it is stored in
+--      item_events as 'recheck_conflict' and the function returns
+--      'conflict' so the app can tell the user.
+--   4. Item deleted while someone rechecks it offline -> recheck_item()
+--      returns 'gone'; the client keeps the result locally and tells
+--      the user.
 --
--- Run once in Supabase SQL Editor. Idempotency is not attempted:
--- this is the first migration on an empty project.
+-- Item workflow (inspection_items.status), only for res = fix|bad:
+--   open -> assigned -> fixed -> approved
+--                  ^       |
+--                  +- rejected
+--   Legacy form fields stay in step: rres='ok' <-> approved,
+--   rres='bad' <-> rejected, so the existing form keeps working.
+--
+-- Run once in the Supabase SQL Editor of an empty project.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -60,6 +79,7 @@ create index project_members_user_idx on public.project_members(user_id);
 create table public.inspections (
   id          text primary key,
   project_id  text not null references public.projects(id) on delete restrict,
+  owner_id    uuid not null references auth.users(id) default auth.uid(),
   docno       text not null default '',
   insp_date   date,
   site        text not null default '',
@@ -77,6 +97,7 @@ create table public.inspections (
   deleted_at  timestamptz
 );
 create index inspections_project_idx on public.inspections(project_id, updated_at desc);
+create index inspections_owner_idx on public.inspections(owner_id);
 
 create table public.inspection_items (
   id             text primary key,
@@ -94,6 +115,8 @@ create table public.inspection_items (
   rres           text not null default '' check (rres in ('','ok','bad')),
   rdate          text not null default '',
   rnote          text not null default '',
+  rchk_at        timestamptz,                    -- when the current recheck result was set
+  rchk_by        uuid references auth.users(id), -- and by whom
   status         text check (status in ('open','assigned','fixed','approved','rejected')),
   assignee_id    uuid references auth.users(id),
   due_date       date,
@@ -107,19 +130,33 @@ create index inspection_items_project_idx on public.inspection_items(project_id,
 create index inspection_items_assignee_idx on public.inspection_items(assignee_id)
   where status in ('assigned','rejected','fixed');
 
--- Audit trail: who changed status / assignee / due date, and when.
+-- Audit trail per item. No FK to the item: history must outlive a deleted item.
 create table public.item_events (
   id           bigint generated always as identity primary key,
-  item_id      text not null references public.inspection_items(id) on delete cascade,
+  item_id      text not null,
+  inspection_id text not null,
   project_id   text not null references public.projects(id) on delete cascade,
   actor        uuid references auth.users(id) default auth.uid(),
-  kind         text not null check (kind in ('created','status','assign','due')),
+  kind         text not null check (kind in ('created','status','assign','due','recheck','recheck_conflict','deleted')),
   from_value   text,
   to_value     text,
   note         text not null default '',
+  photos       text[] not null default '{}',
   created_at   timestamptz not null default now()
 );
 create index item_events_item_idx on public.item_events(item_id, created_at);
+create index item_events_project_idx on public.item_events(project_id, created_at desc);
+
+create table public.inspection_events (
+  id             bigint generated always as identity primary key,
+  inspection_id  text not null,
+  project_id     text not null references public.projects(id) on delete cascade,
+  actor          uuid references auth.users(id) default auth.uid(),
+  kind           text not null check (kind in ('transfer')),
+  from_value     text,
+  to_value       text,
+  created_at     timestamptz not null default now()
+);
 
 -- ---------------------------------------------------------------------
 -- 2. Permission helpers (security definer: they read membership tables
@@ -140,19 +177,18 @@ language sql stable security definer set search_path = public as $$
   select role from project_members where project_id = p and user_id = auth.uid();
 $$;
 
--- can see the project row and its member list (any member, incl. headman)
+create function public.is_member(p text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.project_role(p) is not null;
+$$;
+
+-- see the project, its documents and its items
 create function public.can_see_project(p text) returns boolean
 language sql stable security definer set search_path = public as $$
-  select public.is_org_reader() or public.project_role(p) is not null;
+  select public.is_org_reader() or public.is_member(p);
 $$;
 
--- can read full inspections (everyone except headman)
-create function public.can_read_inspections(p text) returns boolean
-language sql stable security definer set search_path = public as $$
-  select public.is_org_reader() or coalesce(public.project_role(p) in ('pm','foreman','viewer'), false);
-$$;
-
-create function public.can_edit_project(p text) returns boolean
+create function public.can_create_inspection(p text) returns boolean
 language sql stable security definer set search_path = public as $$
   select coalesce(public.project_role(p) in ('pm','foreman'), false);
 $$;
@@ -162,11 +198,17 @@ language sql stable security definer set search_path = public as $$
   select public.is_org_admin() or coalesce(public.project_role(p) = 'pm', false);
 $$;
 
-create function public.is_assigned_in_inspection(insp text) returns boolean
+-- owner who is still a member of the document's project
+create function public.is_inspection_owner(insp text) returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from inspection_items
-                 where inspection_id = insp and assignee_id = auth.uid()
-                   and status in ('assigned','rejected','fixed'));
+  select exists (select 1 from inspections
+                 where id = insp and owner_id = auth.uid()
+                   and public.is_member(project_id));
+$$;
+
+create function public.inspection_in_project(insp text, p text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from inspections where id = insp and project_id = p);
 $$;
 
 create function public.shares_project_with(other uuid) returns boolean
@@ -205,9 +247,9 @@ end $$;
 create trigger profiles_guard before update on public.profiles
   for each row execute function public.guard_profile();
 
--- 3c. inspections: bump rev / updated_at / updated_by
+-- 3c. inspections: rev / updated_*, project and owner are fixed except via transfer
 create function public.touch_inspection() returns trigger
-language plpgsql as $$
+language plpgsql security definer set search_path = public as $$
 begin
   new.updated_at := now();
   new.updated_by := coalesce(auth.uid(), new.updated_by);
@@ -216,19 +258,24 @@ begin
     if new.project_id is distinct from old.project_id then
       raise exception 'an inspection cannot move to another project';
     end if;
+    if new.owner_id is distinct from old.owner_id
+       and auth.uid() is not null
+       and coalesce(public.project_role(new.project_id) = 'pm', false) is false then
+      raise exception 'only the project pm can transfer a document';
+    end if;
   end if;
   return new;
 end $$;
 create trigger inspections_touch before insert or update on public.inspections
   for each row execute function public.touch_inspection();
 
--- 3d. items: copy project_id, derive status, enforce who may move it
+-- 3d. items: copy project_id, derive status, guard transitions
 create function public.item_workflow() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare
   uid  uuid := auth.uid();
-  role text;
   old_status text := case when tg_op = 'UPDATE' then old.status end;
+  old_rres   text := case when tg_op = 'UPDATE' then old.rres end;
 begin
   select project_id into new.project_id from inspections where id = new.inspection_id;
   if new.project_id is null then
@@ -237,7 +284,14 @@ begin
   new.updated_at := now();
   new.updated_by := coalesce(uid, new.updated_by);
 
-  -- legacy recheck fields drive status when the status itself was not touched
+  if new.assignee_id is not null
+     and (tg_op = 'INSERT' or new.assignee_id is distinct from old.assignee_id)
+     and not exists (select 1 from project_members
+                     where project_id = new.project_id and user_id = new.assignee_id) then
+    raise exception 'assignee must be a member of the project';
+  end if;
+
+  -- legacy recheck fields drive status when status itself was not touched
   if tg_op = 'UPDATE' and new.status is not distinct from old.status
      and new.rres is distinct from old.rres then
     new.status := case new.rres when 'ok' then 'approved'
@@ -245,7 +299,6 @@ begin
                                 else case when new.assignee_id is null then 'open' else 'assigned' end end;
   end if;
 
-  -- only fix/bad items take part in the workflow
   if new.res not in ('fix','bad') then
     new.status := null;
   elsif new.status is null then
@@ -268,19 +321,24 @@ begin
   elsif new.status in ('open','assigned','fixed') then
     new.rres := '';
   end if;
+  -- stamp only when a recheck RESULT is recorded (not on create, not when
+  -- report_fixed clears it), so rchk_at means "last recheck happened at"
+  if new.rres in ('ok','bad') and new.rres is distinct from old_rres then
+    new.rchk_at := now();
+    new.rchk_by := uid;
+  end if;
   if new.status = 'fixed' and old_status is distinct from 'fixed' then
     new.fixed_at := now();
   end if;
 
   -- who may make the transition (uid null = SQL editor / service role)
   if uid is not null and new.status is distinct from old_status then
-    role := public.project_role(new.project_id);
-    if new.status in ('approved','rejected') and coalesce(role in ('pm','foreman'), false) is false then
-      raise exception 'only pm/foreman may approve or reject';
+    if new.status in ('approved','rejected') and not public.is_member(new.project_id) then
+      raise exception 'only project members may recheck';
     end if;
-    if new.status = 'fixed' and coalesce(role in ('pm','foreman'), false) is false
-       and new.assignee_id is distinct from uid then
-      raise exception 'only the assignee (or pm/foreman) may report fixed';
+    if new.status = 'fixed' and new.assignee_id is distinct from uid
+       and not public.is_inspection_owner(new.inspection_id) then
+      raise exception 'only the assignee or the document owner may report fixed';
     end if;
   end if;
   return new;
@@ -292,30 +350,36 @@ create trigger inspection_items_workflow before insert or update on public.inspe
 create function public.log_item_events() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
+  if tg_op = 'DELETE' then
+    insert into item_events(item_id, inspection_id, project_id, kind, from_value)
+    values (old.id, old.inspection_id, old.project_id, 'deleted', old.status);
+    return old;
+  end if;
   if tg_op = 'INSERT' then
     if new.status is not null then
-      insert into item_events(item_id, project_id, kind, to_value) values (new.id, new.project_id, 'created', new.status);
+      insert into item_events(item_id, inspection_id, project_id, kind, to_value)
+      values (new.id, new.inspection_id, new.project_id, 'created', new.status);
     end if;
     return new;
   end if;
   if new.status is distinct from old.status then
-    insert into item_events(item_id, project_id, kind, from_value, to_value, note)
-    values (new.id, new.project_id, 'status', old.status, new.status,
+    insert into item_events(item_id, inspection_id, project_id, kind, from_value, to_value, note)
+    values (new.id, new.inspection_id, new.project_id, 'status', old.status, new.status,
             case new.status when 'fixed' then new.fixed_note
                             when 'rejected' then new.rnote
                             when 'approved' then new.rnote else '' end);
   end if;
   if new.assignee_id is distinct from old.assignee_id then
-    insert into item_events(item_id, project_id, kind, from_value, to_value)
-    values (new.id, new.project_id, 'assign', old.assignee_id::text, new.assignee_id::text);
+    insert into item_events(item_id, inspection_id, project_id, kind, from_value, to_value)
+    values (new.id, new.inspection_id, new.project_id, 'assign', old.assignee_id::text, new.assignee_id::text);
   end if;
   if new.due_date is distinct from old.due_date then
-    insert into item_events(item_id, project_id, kind, from_value, to_value)
-    values (new.id, new.project_id, 'due', old.due_date::text, new.due_date::text);
+    insert into item_events(item_id, inspection_id, project_id, kind, from_value, to_value)
+    values (new.id, new.inspection_id, new.project_id, 'due', old.due_date::text, new.due_date::text);
   end if;
   return new;
 end $$;
-create trigger inspection_items_events after insert or update on public.inspection_items
+create trigger inspection_items_events after insert or update or delete on public.inspection_items
   for each row execute function public.log_item_events();
 
 -- ---------------------------------------------------------------------
@@ -327,6 +391,7 @@ alter table public.project_members   enable row level security;
 alter table public.inspections       enable row level security;
 alter table public.inspection_items  enable row level security;
 alter table public.item_events       enable row level security;
+alter table public.inspection_events enable row level security;
 
 -- profiles
 create policy profiles_select on public.profiles for select to authenticated
@@ -353,61 +418,70 @@ create policy members_update on public.project_members for update to authenticat
 create policy members_delete on public.project_members for delete to authenticated
   using (public.can_manage_project(project_id));
 
--- inspections
+-- inspections: everyone in the project sees; only the owner writes
 create policy inspections_select on public.inspections for select to authenticated
-  using (public.can_read_inspections(project_id));
+  using (public.can_see_project(project_id));
 create policy inspections_insert on public.inspections for insert to authenticated
-  with check (public.can_edit_project(project_id));
+  with check (public.can_create_inspection(project_id) and owner_id = auth.uid());
 create policy inspections_update on public.inspections for update to authenticated
-  using (public.can_edit_project(project_id)) with check (public.can_edit_project(project_id));
+  using (owner_id = auth.uid() and public.is_member(project_id))
+  with check (owner_id = auth.uid() and public.is_member(project_id));
 create policy inspections_delete on public.inspections for delete to authenticated
-  using (public.project_role(project_id) = 'pm');
+  using (owner_id = auth.uid() and public.is_member(project_id));
 
--- inspection_items: headman reads only their own items and never writes
--- directly (they use report_fixed()).
+-- inspection_items: everyone in the project sees; only the document owner
+-- writes directly. Others recheck via recheck_item(), headman reports via
+-- report_fixed().
 create policy items_select on public.inspection_items for select to authenticated
-  using (public.can_read_inspections(project_id) or assignee_id = auth.uid());
+  using (public.can_see_project(project_id));
 create policy items_insert on public.inspection_items for insert to authenticated
-  with check (public.can_edit_project(project_id));
+  with check (public.is_inspection_owner(inspection_id));
 create policy items_update on public.inspection_items for update to authenticated
-  using (public.can_edit_project(project_id)) with check (public.can_edit_project(project_id));
+  using (public.is_inspection_owner(inspection_id))
+  with check (public.is_inspection_owner(inspection_id));
 create policy items_delete on public.inspection_items for delete to authenticated
-  using (public.can_edit_project(project_id));
+  using (public.is_inspection_owner(inspection_id));
 
--- item_events: read-only for readers; rows are written by triggers
-create policy events_select on public.item_events for select to authenticated
-  using (public.can_read_inspections(project_id)
-         or exists (select 1 from public.inspection_items i
-                    where i.id = item_id and i.assignee_id = auth.uid()));
+-- history: read-only, written by triggers / functions
+create policy item_events_select on public.item_events for select to authenticated
+  using (public.can_see_project(project_id));
+create policy inspection_events_select on public.inspection_events for select to authenticated
+  using (public.can_see_project(project_id));
 
 -- ---------------------------------------------------------------------
--- 5. RPCs for the headman screen and for review
+-- 5. Functions the app calls
 -- ---------------------------------------------------------------------
+-- Headman's list: items assigned to me that still need something
 create function public.my_tasks()
 returns table (
   item_id text, project_id text, project_name text, inspection_id text, docno text,
   work text, loc text, chk text, note text, cat text, ref text, res text,
-  before text[], after text[], status text, due_date date, rnote text, updated_at timestamptz)
+  before text[], after text[], status text, due_date date, rnote text,
+  rchk_at timestamptz, updated_at timestamptz)
 language sql stable security definer set search_path = public as $$
   select i.id, i.project_id, p.name, i.inspection_id, n.docno,
          n.work, i.loc, i.chk, i.note, i.cat, i.ref, i.res,
-         i.before, i.after, i.status, i.due_date, i.rnote, i.updated_at
+         i.before, i.after, i.status, i.due_date, i.rnote, i.rchk_at, i.updated_at
   from inspection_items i
   join inspections n on n.id = i.inspection_id and n.deleted_at is null
   join projects p on p.id = i.project_id
   where i.assignee_id = auth.uid()
+    and public.is_member(i.project_id)
     and i.status in ('assigned','rejected','fixed')
   order by (i.status = 'fixed'), i.due_date nulls last, i.updated_at;
 $$;
 
+-- Assigned headman: "I fixed it" (+ after photos). Does not close the item.
 create function public.report_fixed(p_item text, p_after text[] default '{}', p_note text default '')
-returns void language plpgsql security definer set search_path = public as $$
+returns text language plpgsql security definer set search_path = public as $$
 declare it inspection_items;
 begin
   select * into it from inspection_items where id = p_item for update;
-  if not found or it.assignee_id is distinct from auth.uid() then
+  if not found then return 'gone'; end if;
+  if it.assignee_id is distinct from auth.uid() or not public.is_member(it.project_id) then
     raise exception 'item not assigned to you';
   end if;
+  if it.status = 'fixed' then return 'already_fixed'; end if;
   if it.status not in ('assigned','rejected') then
     raise exception 'item is %, cannot report fixed', it.status;
   end if;
@@ -416,28 +490,73 @@ begin
          after = it.after || coalesce(p_after, '{}'),
          fixed_note = coalesce(p_note, '')
    where id = p_item;
+  return 'ok';
 end $$;
 
-create function public.review_item(p_item text, p_ok boolean, p_note text default '')
-returns void language plpgsql security definer set search_path = public as $$
+-- Any project member: recheck result. p_seen_at = the item's rchk_at the
+-- client had when the user rechecked (null if it had never been rechecked).
+-- Returns 'ok' | 'conflict' (someone else rechecked first; kept in history) | 'gone'.
+create function public.recheck_item(
+  p_item text, p_result text, p_note text default '',
+  p_after text[] default '{}', p_seen_at timestamptz default null)
+returns text language plpgsql security definer set search_path = public as $$
 declare it inspection_items;
 begin
+  if p_result not in ('ok','bad') then
+    raise exception 'result must be ok or bad';
+  end if;
   select * into it from inspection_items where id = p_item for update;
-  if not found or not public.can_edit_project(it.project_id) then
-    raise exception 'not allowed';
+  if not found then return 'gone'; end if;
+  if not public.is_member(it.project_id) then
+    raise exception 'only project members may recheck';
+  end if;
+  if it.res not in ('fix','bad') then
+    raise exception 'item does not need a recheck';
+  end if;
+  if it.rchk_at is distinct from p_seen_at then
+    insert into item_events(item_id, inspection_id, project_id, kind, to_value, note, photos)
+    values (it.id, it.inspection_id, it.project_id, 'recheck_conflict', p_result,
+            coalesce(p_note, ''), coalesce(p_after, '{}'));
+    return 'conflict';
   end if;
   update inspection_items
-     set status = case when p_ok then 'approved' else 'rejected' end,
-         rnote  = coalesce(nullif(p_note, ''), rnote),
-         rdate  = to_char(now() at time zone 'Asia/Bangkok', 'YYYY-MM-DD')
+     set status = case p_result when 'ok' then 'approved' else 'rejected' end,
+         rnote  = coalesce(p_note, ''),
+         rdate  = to_char(now() at time zone 'Asia/Bangkok', 'YYYY-MM-DD'),
+         after  = it.after || coalesce(p_after, '{}'),
+         rchk_at = now(),
+         rchk_by = auth.uid()
    where id = p_item;
+  insert into item_events(item_id, inspection_id, project_id, kind, to_value, note, photos)
+  values (it.id, it.inspection_id, it.project_id, 'recheck', p_result,
+          coalesce(p_note, ''), coalesce(p_after, '{}'));
+  return 'ok';
+end $$;
+
+-- Project PM hands a document to another pm/foreman of the same project.
+create function public.transfer_inspection(p_insp text, p_new_owner uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare d inspections;
+begin
+  select * into d from inspections where id = p_insp for update;
+  if not found then raise exception 'inspection not found'; end if;
+  if auth.uid() is not null and coalesce(public.project_role(d.project_id) = 'pm', false) is false then
+    raise exception 'only the project pm can transfer a document';
+  end if;
+  if not exists (select 1 from project_members
+                 where project_id = d.project_id and user_id = p_new_owner and role in ('pm','foreman')) then
+    raise exception 'new owner must be a pm or foreman of the project';
+  end if;
+  update inspections set owner_id = p_new_owner where id = p_insp;
+  insert into inspection_events(inspection_id, project_id, kind, from_value, to_value)
+  values (d.id, d.project_id, 'transfer', d.owner_id::text, p_new_owner::text);
 end $$;
 
 -- ---------------------------------------------------------------------
 -- 6. Grants (the project was created with "auto-expose new tables" off)
 -- ---------------------------------------------------------------------
-revoke all on public.profiles, public.projects, public.project_members,
-              public.inspections, public.inspection_items, public.item_events from anon;
+revoke all on public.profiles, public.projects, public.project_members, public.inspections,
+              public.inspection_items, public.item_events, public.inspection_events from anon;
 
 grant select on public.profiles to authenticated;
 grant update (display_name, line_user_id, org_role) on public.profiles to authenticated;
@@ -445,19 +564,22 @@ grant select, insert, update on public.projects to authenticated;
 grant select, insert, update, delete on public.project_members to authenticated;
 grant select, insert, update, delete on public.inspections to authenticated;
 grant select, insert, update, delete on public.inspection_items to authenticated;
-grant select on public.item_events to authenticated;
+grant select on public.item_events, public.inspection_events to authenticated;
 
 revoke execute on all functions in schema public from public, anon;
-grant execute on function public.my_tasks() to authenticated;
-grant execute on function public.report_fixed(text, text[], text) to authenticated;
-grant execute on function public.review_item(text, boolean, text) to authenticated;
-grant execute on function public.is_org_reader(), public.is_org_admin(), public.project_role(text),
-  public.can_see_project(text), public.can_read_inspections(text), public.can_edit_project(text),
-  public.can_manage_project(text), public.is_assigned_in_inspection(text),
-  public.shares_project_with(uuid) to authenticated;
+grant execute on function
+  public.my_tasks(),
+  public.report_fixed(text, text[], text),
+  public.recheck_item(text, text, text, text[], timestamptz),
+  public.transfer_inspection(text, uuid),
+  public.is_org_reader(), public.is_org_admin(), public.project_role(text), public.is_member(text),
+  public.can_see_project(text), public.can_create_inspection(text), public.can_manage_project(text),
+  public.is_inspection_owner(text), public.inspection_in_project(text, text),
+  public.shares_project_with(uuid)
+  to authenticated;
 
 -- ---------------------------------------------------------------------
--- 7. Storage: private photo bucket, path = {project_id}/{inspection_id}/{before|after}/{file}
+-- 7. Storage: private bucket, path = {project_id}/{inspection_id}/{before|after}/{file}
 -- ---------------------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('inspection-photos', 'inspection-photos', false)
@@ -465,23 +587,26 @@ on conflict (id) do nothing;
 
 create policy photos_select on storage.objects for select to authenticated
   using (bucket_id = 'inspection-photos'
-         and (public.can_read_inspections((storage.foldername(name))[1])
-              or public.is_assigned_in_inspection((storage.foldername(name))[2])));
+         and public.can_see_project((storage.foldername(name))[1]));
 
+-- owner uploads anything; any project member may add "after" (recheck/fixed) photos
 create policy photos_insert on storage.objects for insert to authenticated
   with check (bucket_id = 'inspection-photos'
-              and (public.can_edit_project((storage.foldername(name))[1])
+              and public.inspection_in_project((storage.foldername(name))[2], (storage.foldername(name))[1])
+              and (public.is_inspection_owner((storage.foldername(name))[2])
                    or ((storage.foldername(name))[3] = 'after'
-                       and public.is_assigned_in_inspection((storage.foldername(name))[2]))));
+                       and public.is_member((storage.foldername(name))[1]))));
 
 create policy photos_update on storage.objects for update to authenticated
-  using (bucket_id = 'inspection-photos' and public.can_edit_project((storage.foldername(name))[1]));
+  using (bucket_id = 'inspection-photos'
+         and public.is_inspection_owner((storage.foldername(name))[2]));
 
 create policy photos_delete on storage.objects for delete to authenticated
-  using (bucket_id = 'inspection-photos' and public.can_edit_project((storage.foldername(name))[1]));
+  using (bucket_id = 'inspection-photos'
+         and public.is_inspection_owner((storage.foldername(name))[2]));
 
 -- ---------------------------------------------------------------------
--- 8. Realtime (live lists for foreman / headman screens)
+-- 8. Realtime (live lists)
 -- ---------------------------------------------------------------------
 do $$
 begin
