@@ -64,6 +64,9 @@
       insertItems:function(rows){return rows.length?sb.from('inspection_items').insert(rows).then(chk):Promise.resolve()},
       updateItem:function(id,patch){return sb.from('inspection_items').update(patch).eq('id',id).select('id').then(chk)},
       deleteItems:function(ids){return ids.length?sb.from('inspection_items').delete().in('id',ids).then(chk):Promise.resolve()},
+      requests:function(p){return sb.from('inspection_requests').select('*').eq('project_id',p).order('scheduled_at',{ascending:true}).then(chk)},
+      insertRequest:function(row){return sb.from('inspection_requests').insert(row).then(chk)},
+      answerRequest:function(id,action,note,photos,at){return sb.rpc('answer_inspection_request',{p_id:id,p_action:action,p_note:note||'',p_photos:photos||[],p_scheduled:at||null}).then(chk)},
       lineStatus:function(){return sb.rpc('line_status').then(chk)},
       lineLinkStart:function(){return sb.rpc('line_link_start').then(chk)},
       lineUnlink:function(){return sb.rpc('line_unlink').then(chk)},
@@ -85,6 +88,7 @@
         var ch=sb.channel('qc-'+p)
           .on('postgres_changes',{event:'*',schema:'public',table:'inspections',filter:'project_id=eq.'+p},cb)
           .on('postgres_changes',{event:'*',schema:'public',table:'inspection_items',filter:'project_id=eq.'+p},cb)
+          .on('postgres_changes',{event:'*',schema:'public',table:'inspection_requests',filter:'project_id=eq.'+p},cb)
           .subscribe();
         return function(){try{sb.removeChannel(ch)}catch(e){}};
       }
@@ -340,6 +344,7 @@
     var ob=outbox.get(id);if(!ob)return Promise.resolve();
     var v=ver[id]||0,path=PFX+id;
     if(ob.type==='rx'||ob.type==='fx')return pushAct(id,ob,v);
+    if(ob.type==='rq'||ob.type==='ra')return pushReq(id,ob,v);
     if(ob.type==='folder'){
       if(ob.del)return api.deleteFolder(id).then(function(){return done(id,v,[])});
       var f=cache.get(path);if(!f)return done(id,v,[]);
@@ -502,18 +507,19 @@
     return L;
   }
   var taskBtn=null;
-  function taskCount(){var L=lists();return L.mine.length+L.recheck.length}
+  function taskCount(){var L=lists();return L.mine.length+L.recheck.length+reqLists().todo.length}
   function updateTaskBtn(){if(!taskBtn)return;var n=taskCount();taskBtn.querySelector('b').textContent=n?String(n):'';taskBtn.classList.toggle('qo-has',!!n)}
   function tasksPanel(start){
-    var v=overlay(),L=lists(),tab=start||(L.mine.length?'mine':L.recheck.length?'recheck':L.late.length?'late':'open');
+    var v=overlay(),L=lists(),RL=reqLists(),tab=start||(RL.todo.length?'req':L.mine.length?'mine':L.recheck.length?'recheck':L.late.length?'late':'open');
     v.o.classList.add('qo-tasks');
-    var TABS=[['mine','งานของฉัน'],['recheck','รอตรวจซ้ำ'],['late','เลยกำหนด'],['open','ยังไม่มอบหมาย']];
+    var TABS=[['req','ใบขอตรวจ'],['mine','งานของฉัน'],['recheck','รอตรวจซ้ำ'],['late','เลยกำหนด'],['open','ยังไม่มอบหมาย']];
     var bar=el('div',{class:'qo-tabs',role:'tablist'}),body=el('div',{class:'qo-list'});
     function draw(){
-      L=lists();bar.textContent='';body.textContent='';
+      L=lists();RL=reqLists();L.req=RL.open;bar.textContent='';body.textContent='';
       TABS.forEach(function(t){
         bar.appendChild(el('button',{type:'button',role:'tab','aria-selected':tab===t[0]?'true':'false',class:'qo-tab'+(tab===t[0]?' on':''),onclick:function(){tab=t[0];draw()}},t[1]+' ',el('span',{class:'qo-n'},String(L[t[0]].length))));
       });
+      if(tab==='req'){drawRequests(body,RL,v);return}
       var list=L[tab];
       if(!list.length)body.appendChild(el('p',{class:'qo-sm',style:'padding:14px 4px'},{mine:'ไม่มีงานที่มอบหมายให้คุณค้างอยู่',recheck:'ไม่มีรายการที่แจ้งแก้แล้วรอตรวจซ้ำ',late:'ไม่มีรายการเลยกำหนด',open:'ทุกรายการที่ต้องแก้ในเอกสารของคุณมอบหมายแล้ว'}[tab]));
       list.forEach(function(x){
@@ -522,21 +528,270 @@
         var chips=el('span',{class:'qo-chips'},el('span',{class:'qo-chip st-'+s},ST_TH[s]||s));
         if(it.asg)chips.appendChild(el('span',{class:'qo-chip'},'ผู้แก้ '+nameOf(it.asg)));
         if(it.due)chips.appendChild(el('span',{class:'qo-chip'+(late?' late':'')},(late?'เลยกำหนด ':'กำหนด ')+fmtD(it.due)));
+        if(m.form==='safety')chips.appendChild(el('span',{class:'qo-chip late'},'ความปลอดภัย'));
         if(it.pend)chips.appendChild(el('span',{class:'qo-chip'},'รอส่ง'));
         body.appendChild(el('button',{type:'button',class:'qo-task',onclick:function(){v.close();openItem(x.doc,it.id)}},
           el('span',{class:'qo-tt'},(it.loc?it.loc+' · ':'')+(it.chk||it.note||'(ไม่มีชื่อรายการ)')),
           el('span',{class:'qo-sm'},sub),chips));
       });
     }
-    v.c.append(el('div',{style:'display:flex;justify-content:space-between;align-items:center'},el('h2',null,'งาน'),el('button',{class:'btn',type:'button',onclick:v.close},'ปิด')),bar,body);
+    v.c.append(el('div',{style:'display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap'},el('h2',null,'งาน'),
+      el('span',{style:'display:flex;gap:8px;flex-wrap:wrap'},
+        el('button',{class:'btn',type:'button',onclick:function(){v.close();searchPanel()}},'ค้นหา'),
+        canCreate()?el('button',{class:'btn primary',type:'button',onclick:function(){v.close();requestForm()}},'+ ขอตรวจงาน'):null,
+        el('button',{class:'btn',type:'button',onclick:v.close},'ปิด'))),bar,body);
     draw();
-    var h=function(){if(document.body.contains(v.o))draw();else window.removeEventListener('qc-change',h)};
+    var later=false;
+    function busy(){var a=document.activeElement;return a&&v.o.contains(a)&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)}
+    var h=function(){if(!document.body.contains(v.o)){window.removeEventListener('qc-change',h);return}if(busy()){later=true;return}draw()};
+    v.o.addEventListener('focusout',function(){setTimeout(function(){if(later&&!busy()){later=false;draw()}},0)});
     window.addEventListener('qc-change',h);
   }
   function fmtD(s){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||'');return m?(+m[3])+'/'+(+m[2]):s}
   function openItem(docId,iid){
     try{if(window.__qcHome&&window.__qcHome.view&&window.__qcHome.view()!=='form')window.__qcHome.go('form')}catch(e){}
     if(window.__qcForm&&window.__qcForm.openDoc)window.__qcForm.openDoc(docId,iid);
+  }
+
+
+  /* ---------- ใบขอตรวจงาน (inspection requests) ----------
+     Rows live in REQS (cached per project in localStorage); creating and answering queue in the
+     outbox ("rq:<id>" insert, "ra:<id>" answer) so they work offline and are shown at once. */
+  var REQS=[],SRV=[],RQ_TH={requested:'รอผู้ตรวจรับนัด',accepted:'รับนัดแล้ว',passed:'ตรวจผ่าน',failed:'ตรวจไม่ผ่าน',cancelled:'ยกเลิกแล้ว'};
+  function reqKey(){return 'qc-online-reqs:'+UID+':'+CUR}
+  function loadReqCache(){try{SRV=JSON.parse(lsGet(reqKey())||'[]')}catch(e){SRV=[]}REQS=applyReqOps(SRV)}
+  function applyReqOps(list){
+    var by={},out=list.map(function(r){var c=Object.assign({},r);by[c.id]=c;return c});
+    outbox.forEach(function(ob){
+      if(ob.type==='rq'&&!by[ob.row.id]){var n=Object.assign({status:'requested',result_note:'',result_photos:[],created_at:new Date().toISOString()},ob.row,{pend:1});by[n.id]=n;out.push(n)}
+    });
+    outbox.forEach(function(ob){
+      if(ob.type!=='ra')return;var r=by[ob.id];if(!r)return;r.pend=1;
+      if(ob.action==='accept')r.status='accepted';
+      else if(ob.action==='pass'||ob.action==='fail'){r.status=ob.action==='pass'?'passed':'failed';r.result_note=ob.note;r.result_by=UID}
+      else if(ob.action==='cancel')r.status='cancelled';
+      else if(ob.action==='reschedule'){r.scheduled_at=ob.at;r.status='requested'}
+    });
+    out.sort(function(a,b){return a.scheduled_at<b.scheduled_at?-1:1});
+    return out;
+  }
+  function pullRequests(){
+    return api.requests(CUR).then(function(rows){
+      SRV=rows||[];var next=applyReqOps(SRV);
+      lsSet(reqKey(),JSON.stringify(SRV));
+      if(eq(next,REQS))return;
+      REQS=next;notify();
+    });
+  }
+  function reqLists(){
+    var all=REQS,open=all.filter(function(r){return r.status==='requested'||r.status==='accepted'});
+    var closed=all.filter(function(r){return !(r.status==='requested'||r.status==='accepted')}).sort(function(a,b){return (b.result_at||b.scheduled_at)<(a.result_at||a.scheduled_at)?-1:1}).slice(0,20);
+    return {open:open,closed:closed,todo:open.filter(function(r){return r.inspector_id===UID})};
+  }
+  function refreshReqs(){REQS=applyReqOps(SRV);notify();announce();schedule(0)}
+  function queue(key,ob){ver[key]=(ver[key]||0)+1;outbox.set(key,ob);return persist([['outbox',key,ob]]).then(refreshReqs)}
+  function pushReq(key,ob,v){
+    var p=ob.type==='rq'?api.insertRequest(ob.row).then(function(){return 'ok'},function(e){if(e&&(e.code==='23505'||/duplicate/i.test(e.message||'')))return 'ok';throw e})
+      :api.answerRequest(ob.id,ob.action,ob.note,ob.photos,ob.at);
+    return p.then(function(r){
+      if(r==='closed')actMsg('ใบขอตรวจนี้ปิดไปแล้ว ผลของคุณไม่ได้ถูกบันทึก');
+      else if(r==='gone')actMsg('ใบขอตรวจนี้ถูกลบไปแล้ว');
+    },function(e){
+      if(isNet(e))throw e;
+      var m=e.message||e.code||String(e);
+      actMsg((ob.type==='rq'?'ส่งใบขอตรวจ':'บันทึกผลใบขอตรวจ')+'ไม่สำเร็จ: '+(/inspector must be/.test(m)?'ผู้ตรวจไม่ได้อยู่ในโครงการแล้ว':/only the/.test(m)?'คุณไม่มีสิทธิ์ทำขั้นนี้':m));
+    }).then(function(){return done(key,v,[])});
+  }
+  function requestCreate(o){
+    var id='req_'+hex(16);
+    var row={id:id,project_id:CUR,title:o.title,loc:o.loc||'',cat:o.cat||'',hold:!!o.hold,next_step:o.next||'',note:o.note||'',
+      inspection_id:o.doc||null,requested_by:UID,inspector_id:o.inspector,scheduled_at:o.at};
+    return queue('rq:'+id,{type:'rq',row:row}).then(function(){return id});
+  }
+  function requestAnswer(id,action,note,at){
+    var key='ra:'+id+':'+action,ob={type:'ra',id:id,action:action,note:note||'',photos:[],at:at||null};
+    return queue(key,ob);
+  }
+  function fmtAt(iso){var d=new Date(iso);if(isNaN(d))return '';function p(n){return (n<10?'0':'')+n}return d.getDate()+'/'+(d.getMonth()+1)+' '+p(d.getHours())+':'+p(d.getMinutes())+' น.'}
+  function localInput(d){function p(n){return (n<10?'0':'')+n}return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())}
+  var reqDraft={};
+  function drawRequests(body,RL,v){
+    function card(r){
+      var meIns=r.inspector_id===UID,meReq=r.requested_by===UID,open=r.status==='requested'||r.status==='accepted';
+      var chips=el('span',{class:'qo-chips'},el('span',{class:'qo-chip rq-'+r.status},RQ_TH[r.status]||r.status));
+      if(r.hold)chips.appendChild(el('span',{class:'qo-chip late',title:'จุดหยุดตรวจ: งานถัดไปต้องรอผลตรวจผ่าน'},'H จุดหยุดตรวจ'));
+      chips.appendChild(el('span',{class:'qo-chip'},'นัด '+fmtAt(r.scheduled_at)));
+      if(r.pend)chips.appendChild(el('span',{class:'qo-chip'},'รอส่ง'));
+      var box=el('div',{class:'qo-task qo-req'},
+        el('span',{class:'qo-tt'},r.title+(r.loc?' · '+r.loc:'')),
+        el('span',{class:'qo-sm'},(meIns?'คุณเป็นผู้ตรวจ':'ผู้ตรวจ '+nameOf(r.inspector_id))+' · '+(meReq?'คุณขอตรวจ':'ขอโดย '+nameOf(r.requested_by))),chips);
+      if(r.next_step)box.appendChild(el('span',{class:'qo-next '+(r.status==='passed'?'ok':r.hold?'lock':'')},
+        r.status==='passed'?'เริ่มงานถัดไปได้: '+r.next_step:(r.hold?'รอผลก่อนเริ่ม: ':'งานถัดไป: ')+r.next_step));
+      if(r.note)box.appendChild(el('span',{class:'qo-sm'},'หมายเหตุ: '+r.note));
+      if(r.result_note)box.appendChild(el('span',{class:'qo-sm'},'ผลตรวจ: '+r.result_note));
+      var acts=el('span',{class:'qo-acts'});
+      if(r.inspection_id)acts.appendChild(el('button',{class:'btn',type:'button',onclick:function(){v.close();openItem(r.inspection_id,'')}},'เปิดเอกสาร'));
+      if(open&&(meIns||ROLE==='pm')){
+        if(r.status==='requested')acts.appendChild(el('button',{class:'btn',type:'button',onclick:function(){requestAnswer(r.id,'accept')}},'รับนัด'));
+        var ta=el('textarea',{rows:2,placeholder:'ผลตรวจ / สิ่งที่ต้องแก้','aria-label':'บันทึกผลตรวจ '+r.title,class:'qo-note'});
+        ta.value=reqDraft[r.id]||'';ta.addEventListener('input',function(){reqDraft[r.id]=ta.value});
+        box.appendChild(ta);
+        acts.appendChild(el('button',{class:'btn qo-pass',type:'button',onclick:function(){requestAnswer(r.id,'pass',ta.value);delete reqDraft[r.id]}},'ผ่าน'));
+        acts.appendChild(el('button',{class:'btn qo-fail',type:'button',onclick:function(){
+          if(!ta.value.trim()){ta.focus();toast('ระบุสิ่งที่ต้องแก้ก่อนบันทึกว่าไม่ผ่าน');return}
+          requestAnswer(r.id,'fail',ta.value);delete reqDraft[r.id];
+        }},'ไม่ผ่าน'));
+      }
+      if(open&&(meReq||meIns||ROLE==='pm')){
+        var dt=el('input',{type:'datetime-local','aria-label':'เวลานัดใหม่ '+r.title,class:'qo-dt'});dt.value=localInput(new Date(r.scheduled_at));
+        acts.appendChild(el('span',{class:'qo-move'},dt,el('button',{class:'btn',type:'button',onclick:function(){
+          var d=new Date(dt.value);if(isNaN(d)){dt.focus();return}requestAnswer(r.id,'reschedule','',d.toISOString());
+        }},'เลื่อนนัด')));
+      }
+      if(open&&(meReq||ROLE==='pm'))acts.appendChild(el('button',{class:'btn',type:'button',onclick:function(){if(window.confirm('ยกเลิกใบขอตรวจ “'+r.title+'”?'))requestAnswer(r.id,'cancel')}},'ยกเลิก'));
+      if(!open&&r.status==='failed'&&meReq)acts.appendChild(el('button',{class:'btn primary',type:'button',onclick:function(){v.close();requestForm({title:r.title,loc:r.loc,cat:r.cat,hold:r.hold,next:r.next_step,inspector:r.inspector_id,doc:r.inspection_id,note:'แก้แล้ว ขอตรวจใหม่'})}},'ขอตรวจใหม่'));
+      if(acts.childNodes.length)box.appendChild(acts);
+      return box;
+    }
+    if(!RL.open.length)body.appendChild(el('p',{class:'qo-sm',style:'padding:10px 4px'},canCreate()?'ยังไม่มีใบขอตรวจที่เปิดอยู่ กด “+ ขอตรวจงาน” เมื่องานพร้อมให้ตรวจ':'ยังไม่มีใบขอตรวจที่เปิดอยู่'));
+    RL.open.forEach(function(r){body.appendChild(card(r))});
+    if(RL.closed.length){body.appendChild(el('div',{class:'qo-sm',style:'font-weight:700;margin-top:6px'},'ปิดแล้วล่าสุด'));RL.closed.forEach(function(r){body.appendChild(card(r))})}
+  }
+  var REQ_CATS=['เหล็กเสริม','แบบหล่อ / นั่งร้าน','คอนกรีต','งานก่ออิฐ / ฉาบ','งานไฟฟ้า','งานสุขาภิบาล','งานสถาปัตย์ / อื่นๆ','ความปลอดภัย'];
+  function requestForm(pre){
+    pre=pre||{};
+    var v=overlay(),err=el('div',{class:'qo-err'});
+    var curId=window.__qcForm&&window.__qcForm.cur&&window.__qcForm.cur(),cd=curId&&cache.get(PFX+curId),canLink=!!(cd&&base.has(curId));
+    var cm=(cd&&cd.meta)||{};
+    function field(label,input){return el('label',{class:'qo-f'},el('span',null,label),input)}
+    var title=el('input',{placeholder:'เช่น ตรวจเหล็กเสริม คาน-พื้น'});title.value=pre.title||cm.work||'';
+    var loc=el('input',{placeholder:'เช่น ชั้น 3 โซน A'});loc.value=pre.loc||'';
+    var cat=el('select',null,el('option',{value:''},'— หมวดงาน —'));REQ_CATS.forEach(function(c){cat.appendChild(el('option',{value:c},c))});cat.value=pre.cat||'';
+    var t=new Date(Date.now()+86400000);t.setHours(9,0,0,0);
+    var at=el('input',{type:'datetime-local'});at.value=localInput(t);
+    var ins=el('select',null,el('option',{value:''},'— เลือกผู้ตรวจ —'));
+    MEMBERS.filter(function(m){return m.id!==UID&&m.role!=='headman'}).forEach(function(m){ins.appendChild(el('option',{value:m.id},m.name+' ('+(ROLE_TH[m.role]||m.role)+')'))});
+    ins.value=pre.inspector||'';
+    var hold=el('input',{type:'checkbox'});hold.checked=pre.hold!==false;
+    var next=el('input',{placeholder:'เช่น เทคอนกรีตพื้นชั้น 3'});next.value=pre.next||'';
+    var note=el('textarea',{rows:2,placeholder:'เช่น เตรียมบันไดและไฟส่องสว่างไว้แล้ว'});note.value=pre.note||'';
+    var link=el('input',{type:'checkbox'});link.checked=!!(pre.doc||canLink);
+    var send=el('button',{class:'btn primary qo-gbtn',type:'button'},'ส่งใบขอตรวจ');
+    send.addEventListener('click',function(){
+      err.textContent='';
+      if(!title.value.trim()){title.focus();err.textContent='ระบุงานที่ขอตรวจ';return}
+      if(!ins.value){ins.focus();err.textContent='เลือกผู้ตรวจ';return}
+      var d=new Date(at.value);if(isNaN(d)){at.focus();err.textContent='ระบุวันเวลานัด';return}
+      send.disabled=true;
+      requestCreate({title:title.value.trim(),loc:loc.value.trim(),cat:cat.value,hold:hold.checked,next:next.value.trim(),note:note.value.trim(),
+        inspector:ins.value,at:d.toISOString(),doc:link.checked?(pre.doc||(canLink?curId:null)):null}).then(function(){
+        v.close();toast(navigator.onLine?'ส่งใบขอตรวจแล้ว · ผู้ตรวจจะได้รับแจ้งทาง LINE':'บันทึกใบขอตรวจแล้ว · จะส่งเมื่อมีสัญญาณ');tasksPanel('req');
+      },function(e){send.disabled=false;err.textContent=e.message||String(e)});
+    });
+    v.c.append(el('h2',null,'ขอตรวจงาน'),
+      el('p',null,'ผู้ตรวจได้รับแจ้งทาง LINE ทันที ผลตรวจจะบอกว่างานถัดไปเริ่มได้หรือยัง'),
+      field('งานที่ขอตรวจ',title),field('ตำแหน่ง',loc),field('หมวดงาน',cat),field('วันเวลานัด',at),field('ผู้ตรวจ',ins),
+      el('label',{class:'qo-chk'},hold,el('span',null,'เป็นจุดหยุดตรวจ (H): งานถัดไปต้องรอผลตรวจผ่าน')),
+      field('งานถัดไปที่รอผลนี้',next),field('หมายเหตุถึงผู้ตรวจ',note),
+      (pre.doc||canLink)?el('label',{class:'qo-chk'},link,el('span',null,'แนบเอกสาร “'+((cm.docno||cm.work||'ที่เปิดอยู่'))+'”')):null,
+      err,send,el('button',{class:'btn',type:'button',onclick:v.close},'ยกเลิก'));
+    if(!MEMBERS.length)err.textContent='ยังโหลดรายชื่อสมาชิกไม่ได้ ต่ออินเทอร์เน็ตแล้วลองใหม่';
+    title.focus();
+  }
+
+  /* ---------- ค้นหาข้ามทุกเอกสาร ----------
+     Free text such as "เหล็กเสริม ชั้น 3 ไม่ผ่าน เดือนนี้": known words become filters (result, period,
+     category, person, safety), everything left must appear in the item or its document. */
+  var S_RES=[['ไม่ผ่าน','res','bad'],['ต้องแก้ไข','res','fix'],['ต้องแก้','res','fix'],['ตรวจซ้ำผ่าน','st','approved'],['ตรวจซ้ำไม่ผ่าน','st','rejected'],['รอตรวจซ้ำ','st','fixed'],['แจ้งแก้แล้ว','st','fixed'],['ค้างแก้','pend',1],['ค้าง','pend',1],['เลยกำหนด','late',1],['ยังไม่ตรวจ','res',''],['ผ่าน','res','ok']];
+  var S_TIME=[['วันนี้','today'],['เมื่อวาน','yday'],['สัปดาห์นี้','week'],['อาทิตย์นี้','week'],['สัปดาห์ที่แล้ว','lweek'],['เดือนนี้','month'],['เดือนที่แล้ว','lmonth']];
+  var S_CAT=[['เหล็กเสริม','เหล็กเสริม'],['เหล็ก','เหล็กเสริม'],['แบบหล่อ','แบบหล่อ'],['นั่งร้าน','นั่งร้าน'],['คอนกรีต','คอนกรีต'],['ก่ออิฐ','ก่ออิฐ'],['ฉาบ','ฉาบ'],['ไฟฟ้า','ไฟฟ้า'],['สุขาภิบาล','สุขาภิบาล'],['ประปา','สุขาภิบาล'],['สถาปัตย์','สถาปัตย์'],['ราวกันตก','ราวกันตก']];
+  function parseQuery(q){
+    var f={text:[],labels:[]},rest=' '+(q||'').toLowerCase()+' ';
+    function take(word){var i=rest.indexOf(word);if(i<0)return false;rest=rest.slice(0,i)+' '+rest.slice(i+word.length);return true}
+    if(take('ความปลอดภัย')||take('safety')){f.safety=true;f.labels.push('แบบฟอร์ม: ตรวจความปลอดภัย')}
+    S_RES.forEach(function(x){if(f.res===undefined&&f.st===undefined&&!f.pend&&!f.late&&take(x[0])){f[x[1]]=x[2];f.labels.push('ผล: '+x[0])}});
+    S_TIME.forEach(function(x){if(!f.when&&take(x[0])){f.when=x[1];f.labels.push('ช่วง: '+x[0])}});
+    S_CAT.forEach(function(x){if(!f.cat&&take(x[0])){f.cat=x[1];f.labels.push('หมวด: '+x[0])}});
+    if(take('ของฉัน')){f.mine=true;f.labels.push('ผู้แก้: คุณ')}
+    MEMBERS.forEach(function(m){if(f.person)return;var first=(m.name||'').split(/\s+/).filter(function(w){return w.length>1&&!/^(pm|คุณ|ช่าง|เฮดแมน|โฟร์แมน)$/i.test(w)})[0];if(first&&take(first.toLowerCase())){f.person=m.id;f.labels.push('คน: '+m.name)}});
+    f.text=rest.split(/\s+/).filter(Boolean);
+    if(f.text.length)f.labels.push('คำ: '+f.text.join(' '));
+    return f;
+  }
+  function range(w){
+    var n=new Date(),d0=new Date(n.getFullYear(),n.getMonth(),n.getDate());
+    function iso(d){return d.toLocaleDateString('sv-SE')}
+    var dow=(d0.getDay()+6)%7,mon=new Date(d0.getTime()-dow*86400000);
+    if(w==='today')return [iso(d0),iso(d0)];
+    if(w==='yday'){var y=new Date(d0.getTime()-86400000);return [iso(y),iso(y)]}
+    if(w==='week')return [iso(mon),iso(new Date(mon.getTime()+6*86400000))];
+    if(w==='lweek'){var lm=new Date(mon.getTime()-7*86400000);return [iso(lm),iso(new Date(lm.getTime()+6*86400000))]}
+    if(w==='month')return [iso(new Date(n.getFullYear(),n.getMonth(),1)),iso(new Date(n.getFullYear(),n.getMonth()+1,0))];
+    if(w==='lmonth')return [iso(new Date(n.getFullYear(),n.getMonth()-1,1)),iso(new Date(n.getFullYear(),n.getMonth(),0))];
+    return null;
+  }
+  function searchItems(q){
+    var f=parseQuery(q),out=[],t=today(),rg=f.when&&range(f.when);
+    function scan(docId,d,owner,own,proj){
+      if(!d||d.kind==='folder'||d.deletedAt||proj!==CUR)return;
+      var m=d.meta||{},isSafe=m.form==='safety';
+      if(f.safety&&!isSafe)return;
+      if(rg&&!(m.date>=rg[0]&&m.date<=rg[1]))return;
+      var dtext=[m.docno,m.work,m.project,m.site].join(' ').toLowerCase();
+      (d.items||[]).forEach(function(it){
+        var s=stOf(it),fx=it.res==='fix'||it.res==='bad';
+        if(f.res!==undefined&&it.res!==f.res)return;
+        if(f.st&&!(fx&&s===f.st))return;
+        if(f.pend&&!(fx&&it.rres!=='ok'))return;
+        if(f.late&&!(fx&&it.due&&it.due<t&&s!=='approved'&&s!=='fixed'))return;
+        if(f.mine&&it.asg!==UID)return;
+        if(f.person&&it.asg!==f.person)return;
+        var itext=[it.loc,it.chk,it.note,it.cat,it.ref,it.rnote].join(' ').toLowerCase();
+        if(f.cat&&(it.cat||'').toLowerCase().indexOf(f.cat)<0&&itext.indexOf(f.cat)<0)return;
+        var all=itext+' '+dtext;
+        if(!f.text.every(function(w){return all.indexOf(w)>=0}))return;
+        if(!it.loc&&!it.chk&&!it.note&&!it.res)return;
+        out.push({doc:docId,d:d,it:it,owner:owner,own:own,safe:isSafe});
+      });
+    }
+    cache.forEach(function(d,p){if(p.indexOf(PFX)===0)scan(p.slice(PFX.length),d,UID,true,d._project)});
+    shared.forEach(function(x,id){scan(id,x.data,x.owner,false,x.project)});
+    out.sort(function(a,b){var x=(a.d.meta||{}).date||'',y=(b.d.meta||{}).date||'';return x<y?1:x>y?-1:0});
+    return {f:f,items:out};
+  }
+  var RES_TH={ok:'ผ่าน',fix:'ต้องแก้ไข',bad:'ไม่ผ่าน','':'ยังไม่ตรวจ'};
+  function searchPanel(initial){
+    var v=overlay();v.o.classList.add('qo-tasks');
+    var inp=el('input',{type:'search',placeholder:'เช่น เหล็กเสริม ชั้น 3 ไม่ผ่าน เดือนนี้','aria-label':'ค้นหาทุกเอกสารในโครงการ',class:'qo-search'});
+    inp.value=initial||'';
+    var parsed=el('div',{class:'qo-chips'}),count=el('div',{class:'qo-sm'}),body=el('div',{class:'qo-list'});
+    var QUICK=['ไม่ผ่าน','ต้องแก้','รอตรวจซ้ำ','เลยกำหนด','ของฉัน','สัปดาห์นี้','เดือนนี้','ความปลอดภัย'];
+    var quick=el('div',{class:'qo-chips'});
+    QUICK.forEach(function(w){quick.appendChild(el('button',{type:'button',class:'qo-qchip',onclick:function(){
+      var q=' '+inp.value+' ';inp.value=(q.indexOf(' '+w+' ')>=0?q.replace(' '+w+' ',' '):q+w).trim();run();inp.focus();
+    }},w))});
+    var tm=null;
+    function run(){
+      var r=searchItems(inp.value);parsed.textContent='';body.textContent='';
+      r.f.labels.forEach(function(l){parsed.appendChild(el('span',{class:'qo-chip'},l))});
+      count.textContent=inp.value.trim()?'พบ '+r.items.length+' รายการ'+(r.items.length>200?' (แสดง 200 รายการแรก)':''):'พิมพ์คำค้น หรือแตะตัวกรองด้านบน';
+      if(!inp.value.trim())return;
+      r.items.slice(0,200).forEach(function(x){
+        var it=x.it,m=x.d.meta||{},s=stOf(it),fx=it.res==='fix'||it.res==='bad';
+        var chips=el('span',{class:'qo-chips'},el('span',{class:'qo-chip res-'+(it.res||'none')},RES_TH[it.res||'']));
+        if(fx)chips.appendChild(el('span',{class:'qo-chip st-'+s},ST_TH[s]||s));
+        if(it.cat)chips.appendChild(el('span',{class:'qo-chip'},it.cat));
+        if(x.safe)chips.appendChild(el('span',{class:'qo-chip late'},'ความปลอดภัย'));
+        if(it.asg)chips.appendChild(el('span',{class:'qo-chip'},'ผู้แก้ '+nameOf(it.asg)));
+        body.appendChild(el('button',{type:'button',class:'qo-task',onclick:function(){v.close();openItem(x.doc,it.id)}},
+          el('span',{class:'qo-tt'},(it.loc?it.loc+' · ':'')+(it.chk||it.note||'(ไม่มีชื่อรายการ)')),
+          el('span',{class:'qo-sm'},[m.docno||m.work||'เอกสาร',m.date?fmtD(m.date):'',x.own?'ของคุณ':'ของ '+nameOf(x.owner)].filter(Boolean).join(' · ')),chips));
+      });
+    }
+    inp.addEventListener('input',function(){clearTimeout(tm);tm=setTimeout(run,150)});
+    v.c.append(el('div',{style:'display:flex;justify-content:space-between;align-items:center'},el('h2',null,'ค้นหา'),el('button',{class:'btn',type:'button',onclick:v.close},'ปิด')),
+      inp,quick,parsed,count,body);
+    run();inp.focus();
   }
 
   function pull(){
@@ -585,7 +840,7 @@
       });
       shared.forEach(function(x,id){if(x.project===CUR&&!sseen[id]){shared.delete(id);ops.push(['shared',id,undefined]);changed=true}});
       return persist(ops).then(function(){if(changed){notify();announce()}});
-    });
+    }).then(pullRequests);
   }
 
   /* ---------- status (badge + floating pill) ---------- */
@@ -626,6 +881,15 @@
       '.qo-tb{position:fixed;right:8px;bottom:8px;z-index:99999;display:flex;align-items:center;gap:6px;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid var(--line,#ccd);background:var(--surface,#fff);color:var(--fg,#222);font:inherit;font-size:.85rem;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.15);cursor:pointer}',
       '.qo-tb b{min-width:1.4em;padding:0 5px;border-radius:999px;background:#f79009;color:#fff;font-size:.78rem;line-height:1.5;text-align:center}.qo-tb b:empty{display:none}',
       '.qo-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:58px;z-index:2147483001;max-width:min(520px,calc(100vw - 24px));padding:10px 14px;border-radius:10px;background:#1b2430;color:#fff;font-size:.9rem;line-height:1.45;box-shadow:0 6px 24px rgba(0,0,0,.25)}.qo-toast[hidden]{display:none}',
+      '.qo-search{min-height:48px;font-size:1rem}.qo-qchip{min-height:40px;padding:0 12px;border-radius:999px;border:1px solid var(--line,#ccd);background:transparent;color:inherit;font:inherit;font-size:.85rem;cursor:pointer}',
+      '.qo-chip.res-ok{background:#d1fadf;color:#05603a}.qo-chip.res-fix{background:#fef0c7;color:#93370d}.qo-chip.res-bad{background:#fee4e2;color:#b42318}',
+      '.qo-chip.rq-requested{background:#fef0c7;color:#93370d}.qo-chip.rq-accepted{background:#d1e9ff;color:#175cd3}.qo-chip.rq-passed{background:#d1fadf;color:#05603a}.qo-chip.rq-failed{background:#fee4e2;color:#b42318}',
+      '.qo-req{cursor:default}.qo-next{font-size:.85rem;font-weight:600;padding:4px 8px;border-radius:8px;background:rgba(127,127,127,.12)}.qo-next.lock{background:#fee4e2;color:#7a271a}.qo-next.ok{background:#d1fadf;color:#05603a}',
+      '.qo-acts{display:flex;flex-wrap:wrap;gap:6px;width:100%}.qo-acts .btn{min-height:44px}.qo-pass{background:#12b76a!important;border-color:#12b76a!important;color:#fff!important}.qo-fail{background:#d92d20!important;border-color:#d92d20!important;color:#fff!important}',
+      '.qo-note{width:100%;box-sizing:border-box;min-height:56px;padding:8px;border:1px solid var(--line,#ccd);border-radius:8px;font:inherit;background:var(--bg,#fff);color:inherit}',
+      '.qo-move{display:flex;gap:6px;align-items:center}.qo-dt{min-height:44px;padding:0 8px;border:1px solid var(--line,#ccd);border-radius:8px;font:inherit;background:var(--bg,#fff);color:inherit}',
+      '.qo-f{display:flex;flex-direction:column;gap:4px;font-size:.88rem;font-weight:600}.qo-f textarea{min-height:56px;padding:8px 10px;border:1px solid var(--line,#ccd);border-radius:8px;font:inherit;font-weight:400;background:var(--bg,#fff);color:inherit}',
+      '.qo-chk{display:flex;gap:10px;align-items:flex-start;font-size:.9rem;min-height:44px}.qo-chk input{width:22px;height:22px;margin-top:2px;flex:0 0 auto}',
       '.qo-tasks{align-items:flex-start}.qo-tasks .qo-card{width:min(640px,100%)}',
       '.qo-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}.qo-tab{flex:0 0 auto;min-height:40px;padding:6px 12px;border-radius:999px;border:1px solid var(--line,#ccd);background:transparent;color:inherit;font:inherit;font-size:.88rem;cursor:pointer}',
       '.qo-tab.on{background:var(--fg,#1b2430);color:var(--bg,#fff);border-color:transparent}.qo-n{opacity:.7;font-size:.8rem}',
@@ -754,7 +1018,8 @@
       el('p',null,s.state==='offline'?'ออฟไลน์อยู่ · รอส่งขึ้นระบบ '+s.pending+' รายการ (จะส่งเองเมื่อมีสัญญาณ)':s.state==='error'?'ซิงก์ไม่สำเร็จ: '+s.error:s.pending?'กำลังส่งขึ้นระบบ '+s.pending+' รายการ':'ข้อมูลตรงกับระบบแล้ว'),
       conflicts?el('p',null,'ผลตรวจซ้ำชนกับคนอื่น '+conflicts+' รายการ: ระบบใช้ผลที่ถึงก่อน ผลของคุณเก็บไว้ในประวัติ'):null);
     if(!canCreate())v.c.appendChild(el('p',null,'บทบาทนี้เปิดดูเอกสารของทีมได้ แต่สร้างเอกสารใหม่ไม่ได้'));
-    v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();tasksPanel()}},'งานของฉัน / รอตรวจซ้ำ'));
+    v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();tasksPanel()}},'งาน · ใบขอตรวจ'));
+    v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();searchPanel()}},'ค้นหาทุกเอกสาร'));
     v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();linePanel()}},'เชื่อม LINE รับแจ้งเตือน'));
     v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();runSync()}},'ซิงก์ตอนนี้'));
     if(ROLE==='pm'||(ME&&ME.org_role==='admin'))v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();membersPanel()}},'จัดการสมาชิก'));
@@ -798,7 +1063,7 @@
       ROLE=(PROJECTS.filter(function(p){return p.id===id})[0]||{}).role||null;
       try{bc=new BroadcastChannel('qc-online-'+UID);bc.onmessage=function(){loadAll().then(notify)}}catch(e){}
       try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
-      loadMembers();
+      loadMembers();loadReqCache();
       showPill();
       window.addEventListener('online',function(){schedule(0)});window.addEventListener('offline',status);
       setInterval(function(){if(!document.hidden)schedule(0)},60000);
@@ -886,7 +1151,7 @@
     uid:function(){return UID},members:function(){return MEMBERS.slice()},name:nameOf,canCreate:canCreate,
     recheck:function(doc,iid,res,note,after){return act('rx',doc,iid,{res:res,note:note,after:after})},
     reportFixed:function(doc,iid,note,after){return act('fx',doc,iid,{note:note,after:after})},
-    tasks:function(t){tasksPanel(t)},lists:lists,onMessage:function(f){actListeners.push(f)}};
+    tasks:function(t){tasksPanel(t)},lists:lists,search:function(q){searchPanel(q)},requestForm:function(o){requestForm(o)},requests:function(){return REQS.slice()},parseQuery:parseQuery,onMessage:function(f){actListeners.push(f)}};
 
   var caps={db:db,user:user,assets:assets,downloads:downloads};
   window.claude={use:function(n){return ready.then(function(){return caps[n]||null},function(){return null})}};

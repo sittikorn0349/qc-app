@@ -93,6 +93,8 @@ button{font:inherit;cursor:pointer}
 .rec-s{font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
 .rec-chips{display:flex;gap:6px;flex-wrap:wrap;font-size:.74rem;margin-top:2px}
 .rec-chips span{padding:0 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.rec-chips .c-safe{background:#fee4e2;color:#b42318;border-color:transparent;font-weight:600}
+.form-safety .top h1{color:#b42318}
 .rec-chips .c-fix{background:var(--warn-bg);color:var(--warn);border-color:transparent}
 .rec-chips .c-ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
 
@@ -644,6 +646,22 @@ button{font:inherit;cursor:pointer}
 
   /* ---------- data model ---------- */
   var CATS=['เหล็กเสริม','แบบหล่อ / นั่งร้าน','คอนกรีต','งานก่ออิฐ / ฉาบ','งานไฟฟ้า','งานสุขาภิบาล','งานสถาปัตย์ / อื่นๆ'];
+  /* safety inspection: same document shape, meta.form = 'safety', its own checklist and categories */
+  var SAFETY_NAME='แบบตรวจความปลอดภัย',QC_NAME='แบบฟอร์มตรวจงานก่อสร้าง';
+  var SCATS=['นั่งร้าน','ราวกันตก / ช่องเปิด','ประชุมความปลอดภัยก่อนเริ่มงาน','อุปกรณ์ป้องกันส่วนบุคคล','ไฟฟ้าชั่วคราว / เครื่องจักร'];
+  var SAFETY_TPL=[
+    ['นั่งร้าน',['ฐานนั่งร้านมั่นคง มีแผ่นรองฐาน/ล็อกล้อ','ค้ำยันทแยงครบ และยึดติดกับตัวอาคาร','พื้นทางเดินปูเต็ม ยึดแน่น ไม่มีช่องว่าง','ราวกันตกบน-กลาง และแผงกันของตกครบ','บันไดขึ้นลงมั่นคง ไม่ปีนโครงนั่งร้าน','ป้ายสถานะนั่งร้าน (ใช้ได้/ห้ามใช้) ลงวันที่ตรวจล่าสุด']],
+    ['ราวกันตก / ช่องเปิด',['ราวกันตกขอบพื้นและขอบอาคารแข็งแรง ต่อเนื่อง','ช่องเปิดพื้น/ช่องลิฟต์ปิดด้วยฝายึดแน่นหรือราวกั้น พร้อมป้ายเตือน','ขอบพื้นมีแผงกันของตก','ผู้ทำงานที่สูงสวมเข็มขัดนิรภัยแบบเต็มตัวและคล้องจุดยึด','ตาข่ายกันตก/กันของตก (ถ้ามี) ติดตั้งสมบูรณ์']],
+    ['ประชุมความปลอดภัยก่อนเริ่มงาน',['จัดประชุมก่อนเริ่มงาน (ระบุหัวข้อในหมายเหตุ)','ผู้เข้าร่วมครบทุกทีม (ระบุจำนวนคนในหมายเหตุ)','ชี้แจงงานเสี่ยงของวันนี้และวิธีป้องกัน','มีรูปการประชุมและใบลงชื่อ']],
+    ['อุปกรณ์ป้องกันส่วนบุคคล',['สวมหมวกนิรภัย รองเท้านิรภัย เสื้อสะท้อนแสงครบ','อุปกรณ์เฉพาะงาน (แว่น ถุงมือ ที่ครอบหู) ตามลักษณะงาน']],
+    ['ไฟฟ้าชั่วคราว / เครื่องจักร',['สายไฟชั่วคราวไม่ชำรุด ยกพ้นพื้นเปียก มีเบรกเกอร์กันไฟรั่ว','เครื่องจักร/ปั้นจั่น ผ่านการตรวจ มีผู้ให้สัญญาณ']]
+  ];
+  function isSafety(d){return !!(d&&d.meta&&d.meta.form==='safety')}
+  function formName(d){return isSafety(d)?SAFETY_NAME:QC_NAME}
+  function catsFor(d){return isSafety(d)?SCATS:CATS}
+  function safetyItems(){
+    var out=[];SAFETY_TPL.forEach(function(g){g[1].forEach(function(c){var it=blankItem();it.cat=g[0];it.chk=c;out.push(it)})});return out;
+  }
   function blankItem(){return {id:uid(),loc:'',chk:'',res:'',note:'',cat:'',ref:'',before:[],after:[],rres:'',rdate:'',rnote:''}}
   function normPh(a){
     return (Array.isArray(a)?a:[]).filter(function(x){return typeof x==='string'&&x}).map(function(x){return x.indexOf('data:')===0?{d:x}:{a:x}});
@@ -1267,7 +1285,7 @@ button{font:inherit;cursor:pointer}
     var locCell=el('div',{class:'loc'});
     locCell.appendChild(textField('ตำแหน่ง','','loc',it,'เช่น เสา C-3 ชั้น 1'));
     var cs=el('select',{'aria-label':'หมวดงาน (แนะนำให้เลือก ช่วยค้นหาภายหลัง)'},el('option',{value:''},'+ เลือกหมวดงาน (แนะนำ)'));
-    var cats=CATS.slice();if(it.cat&&cats.indexOf(it.cat)<0)cats.push(it.cat);
+    var cats=catsFor(state).slice();if(it.cat&&cats.indexOf(it.cat)<0)cats.push(it.cat);
     cats.forEach(function(c){cs.appendChild(el('option',{value:c},c))});
     cs.value=it.cat;
     cs.classList.toggle('empty',!it.cat);
@@ -1662,6 +1680,7 @@ button{font:inherit;cursor:pointer}
       shown++;
       var cur=r.id===state.id;
       var chips=el('div',{class:'rec-chips'},el('span',null,inf.n+' รายการ'));
+      if(isSafety(d))chips.appendChild(el('span',{class:'c-safe'},'ความปลอดภัย'));
       if(inf.pend)chips.appendChild(el('span',{class:'c-fix'},'รอตรวจซ้ำ '+inf.pend));
       else if(inf.fix)chips.appendChild(el('span',{class:'c-ok'},'ตรวจซ้ำผ่านครบ'));
       if(inf.date)chips.appendChild(el('span',null,'ตรวจ '+fmtDate(inf.date)));
@@ -1686,7 +1705,7 @@ button{font:inherit;cursor:pointer}
     });
     if(!shown)host.appendChild(el('div',{class:'empty'},records.length?(q?'ไม่พบฉบับที่ค้นหา':(onlyPend?'ไม่มีฉบับที่มีรายการค้างในมุมมองนี้':'ไม่มีฉบับในโฟลเดอร์นี้')):'ยังไม่มีฉบับที่บันทึก'));
   }
-  function renderAll(){bindValues();renderItems();renderBar();renderList();if(viewing)lockForm(true)}
+  function renderAll(){var h1=document.querySelector('.top h1');if(h1)h1.textContent=formName(state);document.body.classList.toggle('form-safety',isSafety(state));bindValues();renderItems();renderBar();renderList();if(viewing)lockForm(true)}
 
   listBtn.addEventListener('click',function(){if(dlg.hidden)openList();else closeList()});
   $('#q').addEventListener('input',renderList);
@@ -1743,9 +1762,10 @@ button{font:inherit;cursor:pointer}
       if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่เริ่มฉบับใหม่');return}
       var base=hasContent(state)?state:((records[0]&&records[0].data)||state);
       state=freshState(carryOf(base));touched=false;dirty=false;
+      if(lsGet('qc-form')==='safety'){state.meta.form='safety';state.meta.work='ตรวจความปลอดภัยประจำวัน';state.items=safetyItems()}
       if(mode==='local')lsDel(KEY);
       renderAll();closeList();window.scrollTo({top:0});
-      setStatus('เริ่มฉบับใหม่ ยกข้อมูลโครงการ ผู้ตรวจ ผู้รับเหมา และชื่อผู้ลงนามมาให้แล้ว');
+      setStatus(isSafety(state)?'เริ่มฉบับใหม่ (แบบตรวจความปลอดภัย) พร้อมเช็กลิสต์นั่งร้าน ราวกันตก และการประชุมก่อนเริ่มงาน':'เริ่มฉบับใหม่ ยกข้อมูลโครงการ ผู้ตรวจ ผู้รับเหมา และชื่อผู้ลงนามมาให้แล้ว');
       var f=$('#m-docno');if(f)f.focus({preventScroll:true});
     });
   }
@@ -1768,7 +1788,7 @@ button{font:inherit;cursor:pointer}
       if(!pend.length){setStatus('ฉบับนี้ไม่มีรายการค้าง (ต้องแก้ไข/ไม่ผ่าน ที่ยังตรวจซ้ำไม่ผ่าน)');return}
       var prev=titleOf(state),work=state.meta.work;
       var s=freshState(carryOf(state));
-      s.meta.work=work;s.folder=state.folder||'';
+      s.meta.work=work;s.folder=state.folder||'';if(isSafety(state))s.meta.form='safety';
       s.items=pend.map(function(it){
         var n=normItem({loc:it.loc,chk:it.chk,note:it.note,cat:it.cat,ref:it.ref});
         n.before=(it.after.length?it.after:it.before).filter(function(p){return p.a}).map(function(p){return {a:p.a}});
@@ -2027,6 +2047,7 @@ button{font:inherit;cursor:pointer}
     list.forEach(function(x){
       var d=x.r.data,inf=x.inf,cur=!!(viewing&&viewing.id===x.r.id&&viewing.owner===x.u);
       var chips=el('div',{class:'rec-chips'},el('span',null,inf.n+' รายการ'));
+      if(isSafety(d))chips.appendChild(el('span',{class:'c-safe'},'ความปลอดภัย'));
       if(inf.pend)chips.appendChild(el('span',{class:'c-fix'},'รอตรวจซ้ำ '+inf.pend));
       if(inf.date)chips.appendChild(el('span',null,'ตรวจ '+fmtDate(inf.date)));
       var open=el('button',{type:'button',class:'rec-open','aria-label':'เปิดดูฉบับ '+inf.title,onclick:function(){
@@ -2174,7 +2195,7 @@ button{font:inherit;cursor:pointer}
     var heads=pend?['ลำดับ','ตำแหน่ง / อ้างอิง','รายการตรวจ','ผลตรวจ','สิ่งที่ต้องแก้ไข','กำหนดแก้เสร็จ','ผู้รับเหมารับทราบ']
       :['ลำดับ','รูปที่พบ','ตำแหน่ง','รายการตรวจ','ผลตรวจ','หมายเหตุ'].concat(RC?['ตรวจซ้ำหลังแก้ไข']:[]);
     var widths=pend?['7%','20%','20%','12%','20%','11%','10%']:(RC?['7%','17%','14%','16%','11%','13%','22%']:['7%','26%','17%','20%','12%','18%']);
-    var ttl=pend?'สรุปรายการที่ต้องแก้ไข':'แบบฟอร์มตรวจงานก่อสร้าง';
+    var ttl=pend?'สรุปรายการที่ต้องแก้ไข':formName(d);
     root.textContent='';
     function newSheet(first){
       var s=el('div',{class:'sheet'}),sb=el('div',{class:'sb'});
