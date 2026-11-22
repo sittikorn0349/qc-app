@@ -905,8 +905,8 @@
     var v=overlay(),err=el('div',{class:'qo-err'});
     var b=el('button',{class:'btn primary qo-gbtn',type:'button'},'เข้าสู่ระบบด้วย Google');
     b.addEventListener('click',function(){
-      b.disabled=true;err.textContent='';
-      api.signIn(location.origin+location.pathname).then(function(r){if(r&&r.error)throw r.error}).catch(function(e){b.disabled=false;err.textContent='เข้าสู่ระบบไม่สำเร็จ: '+(e.message||e)});
+      b.disabled=true;err.textContent='';if(window.qcDesktop)err.textContent='เปิดหน้าเข้าสู่ระบบในเบราว์เซอร์แล้ว เข้าสู่ระบบเสร็จระบบจะพากลับมาที่โปรแกรมเอง';
+      api.signIn((window.qcDesktop&&window.qcDesktop.authRedirect)||(location.origin+location.pathname)).then(function(r){if(r&&r.error)throw r.error}).catch(function(e){b.disabled=false;err.textContent='เข้าสู่ระบบไม่สำเร็จ: '+(e.message||e)});
     });
     v.c.append(el('h2',null,'QC App · ออนไลน์'),
       el('p',null,'เข้าสู่ระบบเพื่อใช้เอกสารร่วมกับทีมในโครงการ ข้อมูลยังบันทึกในเครื่องก่อนเสมอ แม้สัญญาณหลุดก็ใช้งานต่อได้'),
