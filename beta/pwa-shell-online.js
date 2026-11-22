@@ -11,7 +11,7 @@
   var CFG={url:'https://kcuhizrtegornpqtaijx.supabase.co',key:'sb_publishable_nFtSYV-yofy8A49VPojy3g_TvNUCSgX',bucket:'inspection-photos'};
   var MAXB=20*1024*1024,PK='qc-online-project',PL='qc-online-projects';
   var HF=['docno','insp_date','site','work','weather','meta','sign','summary','remarks','folder_id','extra','deleted_at'];
-  var IF=['ord','loc','chk','res','note','cat','ref','before','after','rres','rdate','rnote'];
+  var IF=['ord','loc','chk','res','note','cat','ref','before','after','rres','rdate','rnote','assignee_id','due_date'];
 
   /* ---------- small helpers ---------- */
   function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
@@ -37,7 +37,7 @@
     var sb=window.supabase.createClient(CFG.url,CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce',storageKey:'qc-online-auth'}});
     function chk(r){if(r.error){var e=new Error(r.error.message||'error');e.code=r.error.code||r.error.statusCode||'error';throw e}return r.data}
     var IH='id,project_id,owner_id,docno,insp_date,site,work,weather,meta,sign,summary,remarks,rev,created_at,updated_at,deleted_at,folder_id,extra';
-    var II='id,inspection_id,project_id,ord,loc,chk,res,note,cat,ref,before,after,rres,rdate,rnote,rchk_at,status,assignee_id,due_date';
+    var II='id,inspection_id,project_id,ord,loc,chk,res,note,cat,ref,before,after,rres,rdate,rnote,rchk_at,status,assignee_id,due_date,fixed_note';
     function chunks(a,n){var o=[];for(var i=0;i<a.length;i+=n)o.push(a.slice(i,i+n));return o}
     return {
       session:function(){return sb.auth.getSession().then(function(r){return r.data&&r.data.session||null})},
@@ -64,6 +64,10 @@
       insertItems:function(rows){return rows.length?sb.from('inspection_items').insert(rows).then(chk):Promise.resolve()},
       updateItem:function(id,patch){return sb.from('inspection_items').update(patch).eq('id',id).select('id').then(chk)},
       deleteItems:function(ids){return ids.length?sb.from('inspection_items').delete().in('id',ids).then(chk):Promise.resolve()},
+      lineStatus:function(){return sb.rpc('line_status').then(chk)},
+      lineLinkStart:function(){return sb.rpc('line_link_start').then(chk)},
+      lineUnlink:function(){return sb.rpc('line_unlink').then(chk)},
+      reportFixed:function(id,after,note){return sb.rpc('report_fixed',{p_item:id,p_after:after||[],p_note:note||''}).then(chk)},
       recheck:function(id,res,note,after,seen){return sb.rpc('recheck_item',{p_item:id,p_result:res,p_note:note||'',p_after:after||[],p_seen_at:seen||null}).then(chk)},
       folders:function(){return sb.from('folders').select('id,name,created_at,updated_at,deleted_at').then(chk)},
       upsertFolder:function(row){return sb.from('folders').upsert(row).then(chk)},
@@ -110,7 +114,7 @@
     (d.items||[]).forEach(function(it,i){
       out[sid(id,it.id)]={ord:i,loc:it.loc||'',chk:it.chk||'',res:it.res||'',note:it.note||'',cat:it.cat||'',ref:it.ref||'',
         before:(it.before||[]).map(idToPath).filter(Boolean),after:(it.after||[]).map(idToPath).filter(Boolean),
-        rres:it.rres||'',rdate:it.rdate||'',rnote:it.rnote||''};
+        rres:it.rres||'',rdate:it.rdate||'',rnote:it.rnote||'',assignee_id:it.asg||null,due_date:validDate(it.due)};
     });
     return out;
   }
@@ -118,7 +122,8 @@
     var pre=h.id+'.',ex=h.extra||{};
     var its=(items||[]).slice().sort(function(a,b){return a.ord-b.ord}).map(function(r){
       return {id:r.id.indexOf(pre)===0?r.id.slice(pre.length):r.id,loc:r.loc,chk:r.chk,res:r.res,note:r.note,cat:r.cat,ref:r.ref,
-        rres:r.rres,rdate:r.rdate,rnote:r.rnote,before:(r.before||[]).map(pathToId),after:(r.after||[]).map(pathToId)};
+        rres:r.rres,rdate:r.rdate,rnote:r.rnote,before:(r.before||[]).map(pathToId),after:(r.after||[]).map(pathToId),
+        asg:r.assignee_id||'',due:r.due_date||'',st:r.status||'',rat:r.rchk_at||'',fnote:r.fixed_note||''};
     });
     return {v:ex.v||2,kind:'inspection',meta:Object.assign({},h.meta||{}),sign:h.sign||{},summary:h.summary||'',remarks:h.remarks||'',
       items:its,createdAt:h.created_at||'',updatedAt:h.updated_at||'',rev:0,folder:h.folder_id||'',deletedAt:h.deleted_at||'',
@@ -142,7 +147,7 @@
   function recall(id,rev){var h=hist.get(id);return h&&h.get(rev)}
   function syncRev(after){return (Math.floor((+after||0)/1000)+1)*1000}
   var DOCF=['meta','sign','summary','remarks','folder','deletedAt'];
-  var ITF=['loc','chk','res','note','cat','ref','rres','rdate','rnote','before','after'];
+  var ITF=['loc','chk','res','note','cat','ref','rres','rdate','rnote','before','after','asg','due','st','rat','fnote'];
   function mergeObj(b,m,t){
     if(!b||typeof m!=='object'||typeof t!=='object'||!m||!t||Array.isArray(m))return eq(m,b)?t:m;
     var o={},keys={};[b,m,t].forEach(function(x){Object.keys(x||{}).forEach(function(k){keys[k]=1})});
@@ -231,7 +236,7 @@
     var ds=list.map(function(x){return {id:x.id,exists:true,data:function(){return clone(x.data)},metadata:{}}});
     return {docs:ds,size:ds.length,empty:!ds.length,metadata:{fromCache:false,hasPendingWrites:false},docChanges:function(){return[]}};
   }
-  function notify(){try{window.dispatchEvent(new Event('qc-change'))}catch(e){}subs.forEach(function(s){setTimeout(function(){try{s.next(snapOf(s.q))}catch(e){}},0)})}
+  function notify(){try{updateTaskBtn()}catch(e){}try{window.dispatchEvent(new Event('qc-change'))}catch(e){}subs.forEach(function(s){setTimeout(function(){try{s.next(snapOf(s.q))}catch(e){}},0)})}
   function announce(){try{bc&&bc.postMessage('chg')}catch(e){}}
 
   function localPut(id,data){
@@ -334,6 +339,7 @@
   function pushOne(id){
     var ob=outbox.get(id);if(!ob)return Promise.resolve();
     var v=ver[id]||0,path=PFX+id;
+    if(ob.type==='rx'||ob.type==='fx')return pushAct(id,ob,v);
     if(ob.type==='folder'){
       if(ob.del)return api.deleteFolder(id).then(function(){return done(id,v,[])});
       var f=cache.get(path);if(!f)return done(id,v,[]);
@@ -404,6 +410,135 @@
       });
     });
   }
+
+  /* ---------- actions on other people's documents (recheck / report fixed) ----------
+     Members may not edit someone else's document; they act on single items through RPCs.
+     Actions queue in the outbox (key "rx:<doc>.<item>" / "fx:<doc>.<item>") so they work offline,
+     and are shown on the shared copy straight away until the server confirms them. */
+  function uniq(a){var o=[];a.forEach(function(x){if(x&&o.indexOf(x)<0)o.push(x)});return o}
+  function applyActs(docId,doc){
+    outbox.forEach(function(ob){
+      if((ob.type!=='rx'&&ob.type!=='fx')||ob.doc!==docId)return;
+      (doc.items||[]).forEach(function(it){
+        if(it.id!==ob.iid)return;
+        it.after=uniq((it.after||[]).concat(ob.after.map(pathToId)));it.pend=ob.type;
+        if(ob.type==='rx'){it.rres=ob.res;it.rnote=ob.note;it.rdate=today();it.st=ob.res==='ok'?'approved':'rejected'}
+        else{it.st='fixed';it.rres='';it.fnote=ob.note}
+      });
+    });
+    return doc;
+  }
+  var actListeners=[];
+  var toastEl=null,toastT=null;
+  function toast(t){
+    css();if(!toastEl){toastEl=el('div',{class:'qo-toast',role:'status','aria-live':'polite'});document.body.appendChild(toastEl)}
+    toastEl.textContent=t;toastEl.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){toastEl.hidden=true},7000);
+  }
+  function actMsg(t){toast(t);actListeners.forEach(function(f){try{f(t)}catch(e){}});try{window.dispatchEvent(new CustomEvent('qc-msg',{detail:t}))}catch(e){}}
+  function pushAct(key,ob,v){
+    var p=ob.type==='rx'?api.recheck(ob.item,ob.res,ob.note,ob.after,ob.seen||null):api.reportFixed(ob.item,ob.after,ob.note);
+    return p.then(function(r){
+      if(r==='conflict'){conflicts++;actMsg('มีคนบันทึกผลตรวจซ้ำรายการนี้ก่อนคุณ ระบบใช้ผลที่ถึงก่อน ผลของคุณเก็บไว้ในประวัติ')}
+      else if(r==='gone')actMsg('รายการนี้ถูกเจ้าของลบไปแล้ว');
+    },function(e){
+      if(isNet(e))throw e;
+      actMsg((ob.type==='rx'?'บันทึกผลตรวจซ้ำ':'แจ้งแก้แล้ว')+'ไม่สำเร็จ: '+(e.message||e.code||e));
+    }).then(function(){return done(key,v,[])});
+  }
+  function act(type,docId,iid,o){
+    return ready.then(function(){
+      var x=shared.get(docId);if(!x)throw new Error('ไม่พบเอกสารนี้');
+      var it=(x.data.items||[]).filter(function(i){return i.id===iid})[0];if(!it)throw new Error('ไม่พบรายการนี้');
+      if(type==='fx'&&it.asg!==UID)throw new Error('รายการนี้ไม่ได้มอบหมายให้คุณ');
+      if(type==='rx'&&o.res!=='ok'&&o.res!=='bad')throw new Error('เลือกผลตรวจซ้ำก่อน');
+      var key=type+':'+docId+'.'+iid,prev=outbox.get(key);
+      var ob={type:type,doc:docId,iid:iid,item:sid(docId,iid),res:o.res||'',note:o.note||'',
+        after:uniq((prev?prev.after:[]).concat((o.after||[]).map(idToPath))),seen:prev?prev.seen:(it.rat||null)};
+      ver[key]=(ver[key]||0)+1;outbox.set(key,ob);
+      var nd=applyActs(docId,clone(x.data));nd.rev=(+x.data.rev||0)+1;
+      var nx=Object.assign({},x,{data:nd,key:contentKey(nd)});shared.set(docId,nx);
+      return persist([['outbox',key,ob],['shared',docId,nx]]).then(function(){notify();announce();schedule(0)});
+    });
+  }
+
+  /* ---------- project members (names for owners, assignee picker) ---------- */
+  var MEMBERS=[];
+  function loadMembers(){
+    var k='qc-online-members:'+CUR;
+    try{MEMBERS=JSON.parse(lsGet(k)||'[]')}catch(e){MEMBERS=[]}
+    return api.members(CUR).then(function(ms){
+      return api.profiles(ms.map(function(m){return m.user_id})).then(function(ps){
+        var by={};ps.forEach(function(p){by[p.id]=p});
+        MEMBERS=ms.map(function(m){var p=by[m.user_id]||{};return {id:m.user_id,role:m.role,name:p.display_name||p.email||'สมาชิก',email:p.email||''}});
+        lsSet(k,JSON.stringify(MEMBERS));notify();
+      });
+    }).catch(function(){});
+  }
+  function nameOf(u){if(u===UID)return 'คุณ';var m=MEMBERS.filter(function(x){return x.id===u})[0];return m?m.name:'สมาชิก'}
+
+  /* ---------- smart lists: my tasks / waiting for recheck / overdue ---------- */
+  var ST_TH={open:'ยังไม่มอบหมาย',assigned:'มอบหมายแล้ว',fixed:'แจ้งแก้แล้ว รอตรวจซ้ำ',approved:'ตรวจซ้ำผ่าน',rejected:'ตรวจซ้ำไม่ผ่าน'};
+  function allItems(){
+    var out=[];
+    function add(docId,d,owner,own,proj){
+      if(!d||d.kind==='folder'||d.deletedAt||proj!==CUR)return;
+      (d.items||[]).forEach(function(it){if(it.res==='fix'||it.res==='bad')out.push({doc:docId,d:d,it:it,owner:owner,own:own})});
+    }
+    cache.forEach(function(d,p){if(p.indexOf(PFX)===0)add(p.slice(PFX.length),d,UID,true,d._project)});
+    shared.forEach(function(x,id){add(id,x.data,x.owner,false,x.project)});
+    return out;
+  }
+  function stOf(it){return it.st||(it.rres==='ok'?'approved':it.rres==='bad'?'rejected':it.asg?'assigned':'open')}
+  function lists(){
+    var t=today(),all=allItems(),L={mine:[],recheck:[],late:[],open:[]};
+    all.forEach(function(x){
+      var s=stOf(x.it);
+      if(x.it.asg===UID&&(s==='assigned'||s==='rejected'))L.mine.push(x);
+      if(s==='fixed')L.recheck.push(x);
+      if(x.it.due&&x.it.due<t&&(s==='open'||s==='assigned'||s==='rejected'))L.late.push(x);
+      if(x.own&&s==='open')L.open.push(x);
+    });
+    L.mine.sort(function(a,b){return (a.it.due||'9')<(b.it.due||'9')?-1:1});
+    return L;
+  }
+  var taskBtn=null;
+  function taskCount(){var L=lists();return L.mine.length+L.recheck.length}
+  function updateTaskBtn(){if(!taskBtn)return;var n=taskCount();taskBtn.querySelector('b').textContent=n?String(n):'';taskBtn.classList.toggle('qo-has',!!n)}
+  function tasksPanel(start){
+    var v=overlay(),L=lists(),tab=start||(L.mine.length?'mine':L.recheck.length?'recheck':L.late.length?'late':'open');
+    v.o.classList.add('qo-tasks');
+    var TABS=[['mine','งานของฉัน'],['recheck','รอตรวจซ้ำ'],['late','เลยกำหนด'],['open','ยังไม่มอบหมาย']];
+    var bar=el('div',{class:'qo-tabs',role:'tablist'}),body=el('div',{class:'qo-list'});
+    function draw(){
+      L=lists();bar.textContent='';body.textContent='';
+      TABS.forEach(function(t){
+        bar.appendChild(el('button',{type:'button',role:'tab','aria-selected':tab===t[0]?'true':'false',class:'qo-tab'+(tab===t[0]?' on':''),onclick:function(){tab=t[0];draw()}},t[1]+' ',el('span',{class:'qo-n'},String(L[t[0]].length))));
+      });
+      var list=L[tab];
+      if(!list.length)body.appendChild(el('p',{class:'qo-sm',style:'padding:14px 4px'},{mine:'ไม่มีงานที่มอบหมายให้คุณค้างอยู่',recheck:'ไม่มีรายการที่แจ้งแก้แล้วรอตรวจซ้ำ',late:'ไม่มีรายการเลยกำหนด',open:'ทุกรายการที่ต้องแก้ในเอกสารของคุณมอบหมายแล้ว'}[tab]));
+      list.forEach(function(x){
+        var it=x.it,m=x.d.meta||{},s=stOf(it),late=it.due&&it.due<today()&&s!=='fixed'&&s!=='approved';
+        var sub=[m.docno||m.work||'เอกสาร',x.own?'ของคุณ':'ของ '+nameOf(x.owner)].join(' · ');
+        var chips=el('span',{class:'qo-chips'},el('span',{class:'qo-chip st-'+s},ST_TH[s]||s));
+        if(it.asg)chips.appendChild(el('span',{class:'qo-chip'},'ผู้แก้ '+nameOf(it.asg)));
+        if(it.due)chips.appendChild(el('span',{class:'qo-chip'+(late?' late':'')},(late?'เลยกำหนด ':'กำหนด ')+fmtD(it.due)));
+        if(it.pend)chips.appendChild(el('span',{class:'qo-chip'},'รอส่ง'));
+        body.appendChild(el('button',{type:'button',class:'qo-task',onclick:function(){v.close();openItem(x.doc,it.id)}},
+          el('span',{class:'qo-tt'},(it.loc?it.loc+' · ':'')+(it.chk||it.note||'(ไม่มีชื่อรายการ)')),
+          el('span',{class:'qo-sm'},sub),chips));
+      });
+    }
+    v.c.append(el('div',{style:'display:flex;justify-content:space-between;align-items:center'},el('h2',null,'งาน'),el('button',{class:'btn',type:'button',onclick:v.close},'ปิด')),bar,body);
+    draw();
+    var h=function(){if(document.body.contains(v.o))draw();else window.removeEventListener('qc-change',h)};
+    window.addEventListener('qc-change',h);
+  }
+  function fmtD(s){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||'');return m?(+m[3])+'/'+(+m[2]):s}
+  function openItem(docId,iid){
+    try{if(window.__qcHome&&window.__qcHome.view&&window.__qcHome.view()!=='form')window.__qcHome.go('form')}catch(e){}
+    if(window.__qcForm&&window.__qcForm.openDoc)window.__qcForm.openDoc(docId,iid);
+  }
+
   function pull(){
     var own,fl,sh;
     return Promise.all([api.inspections({project:CUR,owner:UID}),api.folders(),api.inspections({project:CUR,notOwner:UID})]).then(function(r){
@@ -442,6 +577,7 @@
       sh.forEach(function(h){
         sseen[h.id]=1;
         var doc=rowsToDoc(h,by[h.id]||[]),cur=shared.get(h.id);
+        applyActs(h.id,doc);
         if(cur&&cur.key===contentKey(doc)&&cur.owner===h.owner_id)return;
         doc.rev=cur?(+cur.data.rev||0)+1:1;doc.submittedAt=h.updated_at;doc.sub={rev:doc.rev,at:h.updated_at};
         var x={owner:h.owner_id,data:doc,key:contentKey(doc),project:h.project_id};
@@ -486,7 +622,16 @@
       '.qo-pill{position:fixed;left:8px;bottom:8px;z-index:99999;display:flex;align-items:center;gap:6px;max-width:calc(100vw - 16px);padding:6px 12px;border-radius:999px;border:1px solid var(--line,#ccd);background:var(--surface,#fff);color:var(--fg,#222);font-size:.8rem;box-shadow:0 2px 10px rgba(0,0,0,.15);cursor:pointer}',
       '.qo-pill .qo-d{width:8px;height:8px;border-radius:50%;background:#12b76a;flex:0 0 auto}.qo-pill.qo-pending .qo-d{background:#f79009}.qo-pill.qo-offline .qo-d{background:#98a2b3}.qo-pill.qo-error .qo-d{background:#d92d20}',
       '.qo-pill .qo-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-      '.qo-gbtn{display:flex;align-items:center;justify-content:center;gap:10px;min-height:46px;font-size:1rem}'
+      '.qo-gbtn{display:flex;align-items:center;justify-content:center;gap:10px;min-height:46px;font-size:1rem}',
+      '.qo-tb{position:fixed;right:8px;bottom:8px;z-index:99999;display:flex;align-items:center;gap:6px;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid var(--line,#ccd);background:var(--surface,#fff);color:var(--fg,#222);font:inherit;font-size:.85rem;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.15);cursor:pointer}',
+      '.qo-tb b{min-width:1.4em;padding:0 5px;border-radius:999px;background:#f79009;color:#fff;font-size:.78rem;line-height:1.5;text-align:center}.qo-tb b:empty{display:none}',
+      '.qo-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:58px;z-index:2147483001;max-width:min(520px,calc(100vw - 24px));padding:10px 14px;border-radius:10px;background:#1b2430;color:#fff;font-size:.9rem;line-height:1.45;box-shadow:0 6px 24px rgba(0,0,0,.25)}.qo-toast[hidden]{display:none}',
+      '.qo-tasks{align-items:flex-start}.qo-tasks .qo-card{width:min(640px,100%)}',
+      '.qo-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}.qo-tab{flex:0 0 auto;min-height:40px;padding:6px 12px;border-radius:999px;border:1px solid var(--line,#ccd);background:transparent;color:inherit;font:inherit;font-size:.88rem;cursor:pointer}',
+      '.qo-tab.on{background:var(--fg,#1b2430);color:var(--bg,#fff);border-color:transparent}.qo-n{opacity:.7;font-size:.8rem}',
+      '.qo-task{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:12px;border:1px solid var(--line,#ddd);border-radius:12px;background:var(--surface,#fff);color:inherit;font:inherit;cursor:pointer;min-height:56px}',
+      '.qo-tt{font-weight:600;line-height:1.35}.qo-chips{display:flex;flex-wrap:wrap;gap:4px}.qo-chip{font-size:.75rem;padding:1px 8px;border-radius:999px;background:rgba(127,127,127,.14)}',
+      '.qo-chip.st-fixed{background:#fef0c7;color:#93370d}.qo-chip.st-rejected,.qo-chip.late{background:#fee4e2;color:#b42318}.qo-chip.st-approved{background:#d1fadf;color:#05603a}.qo-chip.st-assigned{background:#d1e9ff;color:#175cd3}'
     ].join('');
     document.head.appendChild(s);
   }
@@ -564,6 +709,44 @@
       el('button',{class:'btn',type:'button',onclick:v.close},'ปิด'));
     render();
   }
+  function linePanel(){
+    var v=overlay(),body=el('div',{class:'qo-list'}),err=el('div',{class:'qo-err'}),poll=null;
+    v.c.append(el('h2',null,'แจ้งเตือนทาง LINE'),
+      el('p',null,'รับแจ้งเตือนเมื่อมีงานแก้มอบหมายให้คุณ เมื่อเฮดแมนแจ้งแก้แล้วในเอกสารของคุณ ผลตรวจซ้ำ และสรุปงานเลยกำหนดทุกเช้า 8 โมง'),body,err);
+    function close(){clearInterval(poll);v.close()}
+    function linked(){
+      body.textContent='';
+      body.append(el('p',{style:'font-weight:600;color:#05603a'},'✓ เชื่อม LINE แล้ว'),
+        el('button',{class:'btn',type:'button',onclick:function(){api.lineUnlink().then(show,function(e){err.textContent=e.message})}},'ยกเลิกการเชื่อม'));
+    }
+    function show(){
+      clearInterval(poll);body.textContent='กำลังโหลด…';err.textContent='';
+      api.lineStatus().then(function(s){
+        if(s.linked)return linked();
+        body.textContent='';
+        if(!s.oa){body.appendChild(el('p',null,'ผู้ดูแลระบบยังไม่ได้ตั้งค่าบัญชี LINE Official Account ของบริษัท'));return}
+        var get=el('button',{class:'btn primary qo-gbtn',type:'button'},'ขอรหัสเชื่อมบัญชี');
+        get.addEventListener('click',function(){
+          get.disabled=true;
+          api.lineLinkStart().then(function(r){
+            body.textContent='';
+            var oa=r.oa.charAt(0)==='@'?r.oa:'@'+r.oa;
+            body.append(
+              el('p',null,'1. เพิ่มเพื่อน LINE ของบริษัท '+oa),
+              el('a',{class:'btn',href:'https://line.me/R/ti/p/'+encodeURIComponent(oa),target:'_blank',rel:'noopener',style:'display:flex;align-items:center;justify-content:center;min-height:46px;text-decoration:none'},'เพิ่มเพื่อน '+oa),
+              el('p',null,'2. ส่งรหัสนี้ในแชท (ใช้ได้ 15 นาที)'),
+              el('div',{style:'font-size:2rem;font-weight:700;letter-spacing:.3em;text-align:center;padding:8px;border:1px dashed var(--line,#ccd);border-radius:10px','aria-label':'รหัส '+r.code.split('').join(' ')},r.code),
+              el('a',{class:'btn primary',href:'https://line.me/R/oaMessage/'+encodeURIComponent(oa)+'/?'+encodeURIComponent(r.code),target:'_blank',rel:'noopener',style:'display:flex;align-items:center;justify-content:center;min-height:46px;text-decoration:none'},'เปิด LINE แล้วส่งรหัส'),
+              el('p',{class:'qo-sm'},'หน้านี้จะเปลี่ยนเป็น “เชื่อมแล้ว” เองเมื่อ LINE ได้รับรหัส'));
+            poll=setInterval(function(){if(!document.body.contains(v.o)){clearInterval(poll);return}api.lineStatus().then(function(x){if(x.linked){clearInterval(poll);linked()}},function(){})},4000);
+          },function(e){get.disabled=false;err.textContent='ขอรหัสไม่สำเร็จ: '+(e.message||e)});
+        });
+        body.appendChild(get);
+      },function(e){body.textContent='';err.textContent=isNet(e)?'ต้องต่ออินเทอร์เน็ตเพื่อตั้งค่านี้':'โหลดไม่สำเร็จ: '+(e.message||e)});
+    }
+    v.c.append(el('button',{class:'btn',type:'button',onclick:close},'ปิด'));
+    show();
+  }
   function menu(){
     var v=overlay(),s=syncState(),p=PROJECTS.filter(function(x){return x.id===CUR})[0]||{};
     v.c.append(el('h2',null,p.name||'โครงการ'),
@@ -571,6 +754,8 @@
       el('p',null,s.state==='offline'?'ออฟไลน์อยู่ · รอส่งขึ้นระบบ '+s.pending+' รายการ (จะส่งเองเมื่อมีสัญญาณ)':s.state==='error'?'ซิงก์ไม่สำเร็จ: '+s.error:s.pending?'กำลังส่งขึ้นระบบ '+s.pending+' รายการ':'ข้อมูลตรงกับระบบแล้ว'),
       conflicts?el('p',null,'ผลตรวจซ้ำชนกับคนอื่น '+conflicts+' รายการ: ระบบใช้ผลที่ถึงก่อน ผลของคุณเก็บไว้ในประวัติ'):null);
     if(!canCreate())v.c.appendChild(el('p',null,'บทบาทนี้เปิดดูเอกสารของทีมได้ แต่สร้างเอกสารใหม่ไม่ได้'));
+    v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();tasksPanel()}},'งานของฉัน / รอตรวจซ้ำ'));
+    v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();linePanel()}},'เชื่อม LINE รับแจ้งเตือน'));
     v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();runSync()}},'ซิงก์ตอนนี้'));
     if(ROLE==='pm'||(ME&&ME.org_role==='admin'))v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();membersPanel()}},'จัดการสมาชิก'));
     if(PROJECTS.length>1||(ME&&ME.org_role==='admin'))v.c.append(el('button',{class:'btn',type:'button',onclick:function(){lsSet(PK,'');location.reload()}},'เปลี่ยนโครงการ'));
@@ -586,7 +771,9 @@
   function showPill(){
     css();
     pill=el('button',{class:'qo-pill',type:'button','aria-label':'สถานะออนไลน์และเมนูบัญชี'},el('span',{class:'qo-d'}),el('span',{class:'qo-t'},''));
-    pill.addEventListener('click',menu);document.body.appendChild(pill);status();
+    pill.addEventListener('click',menu);document.body.appendChild(pill);
+    taskBtn=el('button',{class:'qo-tb',type:'button','aria-label':'งานของฉันและรายการรอตรวจซ้ำ',onclick:function(){tasksPanel()}},'งาน ',el('b',null,''));
+    document.body.appendChild(taskBtn);status();updateTaskBtn();
   }
 
   /* ---------- boot ---------- */
@@ -611,6 +798,7 @@
       ROLE=(PROJECTS.filter(function(p){return p.id===id})[0]||{}).role||null;
       try{bc=new BroadcastChannel('qc-online-'+UID);bc.onmessage=function(){loadAll().then(notify)}}catch(e){}
       try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+      loadMembers();
       showPill();
       window.addEventListener('online',function(){schedule(0)});window.addEventListener('offline',status);
       setInterval(function(){if(!document.hidden)schedule(0)},60000);
@@ -694,7 +882,11 @@
   var NOT_ONLINE='โหมดออนไลน์ยังไม่รองรับการรับไฟล์/กู้คืนจากไฟล์ สลับไปโหมดออฟไลน์เพื่อใช้ฟีเจอร์นี้';
   window.__qcCommit=function(){return Promise.reject(new Error(NOT_ONLINE))};
   window.__qc={importData:function(){return Promise.reject(new Error(NOT_ONLINE))}};
-  window.__qcOnline={sync:function(){runSync()},state:syncState,project:function(){return CUR},role:function(){return ROLE}};
+  window.__qcOnline={sync:function(){runSync()},state:syncState,project:function(){return CUR},role:function(){return ROLE},
+    uid:function(){return UID},members:function(){return MEMBERS.slice()},name:nameOf,canCreate:canCreate,
+    recheck:function(doc,iid,res,note,after){return act('rx',doc,iid,{res:res,note:note,after:after})},
+    reportFixed:function(doc,iid,note,after){return act('fx',doc,iid,{note:note,after:after})},
+    tasks:function(t){tasksPanel(t)},lists:lists,onMessage:function(f){actListeners.push(f)}};
 
   var caps={db:db,user:user,assets:assets,downloads:downloads};
   window.claude={use:function(n){return ready.then(function(){return caps[n]||null},function(){return null})}};
