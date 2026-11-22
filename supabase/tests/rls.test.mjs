@@ -181,16 +181,33 @@ ok((await rows(U.foreman2, `update inspections set summary='z' where id='i1' ret
 ok((await rows(U.foreman2, `select id from inspections`)).length === 0, 'removed owner cannot see');
 await as(U.pm, () => q(`insert into project_members(project_id, user_id, role) values ('p1',$1,'foreman')`, [U.foreman2]));
 
-console.log('\n[storage]');
+console.log('\n[storage: uploader-keyed photos (migration 0002)]');
 const up = (u, path) => as(u, () => q(`insert into storage.objects(bucket_id, name) values ('inspection-photos', $1) returning id`, [path]));
-ok((await up(U.foreman2, 'p1/i1/before/f1.jpg')).rows.length === 1, 'owner uploads before photo');
-ok((await up(U.headman, 'p1/i1/after/h9.jpg')).rows.length === 1, 'member uploads after photo');
-await fails(U.headman, `insert into storage.objects(bucket_id, name) values ('inspection-photos','p1/i1/before/x.jpg')`, [], 'non-owner cannot upload before photo');
-await fails(U.headman, `insert into storage.objects(bucket_id, name) values ('inspection-photos','p2/i1/after/x.jpg')`, [], 'path must match the document\'s project');
-await fails(U.outsider, `insert into storage.objects(bucket_id, name) values ('inspection-photos','p1/i1/after/x.jpg')`, [], 'outsider cannot upload');
-ok((await rows(U.viewer, `select id from storage.objects`)).length === 2, 'member views photos');
-ok((await rows(U.outsider, `select id from storage.objects`)).length === 0, 'outsider sees no photos');
-ok((await rows(U.headman, `delete from storage.objects returning id`)).length === 0, 'non-owner cannot delete photos');
+const fPath = `${U.foreman2}/f1.jpg`, hPath = `${U.headman}/h9.jpg`, loose = `${U.foreman2}/unused.jpg`;
+ok((await up(U.foreman2, fPath)).rows.length === 1, 'user uploads into own folder');
+ok((await up(U.headman, hPath)).rows.length === 1, 'headman uploads into own folder');
+await as(U.foreman2, () => q(`insert into storage.objects(bucket_id, name) values ('inspection-photos',$1)`, [loose]));
+await fails(U.headman, `insert into storage.objects(bucket_id, name) values ('inspection-photos',$1)`, [`${U.foreman2}/x.jpg`], 'cannot upload into someone else\'s folder');
+await fails(U.outsider, `insert into storage.objects(bucket_id, name) values ('inspection-photos','p1/x.jpg')`, [], 'cannot upload outside own folder');
+ok((await rows(U.viewer, `select name from storage.objects`)).length === 0, 'unreferenced photos are private to uploader');
+await as(U.foreman2, () => q(`update inspection_items set before = array[$1] where id='a'`, [fPath]));
+await as(U.headman, () => q(`update inspection_items set after = array[$1] where id='a' returning id`, [hPath])); // ignored: headman not owner
+ok((await rows(U.headman, `select recheck_item('c','bad','', array[$1]::text[], (select rchk_at from inspection_items where id='c')) r`, [hPath]))[0].r === 'ok', 'headman attaches own photo through recheck');
+const seenBy = async (u) => (await rows(u, `select name from storage.objects order by name`)).map(r => r.name);
+ok((await seenBy(U.viewer)).join() === [fPath, hPath].sort().join(), 'member sees photos referenced by project items (not the unused one)');
+ok((await seenBy(U.foreman2)).length === 3, 'uploader always sees own photos');
+ok((await seenBy(U.outsider)).length === 0, 'outsider sees no photos');
+ok((await rows(U.headman, `delete from storage.objects where name=$1 returning id`, [fPath])).length === 0, 'cannot delete someone else\'s photo');
+ok((await rows(U.foreman2, `delete from storage.objects where name=$1 returning id`, [loose])).length === 1, 'can delete own photo');
+
+console.log('\n[folders & my_projects (migration 0002)]');
+await as(U.foreman2, () => q(`insert into folders(id, name) values ('f1','Tower A ชั้น 1-5')`));
+ok((await rows(U.foreman2, `select id from folders`)).length === 1, 'owner sees own folder');
+ok((await rows(U.pm, `select id from folders`)).length === 0, 'folders are private');
+await fails(U.pm, `insert into folders(id, name, owner_id) values ('f2','x',$1)`, [U.foreman2], 'cannot create folder for someone else');
+const mp = await rows(U.headman, `select * from my_projects()`);
+ok(mp.length === 1 && mp[0].id === 'p1' && mp[0].role === 'headman', 'my_projects returns membership with role');
+ok((await rows(U.outsider, `select * from my_projects()`)).length === 0, 'outsider has no projects');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
