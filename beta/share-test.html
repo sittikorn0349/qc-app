@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ทดสอบการส่งไฟล์</title>
+<style>
+body{font:16px/1.5 system-ui,-apple-system,"Sarabun",sans-serif;margin:0;padding:16px;background:#f1f3f0;color:#1b2a2f}
+h1{font-size:1.25rem;margin:.2rem 0 .6rem}h2{font-size:1rem;margin:1.2rem 0 .4rem}
+.card{background:#fff;border:1px solid #cfd6d2;border-radius:10px;padding:12px;margin:10px 0}
+button{display:block;width:100%;font:inherit;padding:12px;margin:8px 0;border-radius:8px;border:1px solid #1d5f7c;background:#1d5f7c;color:#fff}
+button.alt{background:#fff;color:#1d5f7c}
+code{word-break:break-all;font-size:.85rem}
+pre{white-space:pre-wrap;word-break:break-all;background:#eef1ee;padding:8px;border-radius:6px;font-size:.8rem;margin:6px 0 0}
+small{color:#566;display:block}
+</style></head><body>
+<h1>ทดสอบการส่งไฟล์จากมือถือ</h1>
+<small>หน้านี้ใช้ทดสอบเท่านั้น ไม่แตะข้อมูลงานจริง ทดลองส่งไฟล์ทดสอบไปทาง LINE หรืออีเมลของคุณเอง แล้วถ่ายหน้าจอผลมาให้ผม</small>
+
+<div class="card">
+  <b>ไฟล์ทดสอบ</b> <span id="info">กำลังสร้าง…</span>
+  <div>รหัสตรวจสอบ (SHA-256 ย่อ): <code id="sha">-</code></div>
+</div>
+
+<h2>ขั้น 1 ส่งออก</h2>
+<button id="b1" disabled>A. หน้าต่างแชร์ · ไฟล์ .zip</button>
+<button id="b2" class="alt" disabled>B. หน้าต่างแชร์ · ไฟล์ .qcz (นามสกุลอื่น)</button>
+<button id="b3" class="alt" disabled>C. บันทึกไฟล์ลงเครื่อง (แล้วแนบเอง)</button>
+<pre id="log">รอผล…</pre>
+
+<h2>ขั้น 2 ตรวจไฟล์ที่ได้รับ (ฝั่งรับ)</h2>
+<small>เปิดหน้านี้ในเครื่องผู้รับ เลือกไฟล์ที่ได้รับมา แล้วเทียบรหัสกับฝั่งส่ง ถ้าตรงกันแปลว่าไฟล์มาครบไม่เสียหาย</small>
+<button id="b4" class="alt">เลือกไฟล์ที่ได้รับ…</button>
+<input type="file" id="f" style="display:none">
+<pre id="rx">ยังไม่ได้เลือกไฟล์</pre>
+
+<script>
+(function(){
+  var $=function(s){return document.querySelector(s)},log=$('#log'),L=[];
+  function say(t){L.push(t);log.textContent=L.join('\n')}
+  var env=[navigator.userAgent.replace(/\)\s.*/,')'),'secure='+window.isSecureContext,'share='+!!navigator.share,'canShare='+!!navigator.canShare,'standalone='+(!!navigator.standalone||(matchMedia&&matchMedia('(display-mode: standalone)').matches))];
+  say('เครื่อง: '+env.join(' | '));
+  async function sha(buf){var h=await crypto.subtle.digest('SHA-256',buf);return Array.from(new Uint8Array(h)).map(function(b){return b.toString(16).padStart(2,'0')}).join('')}
+  var T=new Uint32Array(256);for(var i=0;i<256;i++){var c=i;for(var k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;T[i]=c>>>0}
+  function crc(u){var c=~0;for(var i=0;i<u.length;i++)c=T[(c^u[i])&255]^(c>>>8);return(~c)>>>0}
+  function zip(files){var enc=new TextEncoder(),parts=[],cd=[],off=0;
+    files.forEach(function(f){var n=enc.encode(f.name),c=crc(f.data),lh=new DataView(new ArrayBuffer(30));
+      lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x800,true);lh.setUint32(14,c,true);lh.setUint32(18,f.data.length,true);lh.setUint32(22,f.data.length,true);lh.setUint16(26,n.length,true);
+      var ch=new DataView(new ArrayBuffer(46));ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x800,true);ch.setUint32(16,c,true);ch.setUint32(20,f.data.length,true);ch.setUint32(24,f.data.length,true);ch.setUint16(28,n.length,true);ch.setUint32(42,off,true);
+      parts.push(lh.buffer,n,f.data);cd.push(ch.buffer,n);off+=30+n.length+f.data.length});
+    var cdSize=0;cd.forEach(function(x){cdSize+=x.byteLength||x.length});
+    var e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cdSize,true);e.setUint32(16,off,true);
+    return new Blob(parts.concat(cd,[e.buffer]),{type:'application/zip'})}
+  var blobZip,blobQcz,name='ทดสอบ-ส่งงาน';
+  (async function build(){
+    var cv=document.createElement('canvas');cv.width=1600;cv.height=1200;var x=cv.getContext('2d'),g=x.createLinearGradient(0,0,1600,1200);g.addColorStop(0,'#456');g.addColorStop(1,'#cba');x.fillStyle=g;x.fillRect(0,0,1600,1200);
+    for(var i=0;i<4000;i++){x.fillStyle='rgba('+(Math.random()*255|0)+','+(Math.random()*255|0)+','+(Math.random()*255|0)+',.5)';x.fillRect(Math.random()*1600,Math.random()*1200,30,30)}
+    var jpg=await new Promise(function(r){cv.toBlob(r,'image/jpeg',.9)}),jb=new Uint8Array(await jpg.arrayBuffer());
+    var txt=new TextEncoder().encode('ไฟล์ทดสอบการส่งงาน สร้างเมื่อ '+new Date().toISOString());
+    blobZip=zip([{name:'data.json',data:txt},{name:'photos/test1.jpg',data:jb}]);
+    var buf=await blobZip.arrayBuffer(),s=await sha(buf);
+    blobQcz=new Blob([buf],{type:'application/octet-stream'});
+    $('#info').textContent=(buf.byteLength/1024).toFixed(0)+' KB';$('#sha').textContent=s.slice(0,16);
+    ['b1','b2','b3'].forEach(function(id){$('#'+id).disabled=false});
+  })();
+  async function doShare(blob,fname,type,tag){
+    var f=new File([blob],fname,{type:type});
+    say('['+tag+'] canShare='+(navigator.canShare?navigator.canShare({files:[f]}):'n/a'));
+    if(!navigator.share){say('['+tag+'] เครื่องนี้ไม่มี share');return}
+    try{await navigator.share({files:[f],title:'ทดสอบส่งงาน'});say('['+tag+'] หน้าต่างแชร์ปิดแบบสำเร็จ (ยังไม่รับประกันว่าปลายทางได้รับ ให้ตรวจที่ฝั่งรับ)')}
+    catch(e){say('['+tag+'] ผิดพลาด: '+e.name+' '+(e.message||''))}
+  }
+  $('#b1').onclick=function(){doShare(blobZip,name+'.zip','application/zip','A zip')};
+  $('#b2').onclick=function(){doShare(blobQcz,name+'.qcz','application/octet-stream','B qcz')};
+  $('#b3').onclick=function(){var a=document.createElement('a');a.href=URL.createObjectURL(blobZip);a.download=name+'.zip';document.body.appendChild(a);a.click();a.remove();say('[C] สั่งดาวน์โหลดแล้ว ดูที่แอป Files > Downloads (iPhone) หรือโฟลเดอร์ดาวน์โหลด (Android)')};
+  $('#b4').onclick=function(){$('#f').click()};
+  $('#f').onchange=async function(){var f=this.files[0];if(!f)return;var buf=await f.arrayBuffer(),s=await sha(buf);
+    $('#rx').textContent='ชื่อ: '+f.name+'\nขนาด: '+(buf.byteLength/1024).toFixed(0)+' KB\nรหัส: '+s.slice(0,16)+'\n(เทียบกับรหัสฝั่งส่ง ต้องเหมือนกันทุกตัวอักษร)'};
+})();
+</script></body></html>
