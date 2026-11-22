@@ -1984,6 +1984,40 @@ button{font:inherit;cursor:pointer}
     need.forEach(function(p){chain=chain.then(function(){setStatus('กำลังเตรียมรูป '+(++n)+' / '+need.length);return getDataURL(p).then(function(d){return ensureDim(p,d)})})});
     return chain;
   }
+  /* show the rendered A4 sheets on screen so the user can review before the PDF is actually written to disk */
+  function previewSheets(sheets){
+    return new Promise(function(resolve){
+      var root=$('#pdfroot');
+      var vw=Math.min(window.innerWidth-32,600);
+      var scale=Math.min(1,vw/794);
+      var back=el('div',{class:'dlg-back',id:'pdf-preview-back',style:'z-index:70'});
+      var body=el('div',{style:'flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;align-items:center;gap:16px;background:var(--bg);-webkit-overflow-scrolling:touch'});
+      sheets.forEach(function(sh){
+        var holder=el('div',{style:'width:'+(794*scale)+'px;height:'+(1123*scale)+'px;position:relative;flex:0 0 auto;box-shadow:0 2px 10px rgba(0,0,0,.3)'});
+        sh.style.position='absolute';sh.style.left='0';sh.style.top='0';
+        sh.style.transform='scale('+scale+')';sh.style.transformOrigin='top left';
+        holder.appendChild(sh);body.appendChild(holder);
+      });
+      var title=el('div',{class:'dlg-h',style:'padding:14px 16px;border-bottom:1px solid var(--line);flex:0 0 auto;display:flex;align-items:baseline;gap:8px'},
+        el('b',null,'ตัวอย่างก่อนสร้างไฟล์ PDF'),el('span',{style:'color:var(--muted);font-size:.85rem'},sheets.length+' หน้า'));
+      var cancel=el('button',{class:'btn',type:'button'},'ยกเลิก');
+      var ok=el('button',{class:'btn primary',type:'button'},'สร้างไฟล์ PDF');
+      var foot=el('div',{class:'rb-actions',style:'padding:12px 16px;border-top:1px solid var(--line);justify-content:flex-end;flex:0 0 auto'},cancel,ok);
+      var box=el('div',{class:'dlg',style:'max-width:'+(794*scale+32)+'px;width:94%;height:88vh;display:flex;flex-direction:column'},title,body,foot);
+      back.appendChild(box);document.body.appendChild(back);
+      function done(v){
+        sheets.forEach(function(sh){
+          sh.style.position='';sh.style.left='';sh.style.top='';sh.style.transform='';sh.style.transformOrigin='';
+          root.appendChild(sh);
+        });
+        back.remove();resolve(v);
+      }
+      cancel.addEventListener('click',function(){done(false)});
+      ok.addEventListener('click',function(){done(true)});
+      back.addEventListener('click',function(e){if(e.target===back)done(false)});
+      ok.focus();
+    });
+  }
   function pdfButtons(disabled,label){
     document.querySelectorAll('.js-pdf').forEach(function(b){b.disabled=disabled;b.textContent=label});
     ['#btn-pend','#btn-csv'].forEach(function(q){$(q).disabled=disabled});
@@ -2024,6 +2058,10 @@ button{font:inherit;cursor:pointer}
       var ready=(document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();
       return ready.then(kind==='pend'?function(){}:prepPhotos).then(function(){
         sheets=buildSheets(kind,D);
+        pdfButtons(true,'กำลังสร้าง PDF…');
+        return previewSheets(sheets);
+      }).then(function(okToMake){
+        if(!okToMake)throw {code:'cancelled'};
         var pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
         var chain=Promise.resolve();
         sheets.forEach(function(sh,i){
@@ -2047,7 +2085,8 @@ button{font:inherit;cursor:pointer}
       setStatus('ส่งไฟล์ PDF ให้บันทึกแล้ว');
     }).catch(function(e){
       var code=e&&e.code;
-      if(code==='declined')setStatus('ยกเลิกการบันทึก PDF');
+      if(code==='cancelled')setStatus('ยกเลิกการสร้าง PDF');
+      else if(code==='declined')setStatus('ยกเลิกการบันทึก PDF');
       else if(code==='unavailable'||code==='not_granted'||code==='capability_disabled'||code==='capability_removed')
         setStatus('มุมมองนี้บันทึกไฟล์ไม่ได้ ใช้เมนูพิมพ์ของเบราว์เซอร์แล้วเลือกบันทึกเป็น PDF แทน');
       else if(code==='rate_limited')setStatus('มีหน้าต่างบันทึกเปิดอยู่ ลองอีกครั้งในอีกสักครู่');
