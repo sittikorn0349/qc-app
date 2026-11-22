@@ -7,7 +7,7 @@ const fs = require('fs');
 
 const FAKE = `
 (function(){
-  var ME='11111111-2222-3333-4444-555555555555', OTHER='99999999-8888-7777-6666-555555555555';
+  var ME='11111111-2222-3333-4444-555555555555', OTHER='99999999-8888-7777-6666-555555555555', HM='77777777-6666-5555-4444-333333333333';
   var S0=null;try{S0=JSON.parse(sessionStorage.getItem('fakeS')||'null')}catch(e){}
   var S=S0||{insp:{},items:{},folders:{},blobs:{},events:[],calls:[]};S.rt=[];
   function save(){var x=Object.assign({},S);delete x.rt;var b={};Object.keys(S.blobs).forEach(function(k){b[k]=true});x.blobs=b;sessionStorage.setItem('fakeS',JSON.stringify(x))}
@@ -15,16 +15,18 @@ const FAKE = `
   function now(){return new Date(Date.now()+(S.skew=(S.skew||0)+1)).toISOString()}
   function c(o){return JSON.parse(JSON.stringify(o))}
   function today(){return new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Bangkok'})}
-  function status(it){
+  function status(it,keepFixed){
     if(it.res!=='fix'&&it.res!=='bad')return null;
-    return it.rres==='ok'?'approved':it.rres==='bad'?'rejected':'open';
+    if(keepFixed&&it.status==='fixed')return 'fixed';
+    return it.rres==='ok'?'approved':it.rres==='bad'?'rejected':it.assignee_id?'assigned':'open';
   }
   function log(n,a){S.calls.push(n)}
-  window.__fake={S:S,ME:ME,OTHER:OTHER,
+  window.__fake={S:S,ME:ME,OTHER:OTHER,HM:HM,
+    fixedBy:function(sid,note){var it=S.items[sid];it.status='fixed';it.rres='';it.fixed_note=note||''},
     fire:function(){S.rt.forEach(function(cb){cb({})})},
     otherRecheck:function(sid,res,note){var it=S.items[sid];it.rres=res;it.rnote=note;it.rdate=today();it.rchk_at=now();it.status=status(it)},
-    addShared:function(id,docno){S.insp[id]={id:id,project_id:'p1',owner_id:OTHER,docno:docno,insp_date:null,site:'',work:'งานของ PM',weather:'',meta:{project:'Tower A',docno:docno,work:'งานของ PM'},sign:{},summary:'',remarks:'',rev:0,created_at:now(),updated_at:now(),deleted_at:null,folder_id:null,extra:{v:2}};
-      S.items[id+'.x1']={id:id+'.x1',inspection_id:id,project_id:'p1',ord:0,loc:'คาน B1',chk:'ระดับ',res:'fix',note:'',cat:'',ref:'',before:[],after:[],rres:'',rdate:'',rnote:'',rchk_at:null,status:'open'}}
+    addShared:function(id,docno,asg){S.insp[id]={id:id,project_id:'p1',owner_id:OTHER,docno:docno,insp_date:null,site:'',work:'งานของ PM',weather:'',meta:{project:'Tower A',docno:docno,work:'งานของ PM'},sign:{},summary:'',remarks:'',rev:0,created_at:now(),updated_at:now(),deleted_at:null,folder_id:null,extra:{v:2}};
+      S.items[id+'.x1']={id:id+'.x1',inspection_id:id,project_id:'p1',ord:0,loc:'คาน B1',chk:'ระดับ',res:'fix',note:'',cat:'',ref:'',before:[],after:[],rres:'',rdate:'',rnote:'',rchk_at:null,assignee_id:asg||null,due_date:null,fixed_note:'',status:asg?'assigned':'open'}}
   };
   window.__qcOnlineApi={
     session:function(){return Promise.resolve({user:{id:ME,email:'foreman@example.com',user_metadata:{full_name:'Foreman Test'}}})},
@@ -39,26 +41,32 @@ const FAKE = `
     deleteHeader:function(id){var h=S.insp[id];if(h&&h.owner_id===ME){delete S.insp[id];Object.keys(S.items).forEach(function(k){if(S.items[k].inspection_id===id)delete S.items[k]})}return Promise.resolve(null)},
     insertItems:function(rows){log('insertItems');rows.forEach(function(r){var h=S.insp[r.inspection_id];if(!h||h.owner_id!==ME)throw new Error('rls');var it=c(r);it.project_id=h.project_id;it.rchk_at=(it.rres==='ok'||it.rres==='bad')?now():null;it.status=status(it);S.items[it.id]=it});return Promise.resolve(null)},
     updateItem:function(id,p){log('updateItem:'+Object.keys(p).join('+'));var it=S.items[id];if(!it||S.insp[it.inspection_id].owner_id!==ME)return Promise.resolve([]);
-      var before=it.rres;Object.assign(it,c(p));if('rres' in p&&p.rres!==before&&(p.rres==='ok'||p.rres==='bad'))it.rchk_at=now();it.status=status(it);return Promise.resolve([{id:id}])},
+      var before=it.rres;Object.assign(it,c(p));if('rres' in p&&p.rres!==before&&(p.rres==='ok'||p.rres==='bad'))it.rchk_at=now();it.status=status(it,!('rres' in p));return Promise.resolve([{id:id}])},
     deleteItems:function(ids){ids.forEach(function(id){delete S.items[id]});return Promise.resolve(null)},
     recheck:function(id,res,note,after,seen){log('recheck');var it=S.items[id];if(!it)return Promise.resolve('gone');
       if((it.rchk_at||null)!==(seen||null)){S.events.push({kind:'recheck_conflict',item:id,res:res,note:note});return Promise.resolve('conflict')}
-      it.rres=res;it.rnote=note||'';it.rdate=today();it.after=it.after.concat(after||[]);it.rchk_at=now();it.status=status(it);return Promise.resolve('ok')},
+      it.rres=res;it.rnote=note||'';it.rdate=today();it.after=it.after.concat(after||[]);it.rchk_at=now();it.status=status(it);S.events.push({kind:'recheck',item:id,res:res});return Promise.resolve('ok')},
+    reportFixed:function(id,after,note){log('reportFixed');var it=S.items[id];if(!it)return Promise.resolve('gone');
+      if(it.assignee_id!==ME)return Promise.reject(Object.assign(new Error('item not assigned to you'),{code:'P0001'}));
+      if(it.status==='fixed')return Promise.resolve('already_fixed');
+      it.status='fixed';it.rres='';it.after=it.after.concat(after||[]);it.fixed_note=note||'';return Promise.resolve('ok')},
     folders:function(){return Promise.resolve(Object.values(S.folders).map(c))},
     upsertFolder:function(r){S.folders[r.id]=c(r);return Promise.resolve(null)},
     deleteFolder:function(id){delete S.folders[id];return Promise.resolve(null)},
     upload:function(path,blob){log('upload');S.blobs[path]=blob;return Promise.resolve({path:path})},
     download:function(path){return Promise.resolve(S.blobs[path]?(S.blobs[path] instanceof Blob?S.blobs[path]:new Blob([new Uint8Array([137,80,78,71])],{type:'image/png'})):null)},
     remove:function(path){delete S.blobs[path];return Promise.resolve(null)},
-    profiles:function(ids){return Promise.resolve(ids.map(function(id){return {id:id,display_name:id===OTHER?'PM สมชาย':'Foreman Test',email:''}}))},
-    profileByEmail:function(){return Promise.resolve(null)},members:function(){return Promise.resolve([])},
+    profiles:function(ids){return Promise.resolve(ids.map(function(id){return {id:id,display_name:id===OTHER?'PM สมชาย':id===HM?'เฮดแมน สมศักดิ์':'Foreman Test',email:''}}))},
+    profileByEmail:function(){return Promise.resolve(null)},members:function(){return Promise.resolve([{user_id:ME,role:'foreman'},{user_id:OTHER,role:'pm'},{user_id:HM,role:'headman'}])},
     addMember:function(){return Promise.resolve(null)},removeMember:function(){return Promise.resolve(null)},
     createProject:function(){return Promise.reject(new Error('no'))},
+    lineStatus:function(){return Promise.resolve({linked:!!S.linked,oa:'@qcapp'})},lineLinkStart:function(){return Promise.resolve({code:'123456',oa:'@qcapp',linked:false})},lineUnlink:function(){S.linked=false;return Promise.resolve(null)},
     subscribe:function(p,cb){S.rt.push(cb);return function(){}}
   };
 })();`;
 
-(async () => {
+module.exports = { FAKE };
+if (require.main === module) (async () => {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
   await ctx.addInitScript(FAKE);

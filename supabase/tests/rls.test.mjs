@@ -209,5 +209,57 @@ const mp = await rows(U.headman, `select * from my_projects()`);
 ok(mp.length === 1 && mp[0].id === 'p1' && mp[0].role === 'headman', 'my_projects returns membership with role');
 ok((await rows(U.outsider, `select * from my_projects()`)).length === 0, 'outsider has no projects');
 
+console.log('\n[LINE notifications (migration 0003)]');
+const notes = async () => (await q(`select user_id, kind, title, body from notifications order by id`)).rows;
+const before = (await notes()).length;
+await as(U.foreman, async () => {
+  await q(`insert into inspections(id, project_id, docno) values ('n1','p1','QC-N1')`);
+  await q(`insert into inspection_items(id, inspection_id, ord, loc, chk, res, assignee_id, due_date) values ('n1.a','n1',0,'เสา C-1','ระยะหุ้ม','fix',$1,'2026-01-05')`, [U.headman]);
+  await q(`insert into inspection_items(id, inspection_id, ord, loc, res) values ('n1.b','n1',1,'คาน','ok')`);
+});
+let N = (await notes()).slice(before);
+ok(N.length === 1 && N[0].user_id === U.headman && N[0].kind === 'assign', 'assigning (on insert) notifies the assignee only');
+ok(/Tower A · QC-N1/.test(N[0].body) && /เสา C-1 · ระยะหุ้ม/.test(N[0].body) && /05\/01\/2026/.test(N[0].body) && /โดย FOREMAN/.test(N[0].body), 'message names project, document, item, due date and who: ' + JSON.stringify(N[0].body));
+await as(U.foreman, () => q(`update inspection_items set note='x' where id='n1.a'`));
+ok((await notes()).length === before + 1, 'editing other fields sends nothing');
+await as(U.headman, () => q(`select report_fixed('n1.a', '{}', 'เสร็จแล้วครับ')`));
+N = (await notes()).slice(before);
+ok(N.length === 2 && N[1].user_id === U.foreman && N[1].kind === 'fixed' && /เสร็จแล้วครับ/.test(N[1].body) && /โดย HEADMAN/.test(N[1].body), 'headman "แจ้งแก้แล้ว" notifies the document owner');
+await as(U.pm, () => q(`select recheck_item('n1.a','bad','ยังไม่ได้', '{}', (select rchk_at from inspection_items where id='n1.a'))`));
+N = (await notes()).slice(before);
+ok(N.length === 3 && N[2].user_id === U.headman && N[2].kind === 'rejected' && /ยังไม่ได้/.test(N[2].body), 'failed recheck notifies the assignee');
+await as(U.headman, () => q(`select report_fixed('n1.a', '{}', '')`));
+await as(U.headman, () => q(`select recheck_item('n1.a','ok','', '{}', (select rchk_at from inspection_items where id='n1.a'))`));
+N = (await notes()).slice(before);
+ok(!N.slice(3).some(n => n.user_id === U.headman && n.kind === 'approved'), 'no message about your own recheck');
+await as(U.foreman, () => q(`update inspection_items set assignee_id=$1 where id='n1.a'`, [U.foreman]));
+ok(!(await notes()).slice(before).some(n => n.kind === 'assign' && n.user_id === U.foreman), 'assigning to yourself sends nothing');
+await as(U.foreman, async () => {
+  await q(`insert into inspection_items(id, inspection_id, ord, loc, res, assignee_id, due_date) values ('n1.c','n1',2,'พื้น','bad',$1,'2020-01-01'),('n1.d','n1',3,'ผนัง','fix',$1,'2020-01-02')`, [U.headman]);
+});
+const dg = (await q(`select queue_overdue_digest() n`)).rows[0].n;
+const D = (await notes()).filter(n => n.kind === 'overdue');
+ok(dg === 1 && D.length === 1 && D[0].user_id === U.headman && /เลยกำหนด 2 รายการ/.test(D[0].title) && /พื้น/.test(D[0].body) && /ผนัง/.test(D[0].body), 'morning digest: one message per person listing overdue items');
+
+console.log('\n[LINE linking + privacy]');
+ok((await rows(U.headman, `select * from notifications`)).every(n => n.user_id === U.headman), 'people only read their own notifications');
+await fails(U.headman, `insert into notifications(user_id, kind, title) values ($1,'assign','x')`, [U.pm], 'app cannot write notifications');
+const st = await one(U.headman, `select line_link_start() s`);
+ok(/^\d{6}$/.test(st.s.code) && st.s.linked === false, 'app gets a 6-digit link code');
+ok((await one(null, `select line_link_complete($1, 'Uabc') n`, [st.s.code])).n === 'HEADMAN', 'LINE webhook completes linking with the code');
+ok((await one(null, `select line_link_complete($1, 'Uzzz') n`, [st.s.code])).n === null, 'a code works only once');
+ok((await one(U.headman, `select line_status() s`)).s.linked === true, 'app sees "linked"');
+await fails(U.pm, `select line_user_id from profiles where id=$1`, [U.headman], 'teammates cannot read LINE ids');
+await fails(U.pm, `update profiles set line_user_id='Uhack' where id=$1`, [U.pm], 'LINE id cannot be set from the app');
+ok((await rows(U.pm, `select display_name from profiles where id=$1`, [U.headman])).length === 1, 'teammates still see names');
+await fails(U.headman, `select * from claim_notifications(10)`, [], 'app cannot claim the send queue');
+const cl = (await q(`select * from claim_notifications(100)`)).rows;
+ok(cl.length >= 6 && cl.filter(r => r.user_id === U.headman).every(r => r.line_user_id === 'Uabc'), 'sender gets the batch with LINE ids');
+ok((await q(`select * from claim_notifications(100)`)).rows.length === 0, 'claimed rows are not handed out twice');
+await q(`select finish_notifications($1::bigint[], null)`, [cl.map(r => r.id)]);
+ok((await q(`select count(*)::int n from notifications where sent_at is null`)).rows[0].n === 0, 'finished rows marked sent');
+await as(U.headman, () => q(`select line_unlink()`));
+ok((await one(U.headman, `select line_status() s`)).s.linked === false, 'unlink works');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
