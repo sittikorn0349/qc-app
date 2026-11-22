@@ -78,6 +78,16 @@
   function fmtShort(iso){var d=new Date(iso);if(isNaN(d))return '';try{return d.toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}catch(e){return ''}}
   function jget(k,def){try{return JSON.parse(ls(k)||'')||def}catch(e){return def}}
 
+  /* unanswered items / items still awaiting re-inspection, so the sender notices before sending */
+  function gaps(d){
+    var items=(d&&d.items)||[],blank=0,pend=0;
+    items.forEach(function(it){
+      if(!it.res)blank++;
+      else if((it.res==='fix'||it.res==='bad')&&it.rres!=='ok')pend++;
+    });
+    return {blank:blank,pend:pend};
+  }
+
   /* ---------- build + verify a package ---------- */
   var ZIP_README='แพ็กเกจส่งงาน (qc-send v1)\nmanifest.json = รายการไฟล์พร้อมรหัสตรวจ SHA-256 และรหัสยืนยัน\ndocs.json = ข้อมูลเอกสาร\nphotos/ = รูปถ่ายต้นฉบับ\nนำเข้าที่แอปตรวจงานก่อสร้าง > คลังเอกสาร > นำเข้า ระบบจะตรวจความครบถ้วนก่อนนำเข้าทุกครั้ง ห้ามแก้ไขไฟล์ในนี้\n';
   function fail(msg,list){var e=new Error(msg);e.list=list||[];e.user=true;return e}
@@ -342,17 +352,31 @@
       var s=sent[x.id],cb=el('input',{type:'checkbox','aria-label':'เลือก '+titleOf(x.data)});cb.checked=x.id===cur;sel[x.id]=cb.checked;
       cb.addEventListener('change',function(){sel[x.id]=cb.checked;counts()});
       var chips=el('div',{class:'rec-chips'},el('span',null,photosOf(x.data).length+' รูป'));
+      var g=gaps(x.data);
+      if(g.blank)chips.appendChild(el('span',{class:'c-fix'},'ยังไม่ตรวจ '+g.blank));
+      if(g.pend)chips.appendChild(el('span',{class:'c-fix'},'รอตรวจซ้ำ '+g.pend));
       if(s)chips.appendChild(el('span',null,'เคยสร้างไฟล์ส่งแล้ว '+fmtShort(s.at)));
       list.appendChild(el('label',{class:'rec',style:'grid-template-columns:auto minmax(0,1fr);cursor:pointer'},cb,el('span',{style:'min-width:0'},el('span',{class:'rec-t',style:'display:block'},titleOf(x.data)),chips)));
     });
     var go=el('button',{class:'btn primary',type:'button'},'สร้างไฟล์ส่ง');
     var close=el('button',{class:'btn',type:'button',onclick:closeModal},'ปิด');
     acts.appendChild(go);acts.appendChild(close);counts();
+    var gapsConfirmed=false;
     go.addEventListener('click',async function(){
       var nm=nameIn.value.trim();
       if(!nm){info.textContent='กรอกชื่อผู้ส่งก่อน (ให้ผู้รับรู้ว่าไฟล์มาจากใคร)';nameIn.focus();return}
-      lsSet(NAME_K,nm);lsSet(CODE_K,codeIn.value.trim().replace(/[^A-Za-z0-9ก-๙]/g,'').slice(0,6));lsSet(EXT_K,extSel.value);
       var idl=Object.keys(sel).filter(function(k){return sel[k]});
+      if(!gapsConfirmed){
+        var totalGaps=0;idl.forEach(function(id){var d=window.__qcGetDoc(id);if(d){var g=gaps(d);totalGaps+=g.blank+g.pend}});
+        if(totalGaps){
+          gapsConfirmed=true;
+          info.textContent='';
+          info.appendChild(errBox('ฉบับที่เลือกยังมีรายการที่ยังไม่ตรวจ/รอตรวจซ้ำรวม '+totalGaps+' รายการ — กด “สร้างไฟล์ส่ง” อีกครั้งถ้าต้องการส่งต่อเลย'));
+          go.textContent='ยืนยันส่งทั้งที่ยังไม่ครบ';
+          return;
+        }
+      }
+      lsSet(NAME_K,nm);lsSet(CODE_K,codeIn.value.trim().replace(/[^A-Za-z0-9ก-๙]/g,'').slice(0,6));lsSet(EXT_K,extSel.value);
       go.disabled=true;info.textContent='กำลังสร้างและตรวจไฟล์…';info.className='';
       var pkg;
       try{pkg=await build(idl)}catch(e){

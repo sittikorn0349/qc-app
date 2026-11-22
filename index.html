@@ -190,8 +190,9 @@ button{font:inherit;cursor:pointer}
 .addbar small{color:var(--muted)}
 
 /* Re-inspection panel under each row: photos after the fix, result, date, note */
-.tagrow{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
-.tagrow select,.tagrow input{min-height:34px;font-size:.82rem;padding:3px 8px}
+.tagrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.tagrow select,.tagrow input{min-height:40px;font-size:.88rem;padding:6px 10px}
+.tagrow select:required:invalid,.tagrow select.empty{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}
 .flt{width:auto;max-width:100%;min-height:34px;font-size:.85rem}
 .re-toggle{display:block;margin:0 16px 10px calc(16px + 2.6rem + 10px);padding:4px 0;min-height:32px;background:none;border:0;color:var(--accent);font-size:.82rem;text-align:left}
 .re-toggle:hover{text-decoration:underline}
@@ -420,6 +421,10 @@ button{font:inherit;cursor:pointer}
     <div class="dlg-body">
       <nav class="dlg-side" id="foldlist" aria-label="โฟลเดอร์"></nav>
       <div class="dlg-main">
+        <div class="notice" id="lib-tip" hidden>
+          <span>เคล็ดลับ: ใช้ช่อง “เฉพาะฉบับที่มีรายการค้าง” ทางขวาเพื่อกรองเฉพาะฉบับที่ยังมีงานต้องแก้ และกด “+ โฟลเดอร์ใหม่” ทางซ้ายเพื่อจัดกลุ่มเอกสารตามโครงการ</span>
+          <span class="rb-actions" style="flex:0 0 auto"><button class="btn sm" id="lib-tip-ok" type="button">เข้าใจแล้ว</button></span>
+        </div>
         <div class="dlg-tools">
           <input type="search" id="q" placeholder="ค้นหาโครงการ / งานที่ตรวจ / เลขที่เอกสาร" aria-label="ค้นหาฉบับตรวจ">
           <button class="btn primary sm" id="dlg-new" type="button">+ ฉบับใหม่</button>
@@ -885,16 +890,37 @@ button{font:inherit;cursor:pointer}
     var c=e&&e.code;
     flash(c==='too_large'?'รูปใหญ่เกินกำหนด':c==='quota_or_state'?'พื้นที่เก็บรูปของบัญชีเต็ม':c==='rate_limited'?'อัปโหลดถี่เกินไป รอสักครู่แล้วลองใหม่':'อัปโหลดรูปไม่สำเร็จ ลองอีกครั้ง');
   }
+  /* let the user glance at a full-size preview and confirm/retake before the photo is saved */
+  function confirmPhoto(file){
+    return new Promise(function(resolve){
+      var url=URL.createObjectURL(file);
+      var back=el('div',{class:'dlg-back',style:'z-index:60'});
+      var img=el('img',{src:url,style:'max-width:100%;max-height:62vh;display:block;margin:0 auto 12px;object-fit:contain;border-radius:6px'});
+      var use=el('button',{class:'btn primary',type:'button'},'ใช้รูปนี้');
+      var cancel=el('button',{class:'btn',type:'button'},'ไม่ใช้ / ถ่ายใหม่');
+      var box=el('div',{class:'dlg',style:'max-width:520px;width:92%;height:auto;max-height:90vh;padding:16px'},
+        img,el('div',{class:'rb-actions',style:'justify-content:flex-end'},cancel,use));
+      back.appendChild(box);document.body.appendChild(back);
+      function done(ok){URL.revokeObjectURL(url);back.remove();resolve(ok)}
+      use.addEventListener('click',function(){done(true)});
+      cancel.addEventListener('click',function(){done(false)});
+      back.addEventListener('click',function(e){if(e.target===back)done(false)});
+      use.focus();
+    });
+  }
   function addFiles(it,key,files){
     var arr=Array.prototype.slice.call(files),bad=0,chain=Promise.resolve();
     arr.forEach(function(f){
       chain=chain.then(function(){
-        return shrink(f).then(function(s){
+        return (arr.length===1?confirmPhoto(f):Promise.resolve(true)).then(function(ok){
+          if(!ok)return;
+          return shrink(f).then(function(s){
           var p={d:s.dataURL,busy:true};it[key].push(p);refreshRow(it);
           return putImage(p,s).then(function(){delete p.busy;refreshRow(it);save()},function(e){
             var i=it[key].indexOf(p);if(i>=0)it[key].splice(i,1);refreshRow(it);uploadErr(e);
           });
         },function(){bad++});
+        });
       });
     });
     chain.then(function(){if(bad)flash('เปิดรูปบางไฟล์ไม่ได้ ('+bad+' ไฟล์)')});
@@ -1021,11 +1047,12 @@ button{font:inherit;cursor:pointer}
     main.appendChild(photoStrip(it,'before','ที่พบ รายการที่ '+(i+1),'+ เพิ่มรูป'));
     var locCell=el('div',{class:'loc'});
     locCell.appendChild(textField('ตำแหน่ง','','loc',it,'เช่น เสา C-3 ชั้น 1'));
-    var cs=el('select',{'aria-label':'หมวดงาน'},el('option',{value:''},'หมวดงาน…'));
+    var cs=el('select',{'aria-label':'หมวดงาน (แนะนำให้เลือก ช่วยค้นหาภายหลัง)'},el('option',{value:''},'+ เลือกหมวดงาน (แนะนำ)'));
     var cats=CATS.slice();if(it.cat&&cats.indexOf(it.cat)<0)cats.push(it.cat);
     cats.forEach(function(c){cs.appendChild(el('option',{value:c},c))});
     cs.value=it.cat;
-    cs.addEventListener('change',function(){it.cat=cs.value;save();updateCounts()});
+    cs.classList.toggle('empty',!it.cat);
+    cs.addEventListener('change',function(){it.cat=cs.value;cs.classList.toggle('empty',!it.cat);save();updateCounts()});
     var rf=el('input',{type:'text','aria-label':'อ้างอิงแบบ',placeholder:'อ้างอิงแบบ เช่น S-03'});rf.value=it.ref;
     rf.addEventListener('input',function(){it.ref=rf.value;save()});
     main.appendChild(locCell);
@@ -1153,6 +1180,7 @@ button{font:inherit;cursor:pointer}
     $('#curtitle').textContent=titleOf(state)+((cloud&&!viewing&&!persisted()&&!touched)?' (ยังไม่ได้บันทึก)':'');
     var b=$('#badge');b.textContent=cloud?'ออฟไลน์ · เก็บในเครื่อง':(mode==='local'?'เฉพาะเครื่องนี้':'กำลังเชื่อมต่อ…');
     b.className='badge'+(cloud?' cloud':'');
+    b.title=cloud?'ข้อมูลฉบับนี้อยู่ในมือถือ/คอมพิวเตอร์เครื่องนี้เท่านั้น เพื่อนร่วมทีมที่ใช้เครื่องอื่นจะไม่เห็นข้อมูลนี้ จนกว่าจะส่งไฟล์ให้โดยตรง (ปุ่ม “ส่งเอกสาร”)':'';
     listBtn.hidden=!cloud;dupBtn.hidden=!cloud;followBtn.hidden=!cloud;
     setLabel(listBtn,'คลังเอกสาร ('+records.length+')');
     setLabel(newBtn,'+ ฉบับใหม่');
@@ -1176,6 +1204,11 @@ button{font:inherit;cursor:pointer}
   function openList(){
     dlg.hidden=false;listBtn.setAttribute('aria-expanded','true');document.body.style.overflow='hidden';
     renderList();$('#q').focus();
+    var tip=$('#lib-tip');
+    if(tip&&!lsGet('qc-seen-library-tips')){
+      tip.hidden=false;
+      $('#lib-tip-ok').addEventListener('click',function(){tip.hidden=true;lsSet('qc-seen-library-tips','1')},{once:true});
+    }
   }
   function closeList(){
     if(dlg.hidden)return;
@@ -1981,7 +2014,9 @@ button{font:inherit;cursor:pointer}
     kind=(kind==='pend')?'pend':'full';
     var D=batch?batch.d:state;
     if(kind==='pend'&&!D.items.some(isPend)){setStatus('ไม่มีรายการค้างแก้ (ต้องแก้ไข/ไม่ผ่าน ที่ยังตรวจซ้ำไม่ผ่าน)');return}
+    var blankN=kind==='full'?D.items.filter(function(it){return !it.res}).length:0;
     pdfBusy=true;pdfButtons(true,'กำลังสร้าง PDF…');
+    if(blankN)setStatus('หมายเหตุ: ยังมี '+blankN+' รายการที่ยังไม่สรุปผลตรวจ กำลังสร้าง PDF…');
     var sheets;
     dlP.then(function(dl){
       if(!dl)throw {code:'unavailable'};
