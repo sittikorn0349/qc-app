@@ -450,7 +450,14 @@ button{font:inherit;cursor:pointer}
 <div id="lb" hidden><img alt="รูปขยาย"></div>
 <div id="pdfroot" aria-hidden="true"></div>
 
-<script src="./pwa-shell.js"></script>
+<script>
+/* storage shell: offline (default, this device only) or online (?mode=online, Supabase). The choice is remembered. */
+(function(){
+  var m=/[?&]mode=(online|offline)\b/.exec(location.search),on=false;
+  try{if(m)localStorage.setItem('qc-mode',m[1]);on=localStorage.getItem('qc-mode')==='online'}catch(e){}
+  document.write(on?'<script src="./libs/supabase.min.js"><\/script><script src="./pwa-shell-online.js"><\/script>':'<script src="./pwa-shell.js"><\/script>');
+})();
+</script>
 <script>
 /* QC library: normalised data model helpers + backup ZIP (shared by the hosted form and the offline PWA) */
 (function(){
@@ -1181,6 +1188,11 @@ button{font:inherit;cursor:pointer}
     var b=$('#badge');b.textContent=cloud?'ออฟไลน์ · เก็บในเครื่อง':(mode==='local'?'เฉพาะเครื่องนี้':'กำลังเชื่อมต่อ…');
     b.className='badge'+(cloud?' cloud':'');
     b.title=cloud?'ข้อมูลฉบับนี้อยู่ในมือถือ/คอมพิวเตอร์เครื่องนี้เท่านั้น เพื่อนร่วมทีมที่ใช้เครื่องอื่นจะไม่เห็นข้อมูลนี้ จนกว่าจะส่งไฟล์ให้โดยตรง (ปุ่ม “ส่งเอกสาร”)':'';
+    if(cloud&&window.__ONLINE&&window.__qcSync){
+      var sy=window.__qcSync();
+      b.textContent=sy.state==='offline'?'ออฟไลน์ · รอส่ง '+sy.pending:sy.state==='error'?'ซิงก์ไม่สำเร็จ':sy.state==='pending'?'ออนไลน์ · กำลังซิงก์':'ออนไลน์ · ซิงก์แล้ว';
+      b.title=viewing?'เอกสารของคนอื่นในโครงการ (ดูอย่างเดียว)':'บันทึกในเครื่องนี้ก่อนเสมอ แล้วส่งขึ้นระบบให้ทุกคนในโครงการเห็นเมื่อมีสัญญาณ';
+    }
     listBtn.hidden=!cloud;dupBtn.hidden=!cloud;followBtn.hidden=!cloud;
     setLabel(listBtn,'คลังเอกสาร ('+records.length+')');
     setLabel(newBtn,'+ ฉบับใหม่');
@@ -1350,7 +1362,7 @@ button{font:inherit;cursor:pointer}
       host.appendChild(w);
     });
     cnt.shared=sharedList().length;
-    if(!window.__PWA)host.appendChild(el('div',{class:'fd'+(activeF==='shared'?' on':'')},openBtn('shared','ส่งแล้วทั้งทีม (ดูอย่างเดียว)')));
+    if(!window.__PWA||window.__ONLINE)host.appendChild(el('div',{class:'fd'+(activeF==='shared'?' on':'')},openBtn('shared',window.__ONLINE?'ของคนอื่นในโครงการ (ดูอย่างเดียว)':'ส่งแล้วทั้งทีม (ดูอย่างเดียว)')));
     folders.forEach(function(f){
       var w=el('div',{class:'fd'+(activeF===f.id?' on':'')});
       if(renamingF===f.id){
@@ -1787,7 +1799,7 @@ button{font:inherit;cursor:pointer}
     var q=($('#q').value||'').trim().toLowerCase(),list=sharedList().filter(function(x){
       return !q||(x.inf.title+' '+x.inf.sub+' '+whoName(x.u)).toLowerCase().indexOf(q)>=0;
     });
-    $('#scope').textContent='ส่งแล้วทั้งทีม · '+list.length+' ฉบับ (ดูอย่างเดียว)';
+    $('#scope').textContent=(window.__ONLINE?'ของคนอื่นในโครงการ · ':'ส่งแล้วทั้งทีม · ')+list.length+' ฉบับ (ดูอย่างเดียว)';
     expN=0;updateExp();
     list.forEach(function(x){
       var d=x.r.data,inf=x.inf,cur=!!(viewing&&viewing.id===x.r.id&&viewing.owner===x.u);
@@ -1802,7 +1814,7 @@ button{font:inherit;cursor:pointer}
         el('span',{class:'rec-s'},[inf.sub,'ส่งโดย '+whoName(x.u)+(d.submittedAt?' · '+fmtShort(d.submittedAt):'')].filter(Boolean).join(' · ')),chips);
       host.appendChild(el('div',{class:'rec'},open));
     });
-    if(!list.length)host.appendChild(el('div',{class:'empty'},q?'ไม่พบฉบับที่ค้นหา':'ยังไม่มีใครส่งเอกสาร ฉบับร่างของแต่ละคนจะเห็นเฉพาะเจ้าของจนกว่าจะกด “ส่งเอกสาร”'));
+    if(!list.length)host.appendChild(el('div',{class:'empty'},q?'ไม่พบฉบับที่ค้นหา':window.__ONLINE?'ยังไม่มีเอกสารของคนอื่นในโครงการนี้':'ยังไม่มีใครส่งเอกสาร ฉบับร่างของแต่ละคนจะเห็นเฉพาะเจ้าของจนกว่าจะกด “ส่งเอกสาร”'));
   }
   function startCloud(){
     mode='cloud';col=DB.collection('data/users/'+UID);
@@ -1813,7 +1825,8 @@ button{font:inherit;cursor:pointer}
       if(!booted){booted=true;chooseInitial()}
     },10000);
     col.orderBy('updatedAt','desc').limit(300).onSnapshot(onList,onListErr);
-    if(!window.__PWA)startShared();
+    if(!window.__PWA||window.__ONLINE)startShared();
+    if(window.__ONLINE)window.addEventListener('qc-sync',function(){renderBar()});
   }
   function startLocal(why){
     mode='local';booted=true;suffix='';
