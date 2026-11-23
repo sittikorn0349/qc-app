@@ -63,7 +63,7 @@ button{font:inherit;cursor:pointer}
 .rb-cur{min-width:0;flex:1 1 16rem}
 .rb-cur strong{display:block;font-size:1.05rem;line-height:1.35;overflow-wrap:anywhere}
 .badge{display:inline-block;font-size:.72rem;padding:1px 9px;border-radius:99px;border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:middle;font-weight:500}
-.badge.cloud{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.badge.stored{background:var(--ok-bg);color:var(--ok);border-color:transparent}
 .rb-actions{display:flex;gap:8px;flex-wrap:wrap}
 .badge.sub{background:var(--ok-bg);color:var(--ok);border-color:transparent}
 .badge.draft{background:var(--warn-bg);color:var(--fg);border-color:var(--line)}
@@ -612,17 +612,53 @@ button{font:inherit;cursor:pointer}
       entries.push({name:file,blob:b});list.push({id:id,file:file,mime:b.type||'image/jpeg',size:b.size});
       if(o.onProgress)o.onProgress(++n,keys.length);
     }
+    /* documents from the form engine (pwa-forms.js, own database 'qc-forms'): photos are data URLs inside the values,
+       moved out to form-photos/ so data.json stays small; readers that predate this simply ignore the extra keys */
+    var fdocs=[],fforms=[],flist=[],fseen={};
+    if(o.forms){
+      var outF=function(v){
+        if(typeof v==='string'&&v.indexOf('data:image')===0){
+          var pid='fp_'+h32(v);
+          if(!fseen[pid]){fseen[pid]=1;var fb=dataURLBlob(v),fx=/png/.test(fb.type)?'png':(/webp/.test(fb.type)?'webp':'jpg'),ff='form-photos/'+pid+'.'+fx;
+            entries.push({name:ff,blob:fb});flist.push({id:pid,file:ff,mime:fb.type||'image/jpeg',size:fb.size})}
+          return 'qcph:'+pid;
+        }
+        if(Array.isArray(v))return v.map(outF);
+        if(v&&typeof v==='object'){var r={};Object.keys(v).forEach(function(k){r[k]=outF(v[k])});return r}
+        return v;
+      };
+      fdocs=(o.forms.docs||[]).map(outF);fforms=JSON.parse(JSON.stringify(o.forms.forms||[]));
+    }
     var data={format:'qc-inspection-backup',version:1,exportedAt:new Date().toISOString(),source:o.source||'',
       projects:Object.keys(projects).map(function(k){return projects[k]}),parties:Object.keys(parties).map(function(k){return parties[k]}),
-      folders:folders,inspections:inspections,items:items,photos:list};
-    var txt='QC inspection backup\nformat: qc-inspection-backup v1\nนำเข้าได้ที่แอปตรวจงานก่อสร้าง > คลังเอกสาร > นำเข้า\ndata.json = ข้อมูลแยกตาราง (projects, parties, folders, inspections, items, photos)\nphotos/ = รูปถ่าย\n';
+      folders:folders,inspections:inspections,items:items,photos:list,
+      formDocs:fdocs,customForms:fforms,formPhotos:flist};
+    var txt='QC inspection backup\nformat: qc-inspection-backup v1\nนำเข้าได้ที่แอปตรวจงานก่อสร้าง > คลังเอกสาร > นำเข้า\ndata.json = ข้อมูลแยกตาราง (projects, parties, folders, inspections, items, photos, formDocs, customForms, formPhotos)\nphotos/ = รูปถ่าย\nform-photos/ = รูปในรายงานแบบอื่น (รายงานประจำวัน ใบขอเท ตรวจรับวัสดุ แบบฟอร์มที่สร้างเอง)\n';
     entries.unshift({name:'data.json',blob:new Blob([JSON.stringify(data)],{type:'application/json'})});
     entries.push({name:'README.txt',blob:new Blob([txt],{type:'text/plain'})});
     return {blob:await makeZip(entries),missing:missing,
-      counts:{inspections:inspections.length,items:items.length,photos:list.length,folders:folders.length}};
+      counts:{inspections:inspections.length,items:items.length,photos:list.length,folders:folders.length,formDocs:fdocs.length,formPhotos:flist.length}};
   }
 
-  window.QC={h32:h32,explode:explode,implode:implode,makeZip:makeZip,readZip:readZip,buildBackup:buildBackup,dataURLBlob:dataURLBlob,projectId:projectId,partyId:partyId};
+  /* restore form-engine documents from a backup zip (no-op for backups without them) */
+  async function restoreForms(z,data){
+    if(!window.__qcForms||!data||!((data.formDocs||[]).length||(data.customForms||[]).length))return null;
+    var map={};
+    for(var i=0;i<(data.formPhotos||[]).length;i++){
+      var ph=data.formPhotos[i],b=await z.read(ph.file,ph.mime);
+      if(!b)throw new Error('form photo missing: '+ph.file);
+      map['qcph:'+ph.id]=await new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){res(fr.result)};fr.onerror=function(){rej(fr.error)};fr.readAsDataURL(b)});
+    }
+    var back=function(v){
+      if(typeof v==='string'&&v.indexOf('qcph:')===0){if(!(v in map))throw new Error('form photo not listed: '+v);return map[v]}
+      if(Array.isArray(v))return v.map(back);
+      if(v&&typeof v==='object'){var r={};Object.keys(v).forEach(function(k){r[k]=back(v[k])});return r}
+      return v;
+    };
+    return window.__qcForms.importAll({docs:(data.formDocs||[]).map(back),forms:data.customForms||[]});
+  }
+
+  window.QC={restoreForms:restoreForms,h32:h32,explode:explode,implode:implode,makeZip:makeZip,readZip:readZip,buildBackup:buildBackup,dataURLBlob:dataURLBlob,projectId:projectId,partyId:partyId};
 })();
 </script>
 <script src="./libs/jspdf.umd.min.js"></script>
@@ -700,7 +736,7 @@ button{font:inherit;cursor:pointer}
   }
   function freshState(carry){
     var s=norm(carry||{},newId());
-    if(mode==='cloud'&&!s.meta.docno)s.meta.docno=nextDocno();
+    if(mode==='store'&&!s.meta.docno)s.meta.docno=nextDocno();
     return s;
   }
   function hasContent(d){
@@ -731,7 +767,7 @@ button{font:inherit;cursor:pointer}
   }
 
   /* ---------- runtime ---------- */
-  var mode='boot';                 /* boot | cloud | local */
+  var mode='boot';                 /* boot | store | local · store = records kept in the document store (IndexedDB, or the online shell); local = single-draft fallback in localStorage. Not related to the online/cloud sync of beta. */
   var DB=null,UID=null,ASSETS=null,col=null;
   var records=[];                  /* [{id,data}] newest first, from the live listener */
   var state=freshState();
@@ -740,6 +776,8 @@ button{font:inherit;cursor:pointer}
   var PH={};                       /* asset id -> data URL (cache for PDF and rotate) */
   var pendDel={};                  /* asset ids to delete once the save that dropped them has landed */
 
+  /* explicit action signal for the home shell (pwa-home.js) - do not infer navigation from status text */
+  function qcAction(type,extra){try{document.dispatchEvent(new CustomEvent('qc-action',{detail:Object.assign({type:type},extra||{})}))}catch(e){}}
   function setStatus(t){
     $('#status').textContent=t+(suffix?' · '+suffix:'');
     if(dlg&&!dlg.hidden){var dm=$('#dlg-msg');if(dm){dm.textContent=t;dm.className='dlg-msg'}}
@@ -764,9 +802,9 @@ button{font:inherit;cursor:pointer}
   }
 
   /* ---------- serialising ---------- */
-  function ser(cloud){
+  function ser(inStore){
     function ph(list){
-      return list.filter(function(p){return cloud?!!p.a:!!p.d}).map(function(p){return cloud?p.a:p.d});
+      return list.filter(function(p){return inStore?!!p.a:!!p.d}).map(function(p){return inStore?p.a:p.d});
     }
     return {
       v:2,meta:Object.assign({},state.meta),sign:JSON.parse(JSON.stringify(state.sign)),
@@ -788,7 +826,7 @@ button{font:inherit;cursor:pointer}
   function save(){
     if(viewing)return;
     touched=true;
-    if(mode==='cloud'){
+    if(mode==='store'){
       dirty=true;
       if(booted){setStatus('กำลังบันทึก…');clearTimeout(saveTimer);saveTimer=setTimeout(flush,800)}
     }else if(mode==='local'){
@@ -801,7 +839,7 @@ button{font:inherit;cursor:pointer}
   function flush(){
     clearTimeout(saveTimer);
     if(viewing)return Promise.resolve();
-    if(mode!=='cloud'||!booted||!dirty)return writing||Promise.resolve();
+    if(mode!=='store'||!booted||!dirty)return writing||Promise.resolve();
     if(writing)return writing;
     dirty=false;
     var now=new Date().toISOString();
@@ -828,7 +866,7 @@ button{font:inherit;cursor:pointer}
   /* wait until nothing is pending; resolves false if the last write failed */
   function drain(){
     clearTimeout(saveTimer);
-    if(mode!=='cloud'||!booted)return Promise.resolve(true);
+    if(mode!=='store'||!booted)return Promise.resolve(true);
     if(writing)return writing.then(drain);
     if(!dirty)return Promise.resolve(true);
     return flush().then(function(){return lastErr?false:drain()});
@@ -929,7 +967,7 @@ button{font:inherit;cursor:pointer}
       });
     });
   }
-  var canUpload=function(){return mode==='cloud'&&!!ASSETS};
+  var canUpload=function(){return mode==='store'&&!!ASSETS};
   /* put image s={blob,dataURL} into photo slot p (new photo, replacement or rotation) */
   function putImage(p,s){
     var old=p.a;
@@ -1414,22 +1452,22 @@ button{font:inherit;cursor:pointer}
   function setLabel(btn,t){btn._label=t;if(!btn.classList.contains('armed'))btn.textContent=t}
   function persisted(){return records.some(function(r){return r.id===state.id})}
   function renderBar(){
-    var cloud=mode==='cloud';
-    $('#curtitle').textContent=titleOf(state)+((cloud&&!viewing&&!persisted()&&!touched)?' (ยังไม่ได้บันทึก)':'');
-    var b=$('#badge');b.textContent=cloud?'ออฟไลน์ · เก็บในเครื่อง':(mode==='local'?'เฉพาะเครื่องนี้':'กำลังเชื่อมต่อ…');
-    b.className='badge'+(cloud?' cloud':'');
-    b.title=cloud?'ข้อมูลฉบับนี้อยู่ในมือถือ/คอมพิวเตอร์เครื่องนี้เท่านั้น เพื่อนร่วมทีมที่ใช้เครื่องอื่นจะไม่เห็นข้อมูลนี้ จนกว่าจะส่งไฟล์ให้โดยตรง (ปุ่ม “ส่งเอกสาร”)':'';
-    if(cloud&&window.__ONLINE&&window.__qcSync){
+    var inStore=mode==='store';
+    $('#curtitle').textContent=titleOf(state)+((inStore&&!viewing&&!persisted()&&!touched)?' (ยังไม่ได้บันทึก)':'');
+    var b=$('#badge');b.textContent=inStore?'ออฟไลน์ · เก็บในเครื่อง':(mode==='local'?'เฉพาะเครื่องนี้':'กำลังเชื่อมต่อ…');
+    b.className='badge'+(inStore?' stored':'');
+    b.title=inStore?'ข้อมูลฉบับนี้อยู่ในมือถือ/คอมพิวเตอร์เครื่องนี้เท่านั้น เพื่อนร่วมทีมที่ใช้เครื่องอื่นจะไม่เห็นข้อมูลนี้ จนกว่าจะส่งไฟล์ให้โดยตรง (ปุ่ม “ส่งเอกสาร”)':'';
+    if(inStore&&window.__ONLINE&&window.__qcSync){
       var sy=window.__qcSync();
       b.textContent=sy.state==='offline'?'ออฟไลน์ · รอส่ง '+sy.pending:sy.state==='error'?'ซิงก์ไม่สำเร็จ':sy.state==='pending'?'ออนไลน์ · กำลังซิงก์':'ออนไลน์ · ซิงก์แล้ว';
       b.title=viewing?'เอกสารของคนอื่นในโครงการ (ดูอย่างเดียว)':'บันทึกในเครื่องนี้ก่อนเสมอ แล้วส่งขึ้นระบบให้ทุกคนในโครงการเห็นเมื่อมีสัญญาณ';
     }
-    listBtn.hidden=!cloud;dupBtn.hidden=!cloud;followBtn.hidden=!cloud;
+    listBtn.hidden=!inStore;dupBtn.hidden=!inStore;followBtn.hidden=!inStore;
     setLabel(listBtn,'คลังเอกสาร ('+records.length+')');
     setLabel(newBtn,'+ ฉบับใหม่');
     setLabel(dupBtn,'ทำสำเนา');setLabel(followBtn,'ตรวจรอบใหม่จากรายการค้าง');
-    setLabel(resetBtn,cloud?'ย้ายไปถังขยะ':'ล้างแบบฟอร์ม');
-    $('#cpy').hidden=!(cloud&&records.some(function(r){return r.id!==state.id}));
+    setLabel(resetBtn,inStore?'ย้ายไปถังขยะ':'ล้างแบบฟอร์ม');
+    $('#cpy').hidden=!(inStore&&records.some(function(r){return r.id!==state.id}));
     renderSubUi();
   }
   function fmtShort(iso){
@@ -1754,7 +1792,7 @@ button{font:inherit;cursor:pointer}
       var r=records.filter(function(x){return x.id===id})[0];if(!r)return;
       state=norm(r.data,id);touched=false;dirty=false;lsSet(LAST,id);
       renderAll();closeList();window.scrollTo({top:0});
-      setStatus('เปิดฉบับ “'+titleOf(state)+'” แล้ว');
+      setStatus('เปิดฉบับ “'+titleOf(state)+'” แล้ว');qcAction('open');
     });
   }
   function newRecord(){
@@ -1767,6 +1805,7 @@ button{font:inherit;cursor:pointer}
       renderAll();closeList();window.scrollTo({top:0});
       setStatus(isSafety(state)?'เริ่มฉบับใหม่ (แบบตรวจความปลอดภัย) พร้อมเช็กลิสต์นั่งร้าน ราวกันตก และการประชุมก่อนเริ่มงาน':'เริ่มฉบับใหม่ ยกข้อมูลโครงการ ผู้ตรวจ ผู้รับเหมา และชื่อผู้ลงนามมาให้แล้ว');
       var f=$('#m-docno');if(f)f.focus({preventScroll:true});
+      qcAction('new');
     });
   }
   function dupRecord(){
@@ -1778,7 +1817,7 @@ button{font:inherit;cursor:pointer}
       if(m.docno)m.docno+=' (สำเนา)';else if(m.work)m.work+=' (สำเนา)';else m.project+=' (สำเนา)';
       state=copy;touched=true;
       renderAll();save();closeList();window.scrollTo({top:0});
-      setStatus('ทำสำเนาแล้ว (รูปใช้ร่วมกับฉบับเดิม)');
+      setStatus('ทำสำเนาแล้ว (รูปใช้ร่วมกับฉบับเดิม)');qcAction('dup');
     });
   }
   function followUp(){
@@ -1797,7 +1836,7 @@ button{font:inherit;cursor:pointer}
       s.remarks='ตรวจรอบใหม่ต่อจากฉบับ: '+prev;
       state=s;touched=true;flt='all';$('#flt').value='all';
       renderAll();save();closeList();window.scrollTo({top:0});
-      setStatus('สร้างฉบับใหม่จากรายการค้าง '+pend.length+' รายการ (ใช้รูปล่าสุดเป็นรูปตั้งต้น)');
+      setStatus('สร้างฉบับใหม่จากรายการค้าง '+pend.length+' รายการ (ใช้รูปล่าสุดเป็นรูปตั้งต้น)');qcAction('followup');
     });
   }
   function deleteRecord(id){
@@ -1816,7 +1855,7 @@ button{font:inherit;cursor:pointer}
     }).then(function(){
       if(isCur){var base=state;state=freshState(carryOf(base));touched=false;dirty=false;renderAll()}
       else{renderBar();renderList()}
-      setStatus('ย้ายไปถังขยะแล้ว กู้คืนได้ภายใน 30 วันที่ คลังเอกสาร > ถังขยะ');
+      setStatus('ย้ายไปถังขยะแล้ว กู้คืนได้ภายใน 30 วันที่ คลังเอกสาร > ถังขยะ');qcAction('trash',{current:!!isCur});
     }).catch(function(){setStatus('ย้ายไปถังขยะไม่สำเร็จ ลองอีกครั้ง')});
   }
   function clearLocal(){
@@ -1826,7 +1865,7 @@ button{font:inherit;cursor:pointer}
   armBtn(newBtn,'ฉบับเดิมในเครื่องนี้จะถูกแทนที่ กดอีกครั้ง',newRecord,function(){return mode==='local'&&hasContent(state)});
   armBtn(followBtn,'',followUp,function(){return false});
   armBtn(dupBtn,'กดอีกครั้งเพื่อทำสำเนา',dupRecord,function(){return false});
-  armBtn(resetBtn,'กดอีกครั้งเพื่อยืนยัน',function(){mode==='cloud'?deleteRecord(state.id):clearLocal()});
+  armBtn(resetBtn,'กดอีกครั้งเพื่อยืนยัน',function(){mode==='store'?deleteRecord(state.id):clearLocal()});
 
   window.__qcForm={cur:function(){return state.id},drain:function(){return drain()},viewing:function(){return !!viewing},
     openDoc:function(id,iid){
@@ -1847,7 +1886,7 @@ button{font:inherit;cursor:pointer}
     var raw=lsGet(KEY);if(!raw)return null;
     try{var d=JSON.parse(raw);return hasContent(d)?d:null}catch(e){return null}
   }
-  function showLegacy(){$('#legacy').hidden=!(mode==='cloud'&&legacyRaw()&&!lsGet(SKIP))}
+  function showLegacy(){$('#legacy').hidden=!(mode==='store'&&legacyRaw()&&!lsGet(SKIP))}
   $('#legacy-skip').addEventListener('click',function(){lsSet(SKIP,'1');showLegacy()});
   $('#legacy-go').addEventListener('click',function(){
     var raw=legacyRaw();if(!raw)return;
@@ -1943,9 +1982,9 @@ button{font:inherit;cursor:pointer}
     });
   }
   function renderSubUi(){
-    var cloud=mode==='cloud',sb=$('#subbadge'),vb=$('#viewbar');
+    var inStore=mode==='store',sb=$('#subbadge'),vb=$('#viewbar');
     var off=!!window.__PWA;
-    btnSubmit.hidden=off||!cloud||!!viewing;btnWd.hidden=off||!(cloud&&!viewing&&state.sub);
+    btnSubmit.hidden=off||!inStore||!!viewing;btnWd.hidden=off||!(inStore&&!viewing&&state.sub);
     if(viewing){
       dupBtn.hidden=true;followBtn.hidden=true;resetBtn.hidden=true;
       sb.hidden=false;sb.className='badge sub';sb.textContent='ดูอย่างเดียว';
@@ -1954,14 +1993,14 @@ button{font:inherit;cursor:pointer}
       $('#viewmsg').textContent=window.__ONLINE?'เอกสารของ '+whoName(viewing.owner)+' · คุณบันทึกได้เฉพาะผลตรวจซ้ำและแจ้งแก้แล้ว (ในกล่อง “ติดตามงานแก้” ของแต่ละรายการ)':'กำลังดูฉบับที่ '+whoName(viewing.owner)+' ส่งไว้ (อ่านอย่างเดียว'+(at?' · ส่งเมื่อ '+fmtShort(at):'')+')';
     }else{
       vb.hidden=true;resetBtn.hidden=false;
-      if(!cloud||off)sb.hidden=true;
+      if(!inStore||off)sb.hidden=true;
       else if(!state.sub){sb.hidden=false;sb.className='badge draft';sb.textContent='ร่าง · เห็นคนเดียว';setLabel(btnSubmit,'ส่งเอกสาร')}
       else if((state.rev||0)>state.sub.rev){sb.hidden=false;sb.className='badge draft';sb.textContent='ส่งแล้ว · มีแก้ไขที่ยังไม่ส่ง';setLabel(btnSubmit,'ส่งฉบับล่าสุด')}
       else{sb.hidden=false;sb.className='badge sub';sb.textContent='ส่งแล้ว · ทีมเห็นได้';setLabel(btnSubmit,'ส่งอีกครั้ง')}
     }
   }
   function submitDoc(){
-    if(mode!=='cloud'||viewing||!UID)return;
+    if(mode!=='store'||viewing||!UID)return;
     if(!hasContent(state)){setStatus('ฉบับนี้ยังว่างอยู่ กรอกข้อมูลก่อนส่ง');return}
     btnSubmit.disabled=true;setStatus('กำลังส่งเอกสาร…');
     drain().then(function(ok){
@@ -1976,7 +2015,7 @@ button{font:inherit;cursor:pointer}
       .then(function(){btnSubmit.disabled=false;renderBar()});
   }
   function withdrawDoc(){
-    if(mode!=='cloud'||viewing||!state.sub)return;
+    if(mode!=='store'||viewing||!state.sub)return;
     drain().then(function(){return sharedCol(UID).doc(state.id).delete()})
       .then(function(){state.sub=null;dirty=true;touched=true;return flush()})
       .then(function(){setStatus('ถอนกลับเป็นร่างแล้ว ตอนนี้มีแต่คุณที่เห็นฉบับนี้')})
@@ -2061,7 +2100,7 @@ button{font:inherit;cursor:pointer}
     if(!list.length)host.appendChild(el('div',{class:'empty'},q?'ไม่พบฉบับที่ค้นหา':window.__ONLINE?'ยังไม่มีเอกสารของคนอื่นในโครงการนี้':'ยังไม่มีใครส่งเอกสาร ฉบับร่างของแต่ละคนจะเห็นเฉพาะเจ้าของจนกว่าจะกด “ส่งเอกสาร”'));
   }
   function startCloud(){
-    mode='cloud';col=DB.collection('data/users/'+UID);
+    mode='store';col=DB.collection('data/users/'+UID);
     suffix=ASSETS?'':'บัญชีนี้อัปโหลดรูปขึ้นระบบไม่ได้ รูปจะอยู่ในหน้านี้เท่านั้น ไม่ถูกบันทึก';
     renderBar();setStatus('กำลังเปิดฐานข้อมูลในเครื่อง…');
     loadTimer=setTimeout(function(){
@@ -2370,14 +2409,16 @@ button{font:inherit;cursor:pointer}
     var btn=this;if(btn.disabled)return;btn.disabled=true;
     dmsg('กำลังรวบรวมข้อมูล…');
     drain().then(function(){
-      return QC.buildBackup({records:records,folders:folders,trashRecs:trashRecs,trashFolders:trashFolders,source:IS_PWA?'pwa':'claude-artifact',
+      return window.__qcForms?window.__qcForms.exportAll():null;
+    }).then(function(forms){
+      return QC.buildBackup({records:records,folders:folders,trashRecs:trashRecs,trashFolders:trashFolders,source:IS_PWA?'pwa':'claude-artifact',forms:forms,
         getPhoto:getPhotoBlob,onProgress:function(n,t){if(n%5===0||n===t)dmsg('กำลังรวมรูป '+n+' / '+t)}});
     }).then(function(r){
       return dlP.then(function(dl){
         if(!dl)throw {code:'unavailable'};
         return dl.save({filename:stampName(),data:r.blob});
       }).then(function(){
-        dmsg('ส่งไฟล์สำรองให้บันทึกแล้ว · '+r.counts.inspections+' ฉบับ '+r.counts.photos+' รูป'+(r.missing?' · ดึงรูปไม่ได้ '+r.missing+' รูป':''));
+        dmsg('ส่งไฟล์สำรองให้บันทึกแล้ว · '+r.counts.inspections+' ฉบับ '+r.counts.photos+' รูป'+(r.counts.formDocs?' · รายงานแบบอื่น '+r.counts.formDocs+' ฉบับ':'')+(r.missing?' · ดึงรูปไม่ได้ '+r.missing+' รูป':''));
       });
     }).catch(function(e){
       var c=e&&e.code;dmsg(c==='declined'?'ยกเลิกการบันทึกไฟล์สำรอง':'สำรองข้อมูลไม่สำเร็จ ลองอีกครั้ง',c!=='declined');
@@ -2393,10 +2434,13 @@ button{font:inherit;cursor:pointer}
       QC.readZip(f).then(function(z){
         return z.read('data.json').then(function(b){return b?b.text():null}).then(function(t){
           if(!t)throw new Error('no data');
-          return window.__qc.importData(JSON.parse(t),function(ph){return z.read(ph.file,ph.mime)},function(n,t2){if(n%5===0||n===t2)dmsg('กำลังนำเข้ารูป '+n+' / '+t2)});
+          var dj=JSON.parse(t);
+          return window.__qc.importData(dj,function(ph){return z.read(ph.file,ph.mime)},function(n,t2){if(n%5===0||n===t2)dmsg('กำลังนำเข้ารูป '+n+' / '+t2)}).then(function(n){
+            return QC.restoreForms(z,dj).then(function(fr){n.forms=fr;return n});
+          });
         });
       }).then(function(n){
-        dmsg('นำเข้าแล้ว '+n.inspections+' ฉบับ'+(n.skipped?' (ข้าม '+n.skipped+' ฉบับที่ในเครื่องใหม่กว่า)':'')+' · รูปใหม่ '+n.photos+(n.badPhotos?' · รูปที่ไฟล์เสียในไฟล์สำรอง '+n.badPhotos+' รูป':''));
+        dmsg('นำเข้าแล้ว '+n.inspections+' ฉบับ'+(n.skipped?' (ข้าม '+n.skipped+' ฉบับที่ในเครื่องใหม่กว่า)':'')+' · รูปใหม่ '+n.photos+(n.badPhotos?' · รูปที่ไฟล์เสียในไฟล์สำรอง '+n.badPhotos+' รูป':'')+(n.forms&&(n.forms.docs||n.forms.forms)?' · รายงานแบบอื่น '+n.forms.docs+' ฉบับ แบบฟอร์ม '+n.forms.forms+' แบบ':''));
       }).catch(function(){dmsg('นำเข้าไม่สำเร็จ ไฟล์อาจไม่ใช่ไฟล์สำรองของแอปนี้',true)});
     });
   }

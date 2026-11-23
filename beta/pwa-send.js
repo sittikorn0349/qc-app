@@ -95,6 +95,15 @@
   async function build(idList){
     await window.__qcForm.drain();
     var sender={name:(ls(NAME_K)||'').trim(),code:(ls(CODE_K)||'').trim()},docs=[],photoSet={},photoOrder=[],i,j;
+    /* 'f:<id>' = a document from the form engine (pwa-forms.js); photos travel inside it as data URLs */
+    var fids=idList.filter(function(x){return x.indexOf('f:')===0}).map(function(x){return x.slice(2)});
+    idList=idList.filter(function(x){return x.indexOf('f:')!==0});
+    var fdocs=[];
+    if(fids.length){
+      if(!window.__qcForms)throw fail('เครื่องนี้ยังไม่มีระบบรายงานแบบอื่น');
+      fdocs=await window.__qcForms.getDocs(fids);
+      if(fdocs.some(function(d){return !d}))throw fail('ไม่พบรายงานแบบอื่นที่เลือก (อาจถูกลบไปแล้ว)');
+    }
     for(i=0;i<idList.length;i++){
       var d=window.__qcGetDoc(idList[i]);
       if(!d)throw fail('ไม่พบเอกสารที่เลือก (อาจถูกลบไปแล้ว)');
@@ -119,9 +128,16 @@
     }
     var docsOut=docs.map(function(x){return Object.assign({id:x.id},x.data)}),docsTxt=JSON.stringify(docsOut),docsBlob=new Blob([docsTxt],{type:'application/json'});
     files.unshift({name:'docs.json',size:docsBlob.size,sha256:await sha256Blob(docsBlob)});
+    var mforms=[];
+    if(fdocs.length){
+      var fBlob=new Blob([JSON.stringify(fdocs)],{type:'application/json'});
+      files.push({name:'forms.json',size:fBlob.size,sha256:await sha256Blob(fBlob)});entries.push({name:'forms.json',blob:fBlob});
+      for(i=0;i<fdocs.length;i++)mforms.push({id:fdocs[i].id,title:window.__qcForms.titleOf(fdocs[i]),updatedAt:S(fdocs[i].updatedAt),hash:await sha256Text(JSON.stringify(fdocs[i]))});
+    }
     var mdocs=[];
     for(i=0;i<docs.length;i++)mdocs.push({id:docs[i].id,docno:S((docs[i].data.meta||{}).docno),title:docs[i].title,rev:+docs[i].data.rev||0,updatedAt:S(docs[i].data.updatedAt),hash:await hashDoc(docs[i].data),photos:docs[i].photos.length});
     var mf={format:'qc-send',version:1,createdAt:new Date().toISOString(),sender:sender,docs:mdocs,files:files};
+    if(mforms.length)mf.forms=mforms;
     mf.code=fmtCode(await codeOf(mf));
     entries.unshift({name:'docs.json',blob:docsBlob});
     entries.unshift({name:'manifest.json',blob:new Blob([JSON.stringify(mf)],{type:'application/json'})});
@@ -130,9 +146,9 @@
     /* verify what we just built exactly as the receiver will */
     var an=await analyze(zip);
     if(!an.ok)throw fail('ตรวจไฟล์ที่สร้างแล้วไม่ผ่าน จึงไม่ปล่อยให้ส่ง ลองใหม่อีกครั้ง',an.errors);
-    return {blob:zip,manifest:mf,docs:docs,size:zip.size,photos:photoOrder.length};
+    return {blob:zip,manifest:mf,docs:docs,forms:fdocs,size:zip.size,photos:photoOrder.length};
   }
-  function codeOf(mf){return sha256Text(JSON.stringify([mf.docs.map(function(d){return [d.id,d.hash]}),mf.files.map(function(f){return [f.name,f.sha256]})]))}
+  function codeOf(mf){var a=[mf.docs.map(function(d){return [d.id,d.hash]}),mf.files.map(function(f){return [f.name,f.sha256]})];if(mf.forms)a.push(mf.forms.map(function(d){return [d.id,d.hash]}));return sha256Text(JSON.stringify(a))}
 
   /* ---------- analyze (receiver side; also used to self-check the sender's file) ---------- */
   async function analyze(blob){
@@ -172,8 +188,21 @@
       var ty=await sniff(pb);if(!ty){errs.push('ไฟล์รูปไม่ใช่รูปภาพ: '+photos[pids[k]]);continue}
       pblobs[pids[k]]={blob:new Blob([pb],{type:ty}),sha:listed[photos[pids[k]]].sha256};
     }
+    var forms=[];
+    if(mf.forms){
+      if(!Array.isArray(mf.forms)||!listed['forms.json'])errs.push('รายการรายงานแบบอื่นไม่ครบ');
+      else{
+        var fj=await rd('forms.json');
+        if(fj){try{forms=JSON.parse(await fj.text())}catch(e){errs.push('forms.json อ่านไม่ได้')}}
+        if(!Array.isArray(forms)||forms.length!==mf.forms.length)errs.push('จำนวนรายงานแบบอื่นไม่ตรงกับรายการ');
+        else for(k=0;k<forms.length;k++){
+          if(!forms[k]||forms[k].id!==mf.forms[k].id){errs.push('ลำดับ/รหัสรายงานแบบอื่นไม่ตรงรายการ (ฉบับที่ '+(k+1)+')');continue}
+          if(await sha256Text(JSON.stringify(forms[k]))!==mf.forms[k].hash)errs.push('ข้อมูลรายงาน “'+(mf.forms[k].title||mf.forms[k].id)+'” ถูกแก้หรือเสียหาย');
+        }
+      }
+    }
     if(mf.code!==fmtCode(await codeOf(mf)))errs.push('รหัสยืนยันไม่ตรง (รายการไฟล์ถูกแก้ไข)');
-    out.ok=!errs.length;out.manifest=mf;out.docs=docs;out.photos=pblobs;return out;
+    out.ok=!errs.length;out.manifest=mf;out.docs=docs;out.photos=pblobs;out.forms=forms;return out;
   }
 
   /* ---------- receive ---------- */
@@ -216,6 +245,19 @@
         }
       }
       plan.push(item);
+    }
+    if((an.forms||[]).length){
+      if(!window.__qcForms)return {errors:['เครื่องนี้ยังไม่มีระบบรายงานแบบอื่น จึงรับไฟล์นี้ไม่ได้ ให้อัปเดตแอปก่อน']};
+      var lf=await window.__qcForms.listDocs(),lm={};lf.forEach(function(y){lm[y.id]=y});
+      for(k=0;k<an.forms.length;k++){
+        var fd=an.forms[k],mfd=mf.forms[k],fl=lm[fd.id],fit={form:true,id:fd.id,title:mfd.title||fd.id,kind:'',data:null};
+        if(fl&&await sha256Text(JSON.stringify(fl))===mfd.hash)fit.kind='same';
+        else if(!fl){fit.kind='new';fit.data=clone(fd)}
+        else if(S(fl.updatedAt)<=S(fd.updatedAt)){fit.kind='update';fit.data=clone(fd)}
+        else{fit.kind='conflict';fit.data=clone(fd);fit.data.id='f'+Math.random().toString(36).slice(2,10);fit.data.updatedAt=now}
+        if(fit.data)fit.hash=await sha256Text(JSON.stringify(fit.data));
+        plan.push(fit);
+      }
     }
     return {errors:[],items:plan,blobs:newBlobs,warn:warn,from:from,code:cd,createdAt:mf.createdAt};
   }
@@ -274,10 +316,13 @@
     go.addEventListener('click',async function(){
       go.disabled=true;cancel.disabled=true;msg.textContent='กำลังนำเข้า…';
       try{
-        await window.__qcCommit({docs:todo.map(function(x){return {id:x.targetId,data:x.data}}),blobs:pl.blobs});
+        var tIns=todo.filter(function(x){return !x.form}),tFrm=todo.filter(function(x){return x.form});
+        if(tIns.length||pl.blobs.length)await window.__qcCommit({docs:tIns.map(function(x){return {id:x.targetId,data:x.data}}),blobs:pl.blobs});
+        if(tFrm.length)await window.__qcForms.putDocs(tFrm.map(function(x){return x.data}));
         /* read back everything we claim to have written */
         var bad=[];
-        for(var i=0;i<todo.length;i++){var g=window.__qcGetDoc(todo[i].targetId);if(!g||await hashDoc(g)!==todo[i].data.rx.hash)bad.push(todo[i].title)}
+        for(var i=0;i<tIns.length;i++){var g=window.__qcGetDoc(tIns[i].targetId);if(!g||await hashDoc(g)!==tIns[i].data.rx.hash)bad.push(tIns[i].title)}
+        if(tFrm.length){var back=await window.__qcForms.getDocs(tFrm.map(function(x){return x.data.id}));for(var f2=0;f2<tFrm.length;f2++)if(!back[f2]||await sha256Text(JSON.stringify(back[f2]))!==tFrm[f2].hash)bad.push(tFrm[f2].title)}
         for(var j=0;j<pl.blobs.length;j++){var rb=await window.__qcBlob(pl.blobs[j].id);if(!rb||rb.size!==pl.blobs[j].blob.size)bad.push('รูป '+pl.blobs[j].id.slice(0,8))}
         if(bad.length)throw new Error('ตรวจย้อนหลังไม่ผ่าน: '+bad.join(', '));
         var log=jget(RECV_K,[]);log.unshift({at:new Date().toISOString(),code:pl.code,from:pl.from,n:todo.length});lsSet(RECV_K,JSON.stringify(log.slice(0,50)));
@@ -306,9 +351,10 @@
     if(bad.length){dmsg('ไม่นำเข้า: ไฟล์รูปเสียหายหรือหายในไฟล์สำรอง '+bad.length+' รูป (ไม่ได้นำเข้าอะไรเลย) เช่น '+bad[0],true);return}
     try{
       var n=await window.__qc.importData(data,function(p){return Promise.resolve(cache[p.id]||null)},function(a,t){if(a%5===0||a===t)dmsg('กำลังนำเข้ารูป '+a+' / '+t)});
+      var fr=null;try{fr=await QC.restoreForms(z,data)}catch(e){dmsg('นำเข้าฉบับตรวจงานแล้ว แต่รายงานแบบอื่นในไฟล์สำรองนำเข้าไม่ได้ ('+e.message+')',true);return}
       var listed={};(data.photos||[]).forEach(function(p){listed[p.id]=1});
       var miss=0,seen={};(data.items||[]).forEach(function(it){(it.before||[]).concat(it.after||[]).forEach(function(x){if(x&&!listed[x]&&!seen[x]){seen[x]=1;miss++}})});
-      dmsg('นำเข้าแล้ว '+n.inspections+' ฉบับ'+(n.skipped?' (ข้าม '+n.skipped+' ฉบับที่ในเครื่องใหม่กว่า)':'')+' · รูปใหม่ '+n.photos+(n.badPhotos?' · รูปที่ไฟล์เสีย '+n.badPhotos+' รูป':'')+(miss?' · ⚠ ไฟล์สำรองนี้ไม่มีรูปอยู่แล้ว '+miss+' รูป (ขาดมาตั้งแต่ตอนสำรอง)':''),!!(miss||n.badPhotos));
+      dmsg('นำเข้าแล้ว '+n.inspections+' ฉบับ'+(n.skipped?' (ข้าม '+n.skipped+' ฉบับที่ในเครื่องใหม่กว่า)':'')+' · รูปใหม่ '+n.photos+(n.badPhotos?' · รูปที่ไฟล์เสีย '+n.badPhotos+' รูป':'')+(miss?' · ⚠ ไฟล์สำรองนี้ไม่มีรูปอยู่แล้ว '+miss+' รูป (ขาดมาตั้งแต่ตอนสำรอง)':''),!!(miss||n.badPhotos)+(fr&&(fr.docs||fr.forms)?' · รายงานแบบอื่น '+fr.docs+' ฉบับ แบบฟอร์ม '+fr.forms+' แบบ':''));
     }catch(e){dmsg('นำเข้าไม่สำเร็จ ข้อมูลเดิมไม่ถูกแก้ ลองอีกครั้ง',true)}
   }
   window.__qcImport=async function(file,dmsg){
@@ -361,6 +407,16 @@
     var go=el('button',{class:'btn primary',type:'button'},'สร้างไฟล์ส่ง');
     var close=el('button',{class:'btn',type:'button',onclick:closeModal},'ปิด');
     acts.appendChild(go);acts.appendChild(close);counts();
+    /* documents from the form engine (รายงานประจำวัน ใบขอเท ตรวจรับวัสดุ แบบฟอร์มที่สร้างเอง) */
+    if(window.__qcForms)window.__qcForms.listDocs().then(function(fl){
+      if(!fl.length)return;
+      var emp=list.querySelector('.empty');if(emp)emp.remove();
+      fl.forEach(function(d){
+        var key='f:'+d.id,t=window.__qcForms.titleOf(d),cb=el('input',{type:'checkbox','aria-label':'เลือก '+t});sel[key]=false;
+        cb.addEventListener('change',function(){sel[key]=cb.checked;counts()});
+        list.appendChild(el('label',{class:'rec',style:'grid-template-columns:auto minmax(0,1fr);cursor:pointer'},cb,el('span',{style:'min-width:0'},el('span',{class:'rec-t',style:'display:block'},t),el('div',{class:'rec-chips'},el('span',null,'รายงานแบบอื่น')))));
+      });
+    });
     var gapsConfirmed=false;
     go.addEventListener('click',async function(){
       var nm=nameIn.value.trim();
@@ -387,7 +443,7 @@
   }
   function showReady(body,pkg,ext){
     body.textContent='';
-    var nDocs=pkg.manifest.docs.length,fname=('ส่งงาน_'+(nDocs===1?(pkg.manifest.docs[0].docno||'1ฉบับ'):nDocs+'ฉบับ')+'_'+stamp()).replace(/[\\\/:*?"<>|\s]+/g,'_')+'.'+ext;
+    var nDocs=pkg.manifest.docs.length+(pkg.manifest.forms||[]).length,fname=('ส่งงาน_'+(nDocs===1?((pkg.manifest.docs[0]&&pkg.manifest.docs[0].docno)||'1ฉบับ'):nDocs+'ฉบับ')+'_'+stamp()).replace(/[\\\/:*?"<>|\s]+/g,'_')+'.'+ext;
     body.appendChild(para('สร้างไฟล์และตรวจแล้ว ✓ ครบ '+nDocs+' ฉบับ · รูป '+pkg.photos+' รูป · ขนาด '+mb(pkg.size)+' MB'));
     body.appendChild(el('p',{style:'margin:6px 0'},'รหัสยืนยัน ',el('b',null,pkg.manifest.code),' (ผู้รับจะเห็นรหัสเดียวกันหลังนำเข้า ใช้เทียบเพื่อยืนยันว่าได้รับครบ)'));
     body.appendChild(el('p',{style:'margin:6px 0;color:var(--muted)'},'ไฟล์: '+fname));
