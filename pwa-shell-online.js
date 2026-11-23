@@ -111,8 +111,11 @@
     var m=d.meta||{};
     return {docno:m.docno||'',insp_date:validDate(m.date),site:m.site||'',work:m.work||'',weather:m.weather||'',
       meta:m,sign:d.sign||{},summary:d.summary||'',remarks:d.remarks||'',folder_id:d.folder||null,
-      extra:{v:d.v||2,rx:d.rx||null},deleted_at:d.deletedAt||null};
+      extra:{v:d.v||2,rx:d.rx||null,plan:planToRow(d.plan)},deleted_at:d.deletedAt||null};
   }
+  /* plan pins live in the header's extra (no schema change); drawing ids become storage paths like photos */
+  function planToRow(p){if(!p||!p.sheets||!p.sheets.length)return null;return {sheets:p.sheets.map(function(x){return {a:idToPath(x.a)||x.a,name:x.name||'',w:x.w||0,h:x.h||0}}),pins:p.pins||{}}}
+  function planFromRow(p){if(!p||!p.sheets||!p.sheets.length)return null;return {sheets:p.sheets.map(function(x){return {a:pathToId(x.a),name:x.name||'',w:x.w||0,h:x.h||0}}),pins:p.pins||{}}}
   function itemsOf(id,d){
     var out={};
     (d.items||[]).forEach(function(it,i){
@@ -131,14 +134,14 @@
     });
     return {v:ex.v||2,kind:'inspection',meta:Object.assign({},h.meta||{}),sign:h.sign||{},summary:h.summary||'',remarks:h.remarks||'',
       items:its,createdAt:h.created_at||'',updatedAt:h.updated_at||'',rev:0,folder:h.folder_id||'',deletedAt:h.deleted_at||'',
-      rx:ex.rx||null,_project:h.project_id,_owner:h.owner_id};
+      rx:ex.rx||null,plan:planFromRow(ex.plan),_project:h.project_id,_owner:h.owner_id};
   }
   function baseOf(h,items){
     var d=rowsToDoc(h,items),b={h:headerOf(d),items:itemsOf(h.id,d)};
     (items||[]).forEach(function(r){if(b.items[r.id])b.items[r.id].rchk_at=r.rchk_at||null});
     return b;
   }
-  function contentKey(d){return stable({meta:d.meta,sign:d.sign,summary:d.summary,remarks:d.remarks,items:d.items,folder:d.folder||'',deletedAt:d.deletedAt||''})}
+  function contentKey(d){var o={meta:d.meta,sign:d.sign,summary:d.summary,remarks:d.remarks,items:d.items,folder:d.folder||'',deletedAt:d.deletedAt||''};if(d.plan&&d.plan.sheets&&d.plan.sheets.length)o.plan=d.plan;return stable(o)}
 
   /* ---------- 3-way merge for saves made from an outdated copy ----------
      The form saves its whole document. If a sync updated our copy in the meantime (e.g. someone

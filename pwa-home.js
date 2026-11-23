@@ -19,7 +19,9 @@
     gear:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
     back:'<path d="M19 12H5"/><path d="m11 18-6-6 6-6"/>',
     more:'<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>',
-    chev:'<path d="m6 9 6 6 6-6"/>'
+    chev:'<path d="m6 9 6 6 6-6"/>',
+    pin:'<path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/>',
+    print:'<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>'
   };
   function icon(n){var s=document.createElement('span');s.className='qh-ic';s.setAttribute('aria-hidden','true');
     s.innerHTML='<svg viewBox="0 0 24 24" focusable="false">'+P[n]+'</svg>';return s}
@@ -258,7 +260,12 @@
       del.classList.add('armed');del.lastChild.textContent='กดอีกครั้งเพื่อยืนยัน';
       armT=setTimeout(function(){del.classList.remove('armed');del.lastChild.textContent='ย้ายไปถังขยะ'},3500);
     });
-    menuEl=el('div',{class:'qf-menu',role:'menu'},lib,del);
+    /* 8.1, optional: kept in this menu so the main flow stays the same */
+    var Pl=window.__qcPlan,pm=Pl?el('button',{type:'button',role:'menuitem',id:'qf-plan'},icon('pin'),'ระบุตำแหน่งบนแบบแปลน (ไม่บังคับ)'):null;
+    if(pm)pm.addEventListener('click',function(){closeMenu();Pl.open()});
+    var pp=Pl?el('button',{type:'button',role:'menuitem',id:'qf-planprint'},icon('print'),'พิมพ์แผ่นแผนผังสำหรับช่าง (A3)'):null;
+    if(pp)pp.addEventListener('click',function(){closeMenu();Pl.print(false)});
+    menuEl=el('div',{class:'qf-menu',role:'menu'},lib,pm,pp,del);
     formbar.appendChild(menuEl);anchor.setAttribute('aria-expanded','true');
   }
   function closeMenu(){
