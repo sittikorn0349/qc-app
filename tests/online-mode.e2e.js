@@ -95,7 +95,7 @@ if (require.main === module) (async () => {
   const S = (expr, arg) => page.evaluate(expr, arg);
   async function until(fn, arg, ms = 8000) { const t = Date.now(); while (Date.now() - t < ms) { if (await page.evaluate(fn, arg)) return true; await page.waitForTimeout(150); } return false; }
 
-  await page.goto('http://localhost:8911/index.html?mode=online', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:8911/' + (process.argv[2] || '') + 'index.html?mode=online', { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
   ok(await S(() => !!window.__ONLINE && localStorage.getItem('qc-mode') === 'online'), 'online shell loaded and mode remembered');
   ok(await S(() => !!document.querySelector('.qo-pill')), 'status pill shown (single project auto-selected)');
