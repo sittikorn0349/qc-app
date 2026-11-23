@@ -11,7 +11,7 @@ const ONLINE = process.argv[3] === 'online';
   let pass = 0, fail = 0;
   const ok = (c, m) => { if (c) { pass++; console.log('  ✓', m); } else { fail++; console.log('  ✗', m); } };
   async function mk(init) {
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } }); await ctx.addInitScript(() => { try { localStorage.setItem('qa-shell', 'off'); } catch (e) {} });   // these suites drive the classic home
     if (ONLINE) { const { FAKE } = require('./online-mode.e2e.js'); await ctx.addInitScript(FAKE); }
     if (init) await ctx.addInitScript(init);
     const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));

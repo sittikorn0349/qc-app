@@ -12,7 +12,7 @@ if (!fs.existsSync(PNG)) fs.writeFileSync(PNG, Buffer.from('iVBORw0KGgoAAAANSUhE
   const browser = await chromium.launch();
   let pass = 0, fail = 0;
   const ok = (c, m) => { if (c) { pass++; console.log('  ✓', m); } else { fail++; console.log('  ✗', m); } };
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } }); await ctx.addInitScript(() => { try { localStorage.setItem('qa-shell', 'off'); } catch (e) {} });   // these suites drive the classic home
   if (ONLINE) { const { FAKE } = require('./online-mode.e2e.js'); await ctx.addInitScript(FAKE); }
   const page = await ctx.newPage(); const errs = [];
   page.on('pageerror', e => errs.push(e.message)); page.on('dialog', d => { errs.push('native dialog: ' + d.message()); d.dismiss(); });

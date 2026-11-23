@@ -77,14 +77,66 @@ const FAKE = `
       else if(action==='cancel')r.status='cancelled';else if(action==='reschedule'){r.scheduled_at=at;r.status='requested'}
       return Promise.resolve('ok')},
     lineStatus:function(){return Promise.resolve({linked:!!S.linked,oa:'@qcapp'})},lineLinkStart:function(){return Promise.resolve({code:'123456',oa:'@qcapp',linked:false})},lineUnlink:function(){S.linked=false;return Promise.resolve(null)},
-    subscribe:function(p,cb){S.rt.push(cb);return function(){}}
+    subscribe:function(p,cb){S.rt.push(cb);return function(){}},
+    /* 006 workspace; sessionStorage fk-no006=1 simulates a server without it */
+    ws:sessionStorage.getItem('fk-no006')==='1'?undefined:(function(){
+      function W(){S.w=S.w||{chs:{},msgs:[],roles:null,reads:{},plan:{},bl:[],cm:{},audit:[],code:'SCC-4K7',joined:true,co:{name:'บริษัท ทดสอบ',plan:'team',standards:['รายการประกอบแบบของโครงการ','มยผ.','วสท.']},my:{p1:['qc']},access:{}};
+        if(!S.w.roles)S.w.roles=[{id:'owner',name:'เจ้าของ',color:'#B42318',position:100,base:'pm',perms:['*'],builtin:true},{id:'pm',name:'ผู้จัดการโครงการ',color:'#4A2F86',position:80,base:'pm',perms:['*'],builtin:true},
+          {id:'qc',name:'QC',color:'#1F5FA8',position:60,base:'foreman',perms:['ins_view','ins_create','ins_recheck','ins_assign','ch_post','req_answer','pl_progress'],builtin:true},
+          {id:'headman',name:'หัวหน้าช่าง',color:'#B26B00',position:40,base:'headman',perms:['ins_view','ins_fix','ch_post','req_create','pl_progress'],builtin:true},{id:'everyone',name:'ทุกคน',color:'#5B6B7F',position:0,base:'viewer',perms:['ins_view'],builtin:true}];
+        return S.w}
+      function perms(p){var w=W(),ids=w.my[p]||[],o=[];ids.forEach(function(id){var r=w.roles.filter(function(x){return x.id===id})[0];if(r)o=o.concat(r.perms)});return o}
+      return {
+        company:function(){var w=W();return Promise.resolve(Object.assign({id:1,members:3,seats:10,joined:w.joined,is_admin:false},w.co))},
+        companyCode:function(){return Promise.resolve(null)},rotateCode:function(){return Promise.reject(new Error('not admin'))},
+        join:function(code){var w=W();if(code===w.code){w.joined=true;return Promise.resolve(true)}return Promise.resolve(false)},
+        updateCompany:function(){return Promise.reject(new Error('not admin'))},
+        people:function(){return Promise.resolve([{id:ME,name:'Foreman Test',email:'foreman@example.com',org_role:'staff',joined:true},{id:OTHER,name:'PM สมชาย',email:'pm@example.com',org_role:'staff',joined:true},{id:HM,name:'เฮดแมน สมศักดิ์',email:'hm@example.com',org_role:'staff',joined:true}])},
+        projectPeople:function(p){var w=W();return Promise.resolve([{id:ME,name:'Foreman Test',email:'foreman@example.com',base:'foreman',roles:w.my[p]||[]},{id:OTHER,name:'PM สมชาย',email:'pm@example.com',base:'pm',roles:['pm']},{id:HM,name:'เฮดแมน สมศักดิ์',email:'hm@example.com',base:'headman',roles:['headman']}])},
+        perms:function(p){var w=W();return Promise.resolve({perms:perms(p),roles:w.my[p]||[],top:60})},
+        roles:function(){return Promise.resolve(c(W().roles))},
+        saveRole:function(r){var w=W();if(perms('p1').indexOf('*')<0)return Promise.reject(new Error('ไม่มีสิทธิ์จัดการยศ'));r=c(r);r.id=r.id||('rl_'+Math.random().toString(36).slice(2,8));w.roles=w.roles.filter(function(x){return x.id!==r.id}).concat([r]);return Promise.resolve([r])},
+        deleteRole:function(){return Promise.reject(new Error('no'))},
+        setMemberRoles:function(p,u,ids){var w=W();if(perms(p).indexOf('mem_manage')<0&&perms(p).indexOf('*')<0)return Promise.reject(new Error('ไม่มีสิทธิ์ให้ยศ'));w.my[p]=ids;return Promise.resolve(null)},
+        audit:function(){return Promise.resolve(c(W().audit))},
+        ensureChannels:function(p){var w=W();(S.zones||[]).forEach(function(z,i){var id='ch_'+z;if(!w.chs[id])w.chs[id]={id:id,project_id:p,name:z,category:'โซนงาน',kind:'zone',hold:null,standard_ref:'',position:i}});
+          if(!w.chs.ch_ann)w.chs.ch_ann={id:'ch_ann',project_id:p,name:'ประกาศ',category:'ทั่วไป',kind:'announce',position:-1};return Promise.resolve(null)},
+        channels:function(p){return Promise.resolve(Object.values(W().chs).filter(function(x){return x.project_id===p&&!x.archived_at}).map(c))},
+        saveChannel:function(r){var w=W();var p=perms(r.project_id||'p1');if(p.indexOf('ch_manage')<0&&p.indexOf('*')<0)return Promise.reject(new Error('ไม่มีสิทธิ์จัดการช่อง'));r=c(r);r.id=r.id||('ch_'+r.name);w.chs[r.id]=Object.assign(w.chs[r.id]||{},r);return Promise.resolve([c(w.chs[r.id])])},
+        access:function(ch){return Promise.resolve(c(W().access[ch]||[]))},setAccess:function(rows){var w=W();rows.forEach(function(r){w.access[r.channel_id]=(w.access[r.channel_id]||[]).filter(function(x){return x.role_id!==r.role_id}).concat([c(r)])});return Promise.resolve(null)},
+        unread:function(p){var w=W(),n={};w.msgs.forEach(function(m){if(m.author!==ME&&!m.item_id&&(!w.reads[m.channel_id]||m.created_at>w.reads[m.channel_id]))n[m.channel_id]=(n[m.channel_id]||0)+1});return Promise.resolve(Object.keys(n).map(function(k){return {channel_id:k,n:n[k]}}))},
+        markRead:function(ch){W().reads[ch]=now();return Promise.resolve(null)},
+        messages:function(f){return Promise.resolve(W().msgs.filter(function(m){return f.item?m.item_id===f.item:(m.channel_id===f.channel&&!m.item_id)}).map(c))},
+        search:function(p,t){return Promise.resolve(W().msgs.filter(function(m){return (m.body||'').indexOf(t)>=0}).map(c))},
+        post:function(row){log('post');var w=W();var ch=w.chs[row.channel_id];var p=perms('p1');
+          if(ch&&ch.kind==='announce'&&p.indexOf('ch_manage')<0&&p.indexOf('*')<0)return Promise.reject(Object.assign(new Error('ช่องประกาศโพสต์ได้เฉพาะผู้จัดการช่อง'),{code:'42501'}));
+          if(w.msgs.some(function(m){return m.client_id===row.client_id}))return Promise.resolve([]);
+          var m=c(row);m.id=w.msgs.length+1;m.author=ME;m.created_at=now();w.msgs.push(m);return Promise.resolve([m])},
+        editMessage:function(){return Promise.resolve(null)},
+        itemEvents:function(ids){return Promise.resolve(S.events.filter(function(e){return ids.indexOf(e.item)>=0}).map(function(e){return {item_id:e.item,kind:e.kind,actor:ME,detail:{res:e.res},created_at:now()}}))},
+        plan:function(p){return Promise.resolve(Object.values(W().plan).filter(function(t){return t.project_id===p}).map(c))},
+        savePlanTask:function(r){var w=W();r=c(r);r.id=r.id||('pt_'+Math.random().toString(36).slice(2,8));w.plan[r.id]=Object.assign(w.plan[r.id]||{pct:0,preds:[],weight:0,position:0},r);return Promise.resolve([c(w.plan[r.id])])},
+        deletePlanTask:function(id){delete W().plan[id];return Promise.resolve(null)},
+        baselines:function(){return Promise.resolve(c(W().bl))},
+        approveBaseline:function(p){var w=W();if(perms(p).indexOf('pl_baseline')<0&&perms(p).indexOf('*')<0)return Promise.reject(new Error('ไม่มีสิทธิ์อนุมัติแผนฐาน'));
+          w.bl.unshift({id:w.bl.length+1,approved_by:ME,approved_at:now(),snapshot:Object.values(w.plan).map(c)});return Promise.resolve(w.bl[0].id)},
+        commitments:function(ids){var w=W();return Promise.resolve(Object.values(w.cm).filter(function(x){return ids.indexOf(x.task_id)>=0}).map(c))},
+        assign:function(row){var w=W();w.cm[row.task_id+'|'+row.week]=Object.assign({state:'assigned',blocker:'',note:''},c(row));return Promise.resolve(null)},
+        answer:function(t,wk,st,why,pct){var w=W(),x=w.cm[t+'|'+wk];if(!x)return Promise.resolve('gone');var task=w.plan[t];
+          if(task&&task.hold_channel_id&&(st==='promised'||st==='done')&&Object.values(S.items).some(function(i){return (i.loc||'').indexOf((w.chs[task.hold_channel_id]||{}).name+' · ')===0&&(i.status==='open'||i.status==='assigned'||i.status==='fixed'||i.status==='rejected')}))return Promise.resolve('held');
+          x.state=st;x.blocker=st==='blocked'?why:'';if(pct!=null&&task)task.pct=pct;return Promise.resolve('ok')},
+        setProject:function(){return Promise.resolve(null)},
+        share:function(path,blob,days,row){S.blobs['share/'+path]=blob;return Promise.resolve('https://example.test/s/'+encodeURIComponent(path)+'?d='+days)},
+        subscribe:function(p,cb){S.rt.push(cb);return function(){}}
+      };
+    })()
   };
 })();`;
 
 module.exports = { FAKE };
 if (require.main === module) (async () => {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } }); await ctx.addInitScript(() => { try { localStorage.setItem('qa-shell', 'off'); } catch (e) {} });   // these suites drive the classic home
   await ctx.addInitScript(FAKE);
   const page = await ctx.newPage();
   const errs = [];

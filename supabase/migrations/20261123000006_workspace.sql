@@ -417,7 +417,10 @@ begin
   -- an H point that has not passed keeps the task from starting
   if st = 'promised' and exists (select 1 from plan_tasks x where x.id = t and x.hold_channel_id is not null
         and exists (select 1 from inspection_items it join inspections i on i.id = it.inspection_id
-                     where i.channel_id = x.hold_channel_id and i.deleted_at is null and it.res in ('fix','bad'))) then
+                      join channels hc on hc.id = x.hold_channel_id
+                     where i.project_id = x.project_id and i.deleted_at is null and it.res in ('fix','bad')
+                       and coalesce(it.rres, '') <> 'ok'
+                       and (i.channel_id = hc.id or btrim(it.loc) = hc.name or it.loc like hc.name || ' · %'))) then
     return 'held';
   end if;
   return 'ok';

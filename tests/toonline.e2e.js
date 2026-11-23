@@ -1,7 +1,7 @@
 const { chromium } = require('playwright');
 const BASE = 'http://localhost:8911/' + (process.argv[2] || '');
 (async () => {
-  const b = await chromium.launch(); const p = await b.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  const b = await chromium.launch(); const c0 = await b.newContext(); await c0.addInitScript(() => { try { localStorage.setItem('qa-shell', 'off'); } catch (e) {} }); const p = await c0.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   let pass = 0, fail = 0; const ok = (c, m) => { c ? pass++ : fail++; console.log(c ? '  ✓' : '  ✗', m); };
   await p.goto(BASE + 'index.html', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
   await p.click('#qh-t-set'); await p.waitForTimeout(300);

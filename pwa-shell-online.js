@@ -84,6 +84,55 @@
       addMember:function(p,u,role){return sb.from('project_members').upsert({project_id:p,user_id:u,role:role}).then(chk)},
       removeMember:function(p,u){return sb.from('project_members').delete().eq('project_id',p).eq('user_id',u).then(chk)},
       createProject:function(name,site){return sb.from('projects').insert({name:name,site:site||''}).select('id').single().then(chk)},
+      /* 006: workspace for the new UX (company, roles, channels, messages, plan, shares) */
+      ws:{
+        company:function(){return sb.rpc('company_info').then(chk).then(function(r){return r&&r[0]||null})},
+        companyCode:function(){return sb.rpc('company_code').then(chk)},
+        rotateCode:function(){return sb.rpc('rotate_join_code').then(chk)},
+        join:function(code){return sb.rpc('join_company',{code:code}).then(chk)},
+        updateCompany:function(patch){return sb.from('company').update(patch).eq('id',1).then(chk)},
+        people:function(){return sb.rpc('company_people').then(chk)},
+        projectPeople:function(p){return sb.rpc('project_people',{p:p}).then(chk)},
+        perms:function(p){return sb.rpc('my_permissions',{p:p}).then(chk).then(function(r){return r&&r[0]||{perms:[],roles:[],top:-1}})},
+        roles:function(){return sb.from('roles').select('*').order('position',{ascending:false}).then(chk)},
+        saveRole:function(row){return sb.from('roles').upsert(row).select('*').then(chk)},
+        deleteRole:function(id){return sb.from('roles').delete().eq('id',id).then(chk)},
+        setMemberRoles:function(p,u,ids){return sb.rpc('set_member_roles',{p:p,u:u,role_ids:ids}).then(chk)},
+        audit:function(){return sb.from('role_audit').select('*').order('at',{ascending:false}).limit(200).then(chk)},
+        ensureChannels:function(p){return sb.rpc('ensure_channels',{p:p}).then(chk)},
+        channels:function(p){return sb.from('channels').select('*').eq('project_id',p).is('archived_at',null).order('position').then(chk)},
+        saveChannel:function(row){return sb.from('channels').upsert(row).select('*').then(chk)},
+        access:function(ch){return sb.from('channel_access').select('*').eq('channel_id',ch).then(chk)},
+        setAccess:function(rows){return sb.from('channel_access').upsert(rows).then(chk)},
+        unread:function(p){return sb.rpc('unread_counts',{p:p}).then(chk)},
+        markRead:function(ch){return sb.from('channel_reads').upsert({channel_id:ch,last_read:new Date().toISOString()},{onConflict:'user_id,channel_id'}).then(chk)},
+        messages:function(f){var q=sb.from('messages').select('*').is('deleted_at',null).order('created_at',{ascending:true}).limit(f.limit||300);
+          if(f.item)q=q.eq('item_id',f.item);else q=q.eq('channel_id',f.channel).is('item_id',null);return q.then(chk)},
+        search:function(p,text){return sb.from('messages').select('*').eq('project_id',p).is('deleted_at',null).ilike('body','%'+text+'%').limit(50).then(chk)},
+        post:function(row){return sb.from('messages').upsert(row,{onConflict:'client_id',ignoreDuplicates:true}).select('*').then(chk)},
+        editMessage:function(id,patch){return sb.from('messages').update(patch).eq('id',id).then(chk)},
+        itemEvents:function(ids){return ids.length?sb.from('item_events').select('*').in('item_id',ids).order('created_at').then(chk):Promise.resolve([])},
+        plan:function(p){return sb.from('plan_tasks').select('*').eq('project_id',p).order('position').then(chk)},
+        savePlanTask:function(row){return sb.from('plan_tasks').upsert(row).select('*').then(chk)},
+        deletePlanTask:function(id){return sb.from('plan_tasks').delete().eq('id',id).then(chk)},
+        baselines:function(p){return sb.from('plan_baselines').select('id,approved_by,approved_at,snapshot').eq('project_id',p).order('approved_at',{ascending:false}).limit(5).then(chk)},
+        approveBaseline:function(p){return sb.rpc('approve_baseline',{p:p}).then(chk)},
+        commitments:function(taskIds){return taskIds.length?sb.from('plan_commitments').select('*').in('task_id',taskIds).then(chk):Promise.resolve([])},
+        assign:function(row){return sb.from('plan_commitments').insert(row).then(chk)},
+        answer:function(t,w,st,why,pct){return sb.rpc('answer_commitment',{t:t,w:w,st:st,why:why||'',progress:pct==null?null:pct}).then(chk)},
+        setProject:function(p,patch){return sb.from('projects').update(patch).eq('id',p).then(chk)},
+        share:function(path,blob,days,row){
+          return sb.storage.from('shares').upload(path,blob,{contentType:'application/pdf',upsert:true}).then(chk)
+            .then(function(){return sb.storage.from('shares').createSignedUrl(path,Math.max(60,Math.round(days*86400)))}).then(chk)
+            .then(function(r){return sb.from('share_links').insert(row).then(chk).then(function(){return r.signedUrl})})},
+        subscribe:function(p,cb){
+          var ch=sb.channel('qcw-'+p)
+            .on('postgres_changes',{event:'*',schema:'public',table:'messages',filter:'project_id=eq.'+p},cb)
+            .on('postgres_changes',{event:'*',schema:'public',table:'channels',filter:'project_id=eq.'+p},cb)
+            .subscribe();
+          return function(){try{sb.removeChannel(ch)}catch(e){}};
+        }
+      },
       subscribe:function(p,cb){
         var ch=sb.channel('qc-'+p)
           .on('postgres_changes',{event:'*',schema:'public',table:'inspections',filter:'project_id=eq.'+p},cb)
@@ -336,7 +385,7 @@
     if(!navigator.onLine){status();return}
     if(authErr){status();return}            /* waiting for a new sign-in; local writes still go to the outbox */
     syncing=true;status();
-    uploadAll().then(pushAll).then(pull).then(formSync).then(function(){lastErr=''},function(e){
+    uploadAll().then(pushAll).then(pull).then(formSync).then(flushMsgs).then(function(){lastErr=''},function(e){
       if(isAuth(e)){authErr=true;lastErr='';}
       else lastErr=isNet(e)?'':(e&&(e.message||e.code))||'error';
       try{console.warn('[qc-online] sync',e)}catch(x){}
@@ -1379,6 +1428,96 @@
   /* ---------- hooks used by pwa-home / pwa-send / pwa-extras ---------- */
   function ownDocs(){var out=[];cache.forEach(function(d,p){if(p.indexOf(PFX)===0&&d.kind!=='folder'&&!d.deletedAt&&d._project===CUR)out.push({id:p.slice(PFX.length),data:clone(d)})});return out}
   window.__qcStats=function(){return {docs:ownDocs().length}};
+  /* ---------- workspace facade for the new UX (006). Reads are cached per user so the shell opens offline;
+     messages go through their own outbox (client_id = idempotent resend). ---------- */
+  var WS=api.ws||null,wsNo=false;
+  function wsKey(k){return 'qc-wsc:'+UID+':'+k}
+  function cached(k,fn){
+    if(!WS||wsNo)return Promise.resolve(JSON.parse(lsGet(wsKey(k))||'null'));
+    return fn().then(function(v){try{lsSet(wsKey(k),JSON.stringify(v))}catch(e){}return v},function(e){
+      if(noTable(e)||(e&&(e.code==='PGRST202'||e.code==='42883')))wsNo=true;   /* server without 006 yet */
+      var c=lsGet(wsKey(k));if(c!=null)return JSON.parse(c);if(isNet(e)||wsNo)return null;throw e});
+  }
+  function msgQ(){try{return JSON.parse(lsGet('qc-msgq:'+UID)||'[]')}catch(e){return []}}
+  function setMsgQ(q){lsSet('qc-msgq:'+UID,JSON.stringify(q));notifyMsgs()}
+  var msgListeners=[];function notifyMsgs(){msgListeners.forEach(function(f){try{f()}catch(e){}})}
+  function flushMsgs(){
+    var q=msgQ();if(!q.length||!WS||wsNo)return Promise.resolve();
+    var m=q[0];
+    if((m.files||[]).some(function(f){return uploads.has(f)}))return Promise.resolve();   /* photos first (uploadAll), then the message */
+    return Promise.resolve((m.files||[]).map(function(f){return idToPath(f)||f})).then(function(ph){
+      var row={client_id:m.client_id,project_id:m.project_id,channel_id:m.channel_id,inspection_id:m.inspection_id||null,item_id:m.item_id||null,body:m.body,photos:ph.filter(Boolean)};
+      return WS.post(row);
+    }).then(function(){setMsgQ(msgQ().filter(function(x){return x.client_id!==m.client_id}));return flushMsgs()},function(e){
+      if(isNet(e)||isAuth(e))throw e;
+      /* refused by the server (no permission / channel gone): keep it visible as failed instead of retrying forever */
+      setMsgQ(msgQ().map(function(x){return x.client_id===m.client_id?Object.assign({},x,{failed:(e&&e.message)||'ส่งไม่สำเร็จ'}):x}));
+    });
+  }
+  function projectDocs(){
+    var out=ownDocs();
+    shared.forEach(function(x,id){if(x&&x.data&&!x.data.deletedAt&&(!x.data._project||x.data._project===CUR))out.push({id:id,data:clone(x.data),owner:x.owner||x.data._owner||null,shared:true})});
+    return out;
+  }
+  var wsApi={
+    available:function(){return !!WS&&!wsNo},
+    me:function(){return {id:UID,name:ME&&ME.name||'',email:ME&&ME.email||'',org_role:ME&&ME.org_role||'staff'}},
+    projects:function(){return (PROJECTS||[]).slice()},
+    project:function(){return CUR},
+    switchProject:function(id){if(id&&id!==CUR){lsSet(PK,id);location.reload()}},
+    docs:projectDocs,
+    company:function(){return cached('company',WS?WS.company:null)},
+    companyCode:function(){return WS?WS.companyCode():Promise.resolve(null)},
+    rotateCode:function(){return WS.rotateCode()},
+    join:function(code){return WS.join(code)},
+    updateCompany:function(p){return WS.updateCompany(p)},
+    people:function(){return cached('people',WS?WS.people:null)},
+    projectPeople:function(p){p=p||CUR;return cached('pp:'+p,function(){return WS.projectPeople(p)})},
+    perms:function(p){p=p||CUR;return cached('perm:'+p,function(){return WS.perms(p)})},
+    roles:function(){return cached('roles',WS?WS.roles:null)},
+    saveRole:function(r){return WS.saveRole(r)},deleteRole:function(id){return WS.deleteRole(id)},
+    setMemberRoles:function(p,u,ids){return WS.setMemberRoles(p||CUR,u,ids)},
+    audit:function(){return WS.audit()},
+    channels:function(p){p=p||CUR;return cached('ch:'+p,function(){return WS.ensureChannels(p).then(function(){return WS.channels(p)})})},
+    saveChannel:function(r){return WS.saveChannel(Object.assign({project_id:CUR},r))},
+    access:function(ch){return WS.access(ch)},setAccess:function(rows){return WS.setAccess(rows)},
+    unread:function(p){p=p||CUR;return cached('un:'+p,function(){return WS.unread(p)})},
+    markRead:function(ch){return WS&&!wsNo?WS.markRead(ch).catch(function(){}):Promise.resolve()},
+    messages:function(f){var k='m:'+(f.item?'i:'+f.item:'c:'+f.channel);
+      return cached(k,function(){return WS.messages(f)}).then(function(rows){
+        var pend=msgQ().filter(function(m){return f.item?m.item_id===f.item:(m.channel_id===f.channel&&!m.item_id)});
+        return (rows||[]).concat(pend.map(function(m){return {client_id:m.client_id,author:UID,body:m.body,photos:m.files||[],created_at:m.at,pending:true,failed:m.failed||null,item_id:m.item_id||null}}));
+      })},
+    post:function(m){
+      var row={client_id:'msg_'+QCU.randHex(10),project_id:CUR,channel_id:m.channel_id,inspection_id:m.inspection_id||null,item_id:m.item_id||null,body:m.body||'',files:m.files||[],at:new Date().toISOString()};
+      setMsgQ(msgQ().concat([row]));schedule(0);return row;
+    },
+    retry:function(cid){setMsgQ(msgQ().map(function(x){if(x.client_id===cid){x=Object.assign({},x);delete x.failed}return x}));schedule(0)},
+    drop:function(cid){setMsgQ(msgQ().filter(function(x){return x.client_id!==cid}))},
+    pendingMessages:function(){return msgQ().length},
+    onMessages:function(f){msgListeners.push(f)},
+    search:function(t){return WS&&!wsNo?WS.search(CUR,t).catch(function(){return []}):Promise.resolve([])},
+    itemEvents:function(ids){return cached('ev:'+ids.join(',').slice(0,120),function(){return WS.itemEvents(ids)})},
+    plan:function(p){p=p||CUR;return cached('plan:'+p,function(){return WS.plan(p)})},
+    savePlanTask:function(r){return WS.savePlanTask(Object.assign({project_id:CUR},r))},deletePlanTask:function(id){return WS.deletePlanTask(id)},
+    baselines:function(p){p=p||CUR;return cached('bl:'+p,function(){return WS.baselines(p)})},
+    approveBaseline:function(p){return WS.approveBaseline(p||CUR)},
+    commitments:function(ids){return cached('cm:'+CUR,function(){return WS.commitments(ids)})},
+    assign:function(row){return WS.assign(row)},
+    answer:function(t,w,st,why,pct){return WS.answer(t,w,st,why,pct)},
+    setProject:function(patch){return WS.setProject(CUR,patch)},
+    share:function(docId,blob,days){var path=UID+'/'+docId+'-'+Date.now()+'.pdf';
+      return WS.share(path,blob,days,{project_id:CUR,doc_id:docId,path:path,expires_at:new Date(Date.now()+days*864e5).toISOString()})},
+    photoUrl:function(id){return window.__qcUrl?window.__qcUrl(id):null},
+    subscribe:function(cb){return WS&&!wsNo?WS.subscribe(CUR,cb):function(){}},
+    nameOf:nameOf,
+    members:function(){return MEMBERS.slice()},
+    createProject:function(name,site){return api.createProject(name,site)},
+    addMember:function(p,u,role){return api.addMember(p,u,role)}
+  };
+  window.__qcWS=wsApi;
+  window.addEventListener('online',function(){schedule(0)});
+
   window.__qcDocs=ownDocs;
   window.__qcGetDoc=function(id){var d=cache.get(PFX+id);if(d)return clone(d);var s=shared.get(id);return s?clone(s.data):null};
   window.__qcBlob=function(id){return getBlob(id)};

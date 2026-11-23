@@ -9,7 +9,7 @@ const SRFAKE = `window.webkitSpeechRecognition=function(){var r=this;r.start=fun
 
 (async () => {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ ...devices['Pixel 7'] });
+  const ctx = await browser.newContext({ ...devices['Pixel 7'] }); await ctx.addInitScript(() => { try { localStorage.setItem('qa-shell', 'off'); } catch (e) {} });   // these suites drive the classic home
   if (ONLINE) { const { FAKE } = require('./online-mode.e2e.js'); await ctx.addInitScript(FAKE); }
   await ctx.addInitScript(SRFAKE);
   const page = await ctx.newPage();

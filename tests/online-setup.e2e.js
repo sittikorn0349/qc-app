@@ -22,7 +22,7 @@ const KNOBS = `(function(){var A=window.__qcOnlineApi,f=function(k){try{return s
   if (!fs.existsSync(png)) fs.writeFileSync(png, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'));
 
   async function mk() {
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } }); await ctx.addInitScript(() => { try { localStorage.setItem('qa-shell', 'off'); } catch (e) {} });   // these suites drive the classic home
     await ctx.addInitScript(FAKE); await ctx.addInitScript(KNOBS);
     const page = await ctx.newPage(); const errs = [];
     page.on('pageerror', e => errs.push(e.message + ' ' + (e.stack || '').slice(0, 300)));

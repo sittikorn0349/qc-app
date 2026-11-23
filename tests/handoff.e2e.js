@@ -8,7 +8,7 @@ const BASE = 'http://localhost:8911/' + (process.argv[2] || '');
   const browser = await chromium.launch();
   let pass = 0, fail = 0;
   const ok = (c, m) => { if (c) { pass++; console.log('  ✓', m); } else { fail++; console.log('  ✗', m); } };
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } }); await ctx.addInitScript(() => { try { localStorage.setItem('qa-shell', 'off'); } catch (e) {} });   // these suites drive the classic home
   const page = await ctx.newPage(); const errs = [];
   page.on('pageerror', e => errs.push(e.message));
   let nativeDialogs = 0; page.on('dialog', d => { nativeDialogs++; d.dismiss(); });

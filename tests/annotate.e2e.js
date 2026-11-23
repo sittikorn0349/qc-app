@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
 const BASE = 'http://localhost:8911/' + (process.argv[2] || '');
 (async () => {
   const browser = await chromium.launch();
-  const page = await (await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true })).newPage();
+  const ctx0 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true }); await ctx0.addInitScript(() => { try { localStorage.setItem('qa-shell', 'off'); } catch (e) {} }); const page = await ctx0.newPage();
   const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   let pass = 0, fail = 0; const ok = (c, m) => { if (c) { pass++; console.log('  ✓', m); } else { fail++; console.log('  ✗', m); } };
   await page.goto(BASE + 'index.html', { waitUntil: 'networkidle' }); await page.waitForTimeout(800);

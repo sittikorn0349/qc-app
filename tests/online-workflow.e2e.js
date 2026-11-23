@@ -8,7 +8,7 @@ const BASE = 'http://localhost:8911/' + (process.argv[2] || '') ;
 
 (async () => {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } }); await ctx.addInitScript(() => { try { localStorage.setItem('qa-shell', 'off'); } catch (e) {} });   // these suites drive the classic home
   await ctx.addInitScript(FAKE);
   const page = await ctx.newPage();
   const errs = [];

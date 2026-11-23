@@ -8,7 +8,7 @@ const ONLINE = process.argv[3] === 'online';
 
 (async () => {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } }); await ctx.addInitScript(() => { try { localStorage.setItem('qa-shell', 'off'); } catch (e) {} });   // these suites drive the classic home
   if (ONLINE) { const { FAKE } = require('./online-mode.e2e.js'); await ctx.addInitScript(FAKE); }
   await ctx.addInitScript(`window.__qcNoPrint=true;`);
   const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
