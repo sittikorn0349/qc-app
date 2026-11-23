@@ -2450,7 +2450,8 @@ button{font:inherit;cursor:pointer}
     openList:function(){if(dlg.hidden)openList()},closeList:closeList,listOpen:function(){return !dlg.hidden},
     /* direct calls (no timed synthetic clicks from other modules) */
     openTrash:function(){if(dlg.hidden)openList();activeF='trash';renamingF=null;addingF=false;var mm=$('#dlg-msg');if(mm)mm.textContent='';renderList()},
-    exportBackup:function(){if(dlg.hidden)openList();var b=$('#bk-export');if(b&&!b.disabled)b.click()}
+    exportBackup:function(){if(dlg.hidden)openList();var b=$('#bk-export');if(b&&!b.disabled)b.click()},
+    pdfBlob:function(kind){return new Promise(function(ok,fail){exportPdf(kind||'full',null,{ok:ok,fail:fail})})}
   };
 
   window.__qcForm={cur:function(){return state.id},drain:function(){return drain()},viewing:function(){return !!viewing},
@@ -2928,8 +2929,8 @@ button{font:inherit;cursor:pointer}
       var c=e&&e.code;setStatus(c==='declined'?'ยกเลิกการบันทึก CSV':'บันทึกไฟล์ CSV ไม่ได้ในมุมมองนี้');
     }).then(function(){pdfBusy=false;pdfButtons(false,'Plot PDF')});
   }
-  function exportPdf(kind,batch){
-    if(pdfBusy)return;
+  function exportPdf(kind,batch,sink){   /* sink {ok(blob),fail(e)}: hand the PDF to the caller instead of saving it (share link) */
+    if(pdfBusy){if(sink)sink.fail({code:'busy'});return}
     kind=(kind==='pend')?'pend':'full';
     var D=batch?batch.d:state;
     if(kind==='pend'&&!D.items.some(isPend)){setStatus('ไม่มีรายการค้างแก้ (ต้องแก้ไข/ไม่ผ่าน ที่ยังตรวจซ้ำไม่ผ่าน)');return}
@@ -2938,13 +2939,13 @@ button{font:inherit;cursor:pointer}
     if(blankN)setStatus('หมายเหตุ: ยังมี '+blankN+' รายการที่ยังไม่สรุปผลตรวจ กำลังสร้าง PDF…');
     var sheets;
     dlP.then(function(dl){
-      if(!dl)throw {code:'unavailable'};
+      if(!dl&&!sink)throw {code:'unavailable'};
       if(!window.jspdf||!window.html2canvas)throw {code:'lib'};
       var ready=(document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();
       return ready.then(kind==='pend'?function(){}:prepPhotos).then(function(){
         sheets=buildSheets(kind,D);
         pdfButtons(true,'กำลังสร้าง PDF…');
-        return previewSheets(sheets);
+        return sink?true:previewSheets(sheets);   /* share link: the person already chose to send it */
       }).then(function(okToMake){
         if(!okToMake)throw {code:'cancelled'};
         var pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
@@ -2963,6 +2964,7 @@ button{font:inherit;cursor:pointer}
         });
         return chain.then(function(){return pdf.output('blob')});
       }).then(function(blob){
+        if(sink){sink.ok(blob);sink=null;return}
         var m=D.meta,base=batch?batch.base:(m.docno||m.project||m.date||'form').replace(/[\\\/:*?"<>|]+/g,'_');
         return dl.save({filename:(kind==='pend'?'สรุปรายการค้างแก้_':'ตรวจงานก่อสร้าง_')+base+'.pdf',data:blob});
       });
@@ -2970,6 +2972,7 @@ button{font:inherit;cursor:pointer}
       setStatus('ส่งไฟล์ PDF ให้บันทึกแล้ว');
     }).catch(function(e){
       var code=e&&e.code;
+      if(sink){sink.fail(e);sink=null}
       if(code==='cancelled')setStatus('ยกเลิกการสร้าง PDF');
       else if(code==='declined')setStatus('ยกเลิกการบันทึก PDF');
       else if(code==='unavailable'||code==='not_granted'||code==='capability_disabled'||code==='capability_removed')
@@ -3050,5 +3053,7 @@ button{font:inherit;cursor:pointer}
 <script src="./pwa-send.js"></script>
 <script src="./pwa-home.js"></script>
 <script src="./pwa-forms.js"></script>
+<link rel="stylesheet" href="./pwa-app.css">
+<script src="./pwa-app.js"></script>
 <script>if('serviceWorker' in navigator&&location.protocol!=='file:')addEventListener('load',function(){navigator.serviceWorker.register('./sw.js').catch(function(){})})</script>
 </body></html>
