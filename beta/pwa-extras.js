@@ -1,8 +1,9 @@
 /* Offline-app extras: backup reminder, install button, storage status. Pure UI; talks to the form only through its public buttons. */
 (function(){
   'use strict';
+  var U=window.QCU;  /* shared helpers: pwa-util.js */
+  var $=U.$;
   var DAY=864e5,WARN=7;
-  function $(s){return document.querySelector(s)}
   function lastBackup(){try{var v=+localStorage.getItem('qc-last-backup');return v>0?v:0}catch(e){return 0}}
   var isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent),standalone=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone;
   var deferred=null,persisted=null;

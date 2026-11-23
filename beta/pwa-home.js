@@ -3,17 +3,10 @@
    buttons, so documents, hashes and the send/receive format are untouched. */
 (function(){
   'use strict';
+  var U=window.QCU;  /* shared helpers: pwa-util.js */
+  var $=U.$,ls=U.ls,lsSet=U.lsSet,el=U.el;
   var FORMS=[{id:'qc-inspection',name:'แบบฟอร์มตรวจงานก่อสร้าง',sub:'งาน QC ตามมาตรฐาน'},{id:'safety',name:'แบบตรวจความปลอดภัย',sub:'นั่งร้าน · ราวกันตก · ประชุมก่อนเริ่มงาน'}];
   var FORM_K='qc-form',CODE_K='qc-code',NAME_K='qc-sender-name';
-  function $(s,r){return (r||document).querySelector(s)}
-  function ls(k){try{return localStorage.getItem(k)}catch(e){return null}}
-  function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
-  function el(tag,attrs){
-    var e=document.createElement(tag),a=attrs||{},k,i,c;
-    for(k in a){if(a[k]==null||a[k]===false)continue;if(k==='class')e.className=a[k];else if(k.slice(0,2)==='on')e[k]=a[k];else e.setAttribute(k,a[k]===true?'':a[k])}
-    for(i=2;i<arguments.length;i++){c=arguments[i];if(c==null||c===false)continue;e.appendChild(typeof c==='string'?document.createTextNode(c):c)}
-    return e;
-  }
   var P={
     plus:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6M9 14h6"/>',
     folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
@@ -75,6 +68,9 @@
     '#qh-sheet{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;padding:0}',
     '#qh-sheet .qh-card{width:100%;max-width:520px;max-height:90vh;overflow:auto;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:16px 16px 0 0;padding:16px max(16px,env(safe-area-inset-left,0px)) max(18px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}',
     '@media (min-width:700px){#qh-sheet{align-items:center}#qh-sheet .qh-card{border-radius:16px}}',
+    '.qd-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}.qd-kpi div{border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}.qd-kpi b{display:block;font-size:1.4rem}.qd-kpi small{color:var(--muted)}',
+    '.qd-sec{margin-top:12px}.qd-sec h3{margin:0 0 6px;font-size:.95rem}.qd-row{display:grid;grid-template-columns:minmax(0,9rem) 1fr 2.4rem;gap:8px;align-items:center;margin:4px 0;font-size:.9rem}.qd-k{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.qd-bar{height:12px;border-radius:6px;background:var(--bg)}.qd-bar i{display:block;height:100%;border-radius:6px;background:var(--warn,#d98a00)}.qd-row b{text-align:right}',
+    '.qd-late{display:block;width:100%;text-align:left;margin:4px 0;min-height:48px}',
     '#qh-sheet h2{margin:0;font-size:1.15rem}',
     '.qh-big{display:flex;align-items:center;gap:12px;min-height:56px;padding:0 14px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:12px;font:inherit;text-align:left;cursor:pointer}',
     '.qh-big small{display:block;color:var(--muted);font-size:.78rem}',
@@ -82,13 +78,20 @@
     '.qh-kv{font-size:.85rem;color:var(--muted);overflow-wrap:anywhere}'
   ].join('');
 
-  var booted=false,view='home',pending=false,pendT,home,wrap,formbar,msgEl,lastEls={},tiles={},sheet,menuEl,armT;
+  var booted=false,view='home',libFromHome=false,home,wrap,formbar,msgEl,lastEls={},tiles={},sheet,menuEl,armT;
 
   function click(sel){var b=$(sel);if(b)b.click();return !!b}
   function curId(){return window.__qcForm&&window.__qcForm.cur&&window.__qcForm.cur()}
   function curDoc(){var id=curId(),d=id&&window.__qcGetDoc&&window.__qcGetDoc(id);return (d&&!d.deletedAt)?d:null}
   function libCount(){var b=$('#btn-list'),m=b&&/\((\d+)\)/.exec(b.textContent||'');return m?+m[1]:0}
-  function expectNav(){pending=true;clearTimeout(pendT);pendT=setTimeout(function(){pending=false},90000)}
+  /* actions go through index.html's __qcActions (no hidden-button clicks, no timer window);
+     the library list is the only place where the user picks later, so it is tracked by open/close, not by time */
+  function A(){return window.__qcActions}
+  function run(name,arg){
+    var a=A();if(!a)return Promise.resolve(false);
+    return a[name](arg).then(function(ok){if(ok){closeSheet();goForm();if(name==='newRecord'){var f=$('#m-docno');if(f)f.focus({preventScroll:true})}}return ok});
+  }
+  function openList(){libFromHome=true;var a=A();if(a)a.openList();else click('#btn-list')}
   function setMsg(t){if(msgEl)msgEl.textContent=t||''}
 
   /* ---------- navigation ---------- */
@@ -153,8 +156,8 @@
     return b;
   }
 
-  function openLib(){expectNav();click('#btn-list')}
-  function openFile(){closeSheet();expectNav();click('#btn-list');var f=$('#bk-file');if(f)f.click()}
+  function openLib(){openList()}
+  function openFile(){closeSheet();openList();var f=$('#bk-file');if(f)f.click()}
 
   function build(){
     var st=document.createElement('style');st.textContent=CSS;document.head.appendChild(st);
@@ -175,11 +178,12 @@
       tile('new','สร้างรายงาน','เลือกแบบฟอร์ม','plus',{primary:true,run:openPicker}),
       tile('lib','คลังเอกสาร','','folder',{run:openLib}),
       tile('forms','รายงานแบบอื่น','แบบฟอร์มสำเร็จรูป / สร้างเอง','folder',{run:function(){if(window.__qcForms)window.__qcForms.library()}}),
-      tile('send','ส่งเอกสาร','ไฟล์ ZIP','send',{need:true,run:function(){click('#btn-send')}}),
-      tile('follow','ตรวจรอบใหม่','จากรายการค้าง','recheck',{need:true,run:function(){expectNav();click('#btn-follow')}}),
-      tile('dup','ทำสำเนา','เป็นฉบับใหม่','copy',{need:true,run:function(){expectNav();click('#btn-dup')}}),
+      tile('send',window.__ONLINE?'ส่งให้คนนอกโครงการ':'ส่งเอกสาร',window.__ONLINE?'ทีมในโครงการเห็นผ่านซิงก์แล้ว':'ไฟล์ ZIP','send',{need:true,run:function(){click('#btn-send')}}),
+      tile('follow','ตรวจรอบใหม่','จากรายการค้าง','recheck',{need:true,run:function(){run('followUp')}}),
+      tile('dup','ทำสำเนา','เป็นฉบับใหม่','copy',{need:true,run:function(){run('dupRecord')}}),
       tile('imp','รับไฟล์ ZIP','งานที่เพื่อนส่งมา','inbox',{run:openFile}),
       tile('bk','สำรอง / กู้คืน','ข้อมูลทั้งหมด','db',{run:openBackup}),
+      tile('dash','สรุปงานค้าง','ใครค้างแก้ หมวดไหน เลยกำหนด','recheck',{run:openDash}),
       tile('trash','ถังขยะ','กู้คืนได้ 30 วัน','trash',{run:openTrash}),
       tile('set','ตั้งค่า','รหัสผู้ตรวจ ฯลฯ','gear',{run:openSettings}));
 
@@ -194,7 +198,7 @@
     var back=el('button',{type:'button',class:'btn',id:'qf-back','aria-label':'กลับหน้าแรก'},icon('back'),'หน้าแรก');
     back.addEventListener('click',goHome);
     var title=el('div',{class:'qf-t',id:'qf-title'},'');
-    var send=el('button',{type:'button',class:'btn primary',id:'qf-send'},icon('send'),'ส่งเอกสาร');
+    var send=el('button',{type:'button',class:'btn primary',id:'qf-send'},icon('send'),window.__ONLINE?'ส่งคนนอก':'ส่งเอกสาร');
     send.addEventListener('click',function(){click('#btn-send')});
     var more=el('button',{type:'button',class:'btn',id:'qf-more','aria-haspopup':'menu','aria-expanded':'false','aria-label':'เมนูเพิ่มเติม'},icon('more'));
     more.addEventListener('click',function(e){e.stopPropagation();menuEl?closeMenu():openMenu(more)});
@@ -207,14 +211,12 @@
       if(menuEl)closeMenu();
     });
 
-    /* mirror status text; navigation comes only from the explicit 'qc-action' event fired by index.html */
+    /* mirror status text; a document opened/created from the library list (opened from home) moves to the form */
     var NAVT={open:1,'new':1,dup:1,followup:1},navSeen=false;
     document.addEventListener('qc-action',function(e){
       var d=(e&&e.detail)||{};
-      if(view==='home'&&pending&&NAVT[d.type]){
-        pending=false;clearTimeout(pendT);navSeen=true;closeSheet();goForm();setMsg('');
-        if(d.type==='new'){var f=$('#m-docno');if(f)f.focus({preventScroll:true})}
-      }else if(view!=='home'&&pending&&d.type==='trash'){pending=false;clearTimeout(pendT);goHome();setMsg(($('#status')||{}).textContent||'')}
+      if(d.type==='list-close'){setTimeout(function(){libFromHome=false},0);return}   /* open/new fire right after the list closes */
+      if(view==='home'&&libFromHome&&NAVT[d.type]){libFromHome=false;navSeen=true;closeSheet();goForm();setMsg('')}
     });
     var s=$('#status');
     if(s)new MutationObserver(function(){
@@ -244,12 +246,12 @@
   function openMenu(anchor){
     closeMenu();
     var lib=el('button',{type:'button',role:'menuitem'},icon('folder'),'ไปที่คลังเอกสาร');
-    lib.addEventListener('click',function(){closeMenu();click('#btn-list')});
+    lib.addEventListener('click',function(){closeMenu();openList()});
     var del=el('button',{type:'button',role:'menuitem',class:'danger'},icon('trash'),'ย้ายไปถังขยะ');
     del.addEventListener('click',function(){
       if(del.classList.contains('armed')){
-        clearTimeout(armT);closeMenu();expectNav();
-        var r=$('#reset');if(r){r.click();r.click()}
+        clearTimeout(armT);closeMenu();
+        var a=A();if(a)a.trashCurrent().then(function(ok){if(ok){goHome();setMsg(($('#status')||{}).textContent||'')}});
         return;
       }
       del.classList.add('armed');del.lastChild.textContent='กดอีกครั้งเพื่อยืนยัน';
@@ -268,7 +270,7 @@
     var F=window.__qcForms,nodes=[];
     function grp(t){return el('div',{class:'qh-lbl',style:'margin:4px 0 -4px'},t)}
     function original(f){
-      return big('plus',f.name,f.sub||'',function(){lsSet(FORM_K,f.id);closeSheet();expectNav();click('#btn-new')});
+      return big('plus',f.name,f.sub||'',function(){lsSet(FORM_K,f.id);closeSheet();run('newRecord')});
     }
     nodes.push(grp('แบบฟอร์มหลัก (ตรวจงานพร้อมตรวจซ้ำ)'));
     FORMS.forEach(function(f){var b=original(f);b.setAttribute('data-form',f.id);nodes.push(b)});
@@ -306,15 +308,56 @@
     var b=el('button',{type:'button',class:'qh-big'},icon(ic),el('span',null,t,el('small',null,sub||'')));
     b.addEventListener('click',fn);return b;
   }
+  /* ---------- 8.4 dashboard: inspection -> corrective action, from the documents on this device ---------- */
+  function dashData(){
+    var docs=(window.__qcDocs?window.__qcDocs():[]),O=window.__qcOnline,today=new Date().toISOString().slice(0,10);
+    var tot={docs:docs.length,items:0,pend:0,fixed:0,late:0},by={contractor:{},cat:{},asg:{},project:{}},late=[];
+    docs.forEach(function(x){
+      var d=x.data||{},m=d.meta||{};
+      (d.items||[]).forEach(function(it){
+        if(!it.res)return;tot.items++;
+        if(it.res!=='fix'&&it.res!=='bad')return;
+        if(it.rres==='ok'){tot.fixed++;return}
+        tot.pend++;
+        var inc=function(g,k){k=(k||'').trim()||'ไม่ระบุ';by[g][k]=(by[g][k]||0)+1};
+        inc('contractor',m.contractor);inc('cat',it.cat);inc('project',m.project);
+        if(O)inc('asg',it.asg?O.name(it.asg):'ยังไม่มอบหมาย');
+        if(it.due&&it.due<today){tot.late++;late.push({t:(m.docno||m.work||'ฉบับไม่มีเลขที่')+' · '+(it.loc||it.chk||''),due:it.due,id:x.id,iid:it.id})}
+      });
+    });
+    late.sort(function(a,b){return a.due<b.due?-1:1});
+    return {tot:tot,by:by,late:late,online:!!O};
+  }
+  function bars(title,obj){
+    var ks=Object.keys(obj).sort(function(a,b){return obj[b]-obj[a]}).slice(0,8),mx=ks.length?obj[ks[0]]:1;
+    if(!ks.length)return null;
+    return el('section',{class:'qd-sec'},el('h3',null,title),el('div',{class:'qd-bars'},ks.map(function(k){
+      return el('div',{class:'qd-row'},el('span',{class:'qd-k'},k),el('span',{class:'qd-bar'},el('i',{style:'width:'+Math.max(6,Math.round(obj[k]/mx*100))+'%'})),el('b',null,String(obj[k])));
+    })));
+  }
+  function openDash(){
+    var D=dashData(),t=D.tot;
+    var kpi=el('div',{class:'qd-kpi'},[['ฉบับ',t.docs],['ค้างแก้',t.pend],['แก้แล้วผ่าน',t.fixed],['เลยกำหนด',t.late]].map(function(k){return el('div',null,el('b',null,String(k[1])),el('small',null,k[0]))}));
+    var nodes=[kpi];
+    if(!t.pend)nodes.push(el('div',{class:'qh-kv'},'ไม่มีรายการค้างแก้ในเครื่องนี้'));
+    [bars('ผู้รับเหมาที่ค้างแก้มากสุด',D.by.contractor),D.online?bars('ผู้รับผิดชอบ (มอบหมาย)',D.by.asg):null,bars('หมวดงาน',D.by.cat),bars('โครงการ',D.by.project)].forEach(function(n){if(n)nodes.push(n)});
+    if(D.late.length)nodes.push(el('section',{class:'qd-sec'},el('h3',null,'เลยกำหนดแก้'),D.late.slice(0,10).map(function(l){
+      var b=el('button',{type:'button',class:'btn qd-late'},l.t,el('small',null,' ครบ '+l.due));
+      b.addEventListener('click',function(){closeSheet();if(window.__qcForm&&window.__qcForm.openDoc)window.__qcForm.openDoc(l.id,l.iid).then(function(){goForm()})});
+      return b;
+    })));
+    nodes.push(el('small',{class:'qh-kv'},D.online?'นับจากเอกสารของคุณในโครงการนี้ที่อยู่ในเครื่อง':'นับจากเอกสารที่อยู่ในเครื่องนี้'));
+    openSheet('สรุปงานค้างแก้',nodes);
+  }
   function openBackup(){
     openSheet('สำรอง / กู้คืนข้อมูล',[
       el('div',{class:'qh-kv'},'ไฟล์สำรองเก็บทุกฉบับ โฟลเดอร์ และรูป เก็บไว้ในที่ปลอดภัย (เช่น Drive, LINE Keep) เผื่อเครื่องหาย'),
-      big('db','สำรองข้อมูลทั้งหมด (ZIP)','บันทึกไฟล์ลงเครื่อง',function(){closeSheet();expectNav();click('#btn-list');setTimeout(function(){click('#bk-export')},60)}),
+      big('db','สำรองข้อมูลทั้งหมด (ZIP)','บันทึกไฟล์ลงเครื่อง',function(){closeSheet();openList();setTimeout(function(){click('#bk-export')},60)}),
       big('inbox','กู้คืนจากไฟล์ ZIP','เลือกไฟล์สำรองหรือไฟล์ส่งงาน',openFile)
     ]);
   }
   function openTrash(){
-    expectNav();click('#btn-list');
+    openList();
     var n=0,iv=setInterval(function(){
       var b=$('.fd-trash .fd-open');
       if(b){clearInterval(iv);b.click()}else if(++n>20)clearInterval(iv);

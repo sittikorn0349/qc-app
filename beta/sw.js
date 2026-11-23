@@ -1,8 +1,8 @@
-var V='qc-beta-v6',FONTS='qc-fonts-v1';   /* beta: own cache name */
-var SHELL=['./','./index.html','./manifest.webmanifest','./pwa-shell.js','./pwa-extras.js','./pwa-send.js','./pwa-home.js','./pwa-forms.js','./share-test.html','./libs/jspdf.umd.min.js','./libs/html2canvas.min.js','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable-512.png','./icons/apple-touch-icon.png'];
+var V='qc-beta-v7',FONTS='qc-fonts-v1';
+var SHELL=['./','./index.html','./manifest.webmanifest','./pwa-util.js','./pwa-shell.js','./pwa-shell-online.js','./libs/supabase.min.js','./pwa-extras.js','./pwa-send.js','./pwa-home.js','./pwa-forms.js','./share-test.html','./libs/jspdf.umd.min.js','./libs/html2canvas.min.js','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable-512.png','./icons/apple-touch-icon.png'];
 self.addEventListener('install',function(e){e.waitUntil(caches.open(V).then(function(c){return c.addAll(SHELL)}).then(function(){return self.skipWaiting()}))});
-self.addEventListener('activate',function(e){e.waitUntil(caches.keys().then(function(ks){return Promise.all(ks.filter(function(k){return k.indexOf('qc-beta-')===0&&k!==V}).map(function(k){return caches.delete(k)}))   /* never touch the main app's caches */}).then(function(){return self.clients.claim()}))});
-function idb(){return new Promise(function(res,rej){var r=indexedDB.open('qc-offline-beta',1);
+self.addEventListener('activate',function(e){e.waitUntil(caches.keys().then(function(ks){return Promise.all(ks.filter(function(k){return k!==V&&k!==FONTS}).map(function(k){return caches.delete(k)}))}).then(function(){return self.clients.claim()}))});
+function idb(){return new Promise(function(res,rej){var r=indexedDB.open('qc-offline',1);
   r.onupgradeneeded=function(){var d=r.result;if(!d.objectStoreNames.contains('docs'))d.createObjectStore('docs',{keyPath:'path'});if(!d.objectStoreNames.contains('blobs'))d.createObjectStore('blobs')};
   r.onsuccess=function(){res(r.result)};r.onerror=function(){rej(r.error)}})}
 function blobOf(id){return idb().then(function(d){return new Promise(function(res,rej){var q=d.transaction('blobs','readonly').objectStore('blobs').get(id);q.onsuccess=function(){res(q.result)};q.onerror=function(){rej(q.error)}})})}
@@ -30,4 +30,13 @@ self.addEventListener('fetch',function(e){
       return hit||net;
     })}));
   }
+});
+/* due-date reminder (8.5): tapping the notification opens / focuses the app */
+self.addEventListener('notificationclick',function(e){
+  e.notification.close();
+  var url=(e.notification.data&&e.notification.data.url)||'./';
+  e.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(function(cs){
+    for(var i=0;i<cs.length;i++){if(cs[i].focus)return cs[i].focus()}
+    return self.clients.openWindow?self.clients.openWindow(url):null;
+  }));
 });

@@ -2,8 +2,10 @@
    backed by IndexedDB on this device. Swap this file for an online adapter later; the form does not change. */
 (function(){
   'use strict';
+  var U=window.QCU;  /* shared helpers: pwa-util.js */
+  var clone=U.clone;
   window.__PWA=true;
-  var DBN='qc-offline-beta',UID='local',MAXB=20*1024*1024;
+  var DBN='qc-offline',UID='local',MAXB=20*1024*1024;
   var idb=null,docs=new Map(),subs=[],bc=null;
   function open(){
     return new Promise(function(res,rej){
@@ -23,7 +25,6 @@
       docs.clear();rows.forEach(function(r){docs.set(r.path,r.data)});
     });
   }
-  function clone(o){return JSON.parse(JSON.stringify(o))}
   function colOf(p){return p.split('/').slice(0,-1).join('/')}
   function snapOf(q){
     var list=[];
@@ -85,7 +86,7 @@
   }};
 
   var ready=open().then(function(d){idb=d;return loadAll()}).then(function(){
-    try{bc=new BroadcastChannel('qc-offline-beta');bc.onmessage=function(){loadAll().then(notify)}}catch(e){}
+    try{bc=new BroadcastChannel('qc-offline');bc.onmessage=function(){loadAll().then(notify)}}catch(e){}
     try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   });
 
