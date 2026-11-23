@@ -440,7 +440,7 @@
       el('div',{class:'qh-row'},el('label',{class:'qh-lbl','for':'qs-name'},'ชื่อผู้ส่งไฟล์'),name),
       save,saved,store,persist,ver,
       window.__ONLINE?null:toOnlineBtn(),
-      (function(){var off=ls('qa-shell')==='off';var b=el('button',{type:'button',class:'btn'},off?'ใช้หน้าตาใหม่ (โครงการ › ช่อง › แชท)':'ใช้หน้าแรกแบบเดิม');
+      (function(){var off=ls('qa-shell')==='off';var b=el('button',{type:'button',class:'btn'},off?'ใช้หน้าตาใหม่ (แยกตามโครงการและชั้น)':'ใช้หน้าแรกแบบเดิม');
         b.addEventListener('click',function(){if(off)localStorage.removeItem('qa-shell');else lsSet('qa-shell','off');location.reload()});return b})(),
       /[?&]dev=1\b/.test(location.search)?el('a',{href:'./share-test.html',class:'qh-kv'},'ทดสอบการส่งไฟล์จากมือถือ (หน้าทดสอบ)'):null   /* developers only */
     ]);

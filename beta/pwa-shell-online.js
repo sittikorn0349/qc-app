@@ -111,6 +111,7 @@
         search:function(p,text){return sb.from('messages').select('*').eq('project_id',p).is('deleted_at',null).ilike('body','%'+text+'%').limit(50).then(chk)},
         post:function(row){return sb.from('messages').upsert(row,{onConflict:'client_id',ignoreDuplicates:true}).select('*').then(chk)},
         editMessage:function(id,patch){return sb.from('messages').update(patch).eq('id',id).then(chk)},
+        replies:function(ch){return sb.from('messages').select('item_id').eq('channel_id',ch).not('item_id','is',null).is('deleted_at',null).limit(3000).then(chk)},
         itemEvents:function(ids){return ids.length?sb.from('item_events').select('*').in('item_id',ids).order('created_at').then(chk):Promise.resolve([])},
         plan:function(p){return sb.from('plan_tasks').select('*').eq('project_id',p).order('position').then(chk)},
         savePlanTask:function(row){return sb.from('plan_tasks').upsert(row).select('*').then(chk)},
@@ -1497,6 +1498,8 @@
     pendingMessages:function(){return msgQ().length},
     onMessages:function(f){msgListeners.push(f)},
     search:function(t){return WS&&!wsNo?WS.search(CUR,t).catch(function(){return []}):Promise.resolve([])},
+    replies:function(ch){return cached('rp:'+ch,function(){return WS.replies(ch)}).then(function(rows){var n={};(rows||[]).forEach(function(r){n[r.item_id]=(n[r.item_id]||0)+1});
+      msgQ().forEach(function(m){if(m.item_id&&m.channel_id===ch){n[m.item_id]=(n[m.item_id]||0)+1;n['~'+m.item_id]=1}});return n})},
     itemEvents:function(ids){return cached('ev:'+ids.join(',').slice(0,120),function(){return WS.itemEvents(ids)})},
     plan:function(p){p=p||CUR;return cached('plan:'+p,function(){return WS.plan(p)})},
     savePlanTask:function(r){return WS.savePlanTask(Object.assign({project_id:CUR},r))},deletePlanTask:function(id){return WS.deletePlanTask(id)},
