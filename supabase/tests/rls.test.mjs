@@ -321,5 +321,86 @@ ok((await one(U.pm, `select set_project_zones('p1', array['ชั้น 1',' ช
 await fails(U.headman, `select set_project_zones('p1', array['x'])`, [], 'headman cannot set zones');
 ok((await rows(U.viewer, `select zones from my_projects() where id='p1'`))[0].zones.length === 2, 'my_projects returns the zones');
 
+console.log('\n[006 company, roles, channels, messages, plan, shares]');
+await q(`update profiles set joined=true`);   // the migration marks everyone already signed up as joined
+ok((await one(U.pm, `select joined from company_info()`)).joined === true, 'people already in the company count as joined');
+await q(`insert into auth.users(id, email) values ('00000000-0000-0000-0000-0000000000a1','new@x.com')`);
+const NEW = '00000000-0000-0000-0000-0000000000a1';
+ok((await one(NEW, `select joined from company_info()`)).joined === false, 'a new sign-up has not joined the company');
+ok((await one(U.pm, `select company_code() c`)).c === null, 'only admins see the join code');
+const code = (await one(U.admin, `select company_code() c`)).c;
+ok(/^[0-9A-F]{3}-[0-9A-F]{3}$/.test(code), 'admin sees the code ' + code);
+ok((await one(NEW, `select join_company('nope') r`)).r === false, 'wrong code refused');
+ok((await one(NEW, `select join_company($1) r`, [code.toLowerCase()])).r === true && (await one(NEW, `select joined from company_info()`)).joined, 'right code (any case) joins');
+await fails(U.pm, `select rotate_join_code()`, [], 'only admin rotates the code');
+
+ok((await rows(U.pm, `select id from roles where builtin`)).length === 9, '9 builtin roles');
+await fails(U.pm, `insert into roles(name) values ('x')`, [], 'PM cannot create company roles');
+const nr = await one(U.admin, `insert into roles(name, color, position, base, perms) values ('ผู้ควบคุมงาน','#123456',65,'foreman',array['ins_view','ins_recheck']) returning id`);
+ok(!!nr.id, 'admin creates a custom role');
+await fails(U.admin, `delete from roles where id='qc'`, [], 'builtin roles cannot be deleted');
+await fails(U.admin, `update roles set perms=array['ins_view'] where id='owner'`, [], 'owner role is locked');
+ok((await rows(U.admin, `select action from role_audit where target=$1`, [nr.id])).length >= 1, 'role change is in the audit log');
+
+ok((await one(U.pm, `select has_perm('p1','pl_baseline') v`)).v === true, 'PM (by base role) may approve the baseline');
+ok((await one(U.foreman, `select has_perm('p1','pl_baseline') v`)).v === false, 'QC/foreman may not');
+ok((await one(U.pm, `select set_member_roles('p1',$1,array['sub']) b`, [U.headman])).b === 'headman', 'PM gives headman the subcontractor role (base headman)');
+await fails(U.pm, `select set_member_roles('p1',$1,array['pm'])`, [U.foreman], 'PM cannot give a role as senior as their own');
+await fails(U.foreman, `select set_member_roles('p1',$1,array['everyone'])`, [U.viewer], 'foreman cannot manage roles');
+ok((await one(U.admin, `select set_member_roles('p1',$1,array['qc',$2]) b`, [U.foreman2, nr.id])).b === 'foreman', 'admin gives two roles → base foreman');
+ok((await rows(U.pm, `select roles from project_people('p1') where id=$1`, [U.foreman2]))[0].roles.length === 2, 'project_people lists both roles');
+ok((await one(U.foreman2, `select has_perm('p1','ins_recheck') v`)).v === true, 'permissions are the union of roles');
+ok((await one(U.admin, `select set_member_roles('p1',$1,array['qc']) b`, [U.foreman2])).b === 'foreman', 'roles can be narrowed again');
+
+ok((await one(U.foreman, `select ensure_channels('p1') n`)).n === 3, 'first visit makes ประกาศ + one channel per zone');
+ok((await one(U.foreman, `select ensure_channels('p1') n`)).n === 0, 'only once');
+const chs = await rows(U.viewer, `select id, name, kind from channels where project_id='p1' order by position`);
+ok(chs.length === 3 && chs[0].kind === 'announce', 'members see the channels ' + chs.map(c => c.name).join(','));
+ok((await rows(U.outsider, `select id from channels where project_id='p1'`)).length === 0, 'outsiders do not');
+const zone = chs[1].id, ann = chs[0].id;
+await fails(U.foreman, `insert into channels(project_id, name) values ('p1','ชั้น 9')`, [], 'QC cannot create channels');
+const sec = (await one(U.pm, `insert into channels(project_id, name, category, kind, hold) values ('p1','#เหล็กเสริม','โครงสร้าง','topic','H') returning id`)).id;
+ok(!!sec, 'PM creates a channel with a hold point');
+await as(U.pm, () => q(`insert into channel_access(channel_id, role_id, see) values ($1,'everyone','deny'),($1,'qc','allow')`, [sec]));
+ok((await rows(U.viewer, `select id from channels where id=$1`, [sec])).length === 0, 'denied to @ทุกคน: viewer cannot see it');
+ok((await rows(U.foreman, `select id from channels where id=$1`, [sec])).length === 1, 'allowed for QC: foreman (QC by default) sees it');
+
+const msg = (u, ch, txt, item) => as(u, () => q(`insert into messages(client_id, project_id, channel_id, item_id, body) values ($1,'p1',$2,$3,$4) returning id`, ['m' + Math.random(), ch, item || null, txt]));
+await msg(U.foreman, zone, 'เริ่มตรวจชั้น 1');
+await msg(U.headman, zone, 'แก้แล้วครับ', 'a');
+ok((await rows(U.viewer, `select body from messages where channel_id=$1`, [zone])).length === 2, 'members read the channel');
+ok((await rows(U.viewer, `select body from messages where item_id='a'`)).length === 1, 'item thread readable');
+await fails(U.viewer, `insert into messages(client_id, project_id, channel_id, body) values ('v1','p1',$1,'x')`, [zone], 'viewer (@ทุกคน) cannot post');
+await fails(U.foreman, `insert into messages(client_id, project_id, channel_id, body) values ('f9','p1',$1,'x')`, [ann], 'only managers post in ประกาศ');
+await as(U.pm, () => q(`insert into messages(client_id, project_id, channel_id, body) values ('pm1','p1',$1,'ประชุมพรุ่งนี้')`, [ann]));
+ok(true, 'PM posts in ประกาศ');
+await fails(U.viewer, `insert into messages(client_id, project_id, channel_id, body) values ('v2','p1',$1,'x')`, [sec], 'cannot post where you cannot see');
+await fails(U.foreman, `insert into messages(client_id, project_id, channel_id, author, body) values ('f8','p1',$1,$2,'x')`, [zone, U.headman], 'cannot post as someone else');
+await fails(U.foreman, `insert into messages(client_id, project_id, channel_id, body) values ('f7','p2',$1,'x')`, [zone], 'channel must belong to the project');
+ok((await rows(U.headman, `update messages set body='แก้ไขแล้วครับ', edited_at=now() where item_id='a' returning id`)).length === 1, 'author edits own message');
+ok((await rows(U.foreman, `update messages set body='x' where item_id='a' returning id`)).length === 0, 'others cannot');
+const un0 = (await rows(U.viewer, `select n from unread_counts('p1') where channel_id=$1`, [zone]))[0].n;
+ok(un0 >= 2, 'unread counts messages from others (' + un0 + ')');
+await as(U.viewer, () => q(`insert into channel_reads(channel_id) values ($1) on conflict (user_id, channel_id) do update set last_read=now()`, [zone]));
+ok((await rows(U.viewer, `select n from unread_counts('p1') where channel_id=$1`, [zone]))[0].n === 0, 'marking read clears it');
+
+const t1 = (await one(U.pm, `insert into plan_tasks(project_id, wbs, name, dur, weight, hold_channel_id) values ('p1','1.4','เทพื้นชั้น 3',2,500000,$1) returning id`, [sec])).id;
+await fails(U.foreman, `insert into plan_tasks(project_id, name) values ('p1','x')`, [], 'QC cannot edit the plan');
+await fails(U.foreman, `select approve_baseline('p1')`, [], 'baseline needs the permission');
+ok(Number((await one(U.pm, `select approve_baseline('p1') i`)).i) > 0, 'PM approves the baseline');
+await as(U.pm, () => q(`insert into plan_commitments(task_id, week, user_id) values ($1, date_trunc('week', now())::date, $2)`, [t1, U.foreman]));
+await fails(U.headman, `select answer_commitment($1, date_trunc('week', now())::date, 'promised')`, [t1], 'only the assignee answers');
+await fails(U.foreman, `select answer_commitment($1, date_trunc('week', now())::date, 'blocked', '')`, [t1], 'blocked needs a reason');
+await as(U.foreman, () => q(`insert into inspections(id, project_id, docno, channel_id) values ('ih1','p1','QC-H',$1)`, [sec]));
+await as(U.foreman, () => q(`insert into inspection_items(id, inspection_id, ord, chk, res) values ('h1','ih1',0,'ระยะหุ้ม','fix')`));
+ok((await one(U.foreman, `select answer_commitment($1, date_trunc('week', now())::date, 'promised', '', 20) r`, [t1])).r === 'held', 'promise accepted but held: the H point has open items');
+ok(Number((await one(U.pm, `select pct from plan_tasks where id=$1`, [t1])).pct) === 20, 'progress recorded');
+
+await as(U.foreman, () => q(`insert into share_links(project_id, doc_id, path, expires_at) values ('p1','i1',$1, now() + interval '7 days')`, [`${U.foreman}/i1.pdf`]));
+ok((await rows(U.pm, `select id from share_links where doc_id='i1'`)).length === 1, 'PM sees shares of the project');
+ok((await rows(U.headman, `select id from share_links where doc_id='i1'`)).length === 0, 'others do not');
+ok((await rows(U.foreman, `insert into storage.objects(bucket_id, name) values ('shares',$1) returning id`, [`${U.foreman}/i1.pdf`])).length === 1, 'PDF goes to own folder in shares');
+await fails(U.foreman, `insert into storage.objects(bucket_id, name) values ('shares',$1)`, [`${U.pm}/x.pdf`], 'not into someone else\'s folder');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
