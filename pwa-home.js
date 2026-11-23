@@ -3,17 +3,10 @@
    buttons, so documents, hashes and the send/receive format are untouched. */
 (function(){
   'use strict';
+  var U=window.QCU;  /* shared helpers: pwa-util.js */
+  var $=U.$,ls=U.ls,lsSet=U.lsSet,el=U.el;
   var FORMS=[{id:'qc-inspection',name:'แบบฟอร์มตรวจงานก่อสร้าง',sub:'งาน QC ตามมาตรฐาน'},{id:'safety',name:'แบบตรวจความปลอดภัย',sub:'นั่งร้าน · ราวกันตก · ประชุมก่อนเริ่มงาน'}];
   var FORM_K='qc-form',CODE_K='qc-code',NAME_K='qc-sender-name';
-  function $(s,r){return (r||document).querySelector(s)}
-  function ls(k){try{return localStorage.getItem(k)}catch(e){return null}}
-  function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
-  function el(tag,attrs){
-    var e=document.createElement(tag),a=attrs||{},k,i,c;
-    for(k in a){if(a[k]==null||a[k]===false)continue;if(k==='class')e.className=a[k];else if(k.slice(0,2)==='on')e[k]=a[k];else e.setAttribute(k,a[k]===true?'':a[k])}
-    for(i=2;i<arguments.length;i++){c=arguments[i];if(c==null||c===false)continue;e.appendChild(typeof c==='string'?document.createTextNode(c):c)}
-    return e;
-  }
   var P={
     plus:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6M9 14h6"/>',
     folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
@@ -82,13 +75,20 @@
     '.qh-kv{font-size:.85rem;color:var(--muted);overflow-wrap:anywhere}'
   ].join('');
 
-  var booted=false,view='home',pending=false,pendT,home,wrap,formbar,msgEl,lastEls={},tiles={},sheet,menuEl,armT;
+  var booted=false,view='home',libFromHome=false,home,wrap,formbar,msgEl,lastEls={},tiles={},sheet,menuEl,armT;
 
   function click(sel){var b=$(sel);if(b)b.click();return !!b}
   function curId(){return window.__qcForm&&window.__qcForm.cur&&window.__qcForm.cur()}
   function curDoc(){var id=curId(),d=id&&window.__qcGetDoc&&window.__qcGetDoc(id);return (d&&!d.deletedAt)?d:null}
   function libCount(){var b=$('#btn-list'),m=b&&/\((\d+)\)/.exec(b.textContent||'');return m?+m[1]:0}
-  function expectNav(){pending=true;clearTimeout(pendT);pendT=setTimeout(function(){pending=false},90000)}
+  /* actions go through index.html's __qcActions (no hidden-button clicks, no timer window);
+     the library list is the only place where the user picks later, so it is tracked by open/close, not by time */
+  function A(){return window.__qcActions}
+  function run(name,arg){
+    var a=A();if(!a)return Promise.resolve(false);
+    return a[name](arg).then(function(ok){if(ok){closeSheet();goForm();if(name==='newRecord'){var f=$('#m-docno');if(f)f.focus({preventScroll:true})}}return ok});
+  }
+  function openList(){libFromHome=true;var a=A();if(a)a.openList();else click('#btn-list')}
   function setMsg(t){if(msgEl)msgEl.textContent=t||''}
 
   /* ---------- navigation ---------- */
@@ -153,8 +153,8 @@
     return b;
   }
 
-  function openLib(){expectNav();click('#btn-list')}
-  function openFile(){closeSheet();expectNav();click('#btn-list');var f=$('#bk-file');if(f)f.click()}
+  function openLib(){openList()}
+  function openFile(){closeSheet();openList();var f=$('#bk-file');if(f)f.click()}
 
   function build(){
     var st=document.createElement('style');st.textContent=CSS;document.head.appendChild(st);
@@ -176,8 +176,8 @@
       tile('lib','คลังเอกสาร','','folder',{run:openLib}),
       tile('forms','รายงานแบบอื่น','แบบฟอร์มสำเร็จรูป / สร้างเอง','folder',{run:function(){if(window.__qcForms)window.__qcForms.library()}}),
       tile('send','ส่งเอกสาร','ไฟล์ ZIP','send',{need:true,run:function(){click('#btn-send')}}),
-      tile('follow','ตรวจรอบใหม่','จากรายการค้าง','recheck',{need:true,run:function(){expectNav();click('#btn-follow')}}),
-      tile('dup','ทำสำเนา','เป็นฉบับใหม่','copy',{need:true,run:function(){expectNav();click('#btn-dup')}}),
+      tile('follow','ตรวจรอบใหม่','จากรายการค้าง','recheck',{need:true,run:function(){run('followUp')}}),
+      tile('dup','ทำสำเนา','เป็นฉบับใหม่','copy',{need:true,run:function(){run('dupRecord')}}),
       tile('imp','รับไฟล์ ZIP','งานที่เพื่อนส่งมา','inbox',{run:openFile}),
       tile('bk','สำรอง / กู้คืน','ข้อมูลทั้งหมด','db',{run:openBackup}),
       tile('trash','ถังขยะ','กู้คืนได้ 30 วัน','trash',{run:openTrash}),
@@ -207,14 +207,12 @@
       if(menuEl)closeMenu();
     });
 
-    /* mirror status text; navigation comes only from the explicit 'qc-action' event fired by index.html */
+    /* mirror status text; a document opened/created from the library list (opened from home) moves to the form */
     var NAVT={open:1,'new':1,dup:1,followup:1},navSeen=false;
     document.addEventListener('qc-action',function(e){
       var d=(e&&e.detail)||{};
-      if(view==='home'&&pending&&NAVT[d.type]){
-        pending=false;clearTimeout(pendT);navSeen=true;closeSheet();goForm();setMsg('');
-        if(d.type==='new'){var f=$('#m-docno');if(f)f.focus({preventScroll:true})}
-      }else if(view!=='home'&&pending&&d.type==='trash'){pending=false;clearTimeout(pendT);goHome();setMsg(($('#status')||{}).textContent||'')}
+      if(d.type==='list-close'){setTimeout(function(){libFromHome=false},0);return}   /* open/new fire right after the list closes */
+      if(view==='home'&&libFromHome&&NAVT[d.type]){libFromHome=false;navSeen=true;closeSheet();goForm();setMsg('')}
     });
     var s=$('#status');
     if(s)new MutationObserver(function(){
@@ -244,12 +242,12 @@
   function openMenu(anchor){
     closeMenu();
     var lib=el('button',{type:'button',role:'menuitem'},icon('folder'),'ไปที่คลังเอกสาร');
-    lib.addEventListener('click',function(){closeMenu();click('#btn-list')});
+    lib.addEventListener('click',function(){closeMenu();openList()});
     var del=el('button',{type:'button',role:'menuitem',class:'danger'},icon('trash'),'ย้ายไปถังขยะ');
     del.addEventListener('click',function(){
       if(del.classList.contains('armed')){
-        clearTimeout(armT);closeMenu();expectNav();
-        var r=$('#reset');if(r){r.click();r.click()}
+        clearTimeout(armT);closeMenu();
+        var a=A();if(a)a.trashCurrent().then(function(ok){if(ok){goHome();setMsg(($('#status')||{}).textContent||'')}});
         return;
       }
       del.classList.add('armed');del.lastChild.textContent='กดอีกครั้งเพื่อยืนยัน';
@@ -268,7 +266,7 @@
     var F=window.__qcForms,nodes=[];
     function grp(t){return el('div',{class:'qh-lbl',style:'margin:4px 0 -4px'},t)}
     function original(f){
-      return big('plus',f.name,f.sub||'',function(){lsSet(FORM_K,f.id);closeSheet();expectNav();click('#btn-new')});
+      return big('plus',f.name,f.sub||'',function(){lsSet(FORM_K,f.id);closeSheet();run('newRecord')});
     }
     nodes.push(grp('แบบฟอร์มหลัก (ตรวจงานพร้อมตรวจซ้ำ)'));
     FORMS.forEach(function(f){var b=original(f);b.setAttribute('data-form',f.id);nodes.push(b)});
@@ -309,12 +307,12 @@
   function openBackup(){
     openSheet('สำรอง / กู้คืนข้อมูล',[
       el('div',{class:'qh-kv'},'ไฟล์สำรองเก็บทุกฉบับ โฟลเดอร์ และรูป เก็บไว้ในที่ปลอดภัย (เช่น Drive, LINE Keep) เผื่อเครื่องหาย'),
-      big('db','สำรองข้อมูลทั้งหมด (ZIP)','บันทึกไฟล์ลงเครื่อง',function(){closeSheet();expectNav();click('#btn-list');setTimeout(function(){click('#bk-export')},60)}),
+      big('db','สำรองข้อมูลทั้งหมด (ZIP)','บันทึกไฟล์ลงเครื่อง',function(){closeSheet();openList();setTimeout(function(){click('#bk-export')},60)}),
       big('inbox','กู้คืนจากไฟล์ ZIP','เลือกไฟล์สำรองหรือไฟล์ส่งงาน',openFile)
     ]);
   }
   function openTrash(){
-    expectNav();click('#btn-list');
+    openList();
     var n=0,iv=setInterval(function(){
       var b=$('.fd-trash .fd-open');
       if(b){clearInterval(iv);b.click()}else if(++n>20)clearInterval(iv);

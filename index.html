@@ -480,6 +480,7 @@ button{font:inherit;cursor:pointer}
 <div id="lb" hidden><img alt="รูปขยาย"></div>
 <div id="pdfroot" aria-hidden="true"></div>
 
+<script src="./pwa-util.js"></script>
 <script>
 /* storage shell: offline (default, this device only) or online (?mode=online, Supabase). The choice is remembered. */
 (function(){
@@ -1496,6 +1497,7 @@ button{font:inherit;cursor:pointer}
     dlg.hidden=true;listBtn.setAttribute('aria-expanded','false');document.body.style.overflow='';
     renamingF=null;addingF=false;
     try{listBtn.focus({preventScroll:true})}catch(e){}
+    qcAction('list-close');
   }
   function inlineInput(o){
     var done=false;
@@ -1788,16 +1790,16 @@ button{font:inherit;cursor:pointer}
 
   function openRecord(id){
     return drain().then(function(ok){
-      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่เปลี่ยนฉบับ');return}
-      var r=records.filter(function(x){return x.id===id})[0];if(!r)return;
+      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่เปลี่ยนฉบับ');return false}
+      var r=records.filter(function(x){return x.id===id})[0];if(!r)return false;
       state=norm(r.data,id);touched=false;dirty=false;lsSet(LAST,id);
       renderAll();closeList();window.scrollTo({top:0});
-      setStatus('เปิดฉบับ “'+titleOf(state)+'” แล้ว');qcAction('open');
+      setStatus('เปิดฉบับ “'+titleOf(state)+'” แล้ว');qcAction('open');return true;
     });
   }
   function newRecord(){
     return drain().then(function(ok){
-      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่เริ่มฉบับใหม่');return}
+      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่เริ่มฉบับใหม่');return false}
       var base=hasContent(state)?state:((records[0]&&records[0].data)||state);
       state=freshState(carryOf(base));touched=false;dirty=false;
       if(lsGet('qc-form')==='safety'){state.meta.form='safety';state.meta.work='ตรวจความปลอดภัยประจำวัน';state.items=safetyItems()}
@@ -1805,26 +1807,26 @@ button{font:inherit;cursor:pointer}
       renderAll();closeList();window.scrollTo({top:0});
       setStatus(isSafety(state)?'เริ่มฉบับใหม่ (แบบตรวจความปลอดภัย) พร้อมเช็กลิสต์นั่งร้าน ราวกันตก และการประชุมก่อนเริ่มงาน':'เริ่มฉบับใหม่ ยกข้อมูลโครงการ ผู้ตรวจ ผู้รับเหมา และชื่อผู้ลงนามมาให้แล้ว');
       var f=$('#m-docno');if(f)f.focus({preventScroll:true});
-      qcAction('new');
+      qcAction('new');return true;
     });
   }
   function dupRecord(){
     return drain().then(function(ok){
-      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่ทำสำเนา');return}
+      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่ทำสำเนา');return false}
       var copy=norm(ser(true),newId());
       copy.rev=0;copy.createdAt='';copy.updatedAt='';copy.sub=null;copy.rx=null;
       var m=copy.meta;
       if(m.docno)m.docno+=' (สำเนา)';else if(m.work)m.work+=' (สำเนา)';else m.project+=' (สำเนา)';
       state=copy;touched=true;
       renderAll();save();closeList();window.scrollTo({top:0});
-      setStatus('ทำสำเนาแล้ว (รูปใช้ร่วมกับฉบับเดิม)');qcAction('dup');
+      setStatus('ทำสำเนาแล้ว (รูปใช้ร่วมกับฉบับเดิม)');qcAction('dup');return true;
     });
   }
   function followUp(){
     return drain().then(function(ok){
-      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่สร้างฉบับใหม่');return}
+      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่สร้างฉบับใหม่');return false}
       var pend=state.items.filter(isPend);
-      if(!pend.length){setStatus('ฉบับนี้ไม่มีรายการค้าง (ต้องแก้ไข/ไม่ผ่าน ที่ยังตรวจซ้ำไม่ผ่าน)');return}
+      if(!pend.length){setStatus('ฉบับนี้ไม่มีรายการค้าง (ต้องแก้ไข/ไม่ผ่าน ที่ยังตรวจซ้ำไม่ผ่าน)');return false}
       var prev=titleOf(state),work=state.meta.work;
       var s=freshState(carryOf(state));
       s.meta.work=work;s.folder=state.folder||'';if(isSafety(state))s.meta.form='safety';
@@ -1836,7 +1838,7 @@ button{font:inherit;cursor:pointer}
       s.remarks='ตรวจรอบใหม่ต่อจากฉบับ: '+prev;
       state=s;touched=true;flt='all';$('#flt').value='all';
       renderAll();save();closeList();window.scrollTo({top:0});
-      setStatus('สร้างฉบับใหม่จากรายการค้าง '+pend.length+' รายการ (ใช้รูปล่าสุดเป็นรูปตั้งต้น)');qcAction('followup');
+      setStatus('สร้างฉบับใหม่จากรายการค้าง '+pend.length+' รายการ (ใช้รูปล่าสุดเป็นรูปตั้งต้น)');qcAction('followup');return true;
     });
   }
   function deleteRecord(id){
@@ -1866,6 +1868,15 @@ button{font:inherit;cursor:pointer}
   armBtn(followBtn,'',followUp,function(){return false});
   armBtn(dupBtn,'กดอีกครั้งเพื่อทำสำเนา',dupRecord,function(){return false});
   armBtn(resetBtn,'กดอีกครั้งเพื่อยืนยัน',function(){mode==='store'?deleteRecord(state.id):clearLocal()});
+  /* direct actions for the home shell (pwa-home.js): each resolves true when it opened/created a document */
+  window.__qcActions={
+    newRecord:function(){if(mode==='local'&&hasContent(state)){newBtn.click();return Promise.resolve(false)}return newRecord().then(function(r){return r===true})},
+    dupRecord:function(){return dupRecord().then(function(r){return r===true})},
+    followUp:function(){return followUp().then(function(r){return r===true})},
+    openRecord:function(id){return openRecord(id).then(function(r){return r===true})},
+    trashCurrent:function(){return Promise.resolve(mode==='store'?deleteRecord(state.id):clearLocal()).then(function(){return true},function(){return false})},
+    openList:function(){if(dlg.hidden)openList()},closeList:closeList,listOpen:function(){return !dlg.hidden}
+  };
 
   window.__qcForm={cur:function(){return state.id},drain:function(){return drain()},viewing:function(){return !!viewing},
     openDoc:function(id,iid){

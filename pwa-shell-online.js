@@ -7,6 +7,8 @@
    recheck_item() RPC, which refuses to overwrite a newer recheck made by someone else. */
 (function(){
   'use strict';
+  var U=window.QCU;  /* shared helpers: pwa-util.js */
+  var lsSet=U.lsSet,clone=U.clone,el=U.el;
   window.__PWA=true;window.__ONLINE=true;
   var CFG={url:'https://kcuhizrtegornpqtaijx.supabase.co',key:'sb_publishable_nFtSYV-yofy8A49VPojy3g_TvNUCSgX',bucket:'inspection-photos'};
   var MAXB=20*1024*1024,PK='qc-online-project',PL='qc-online-projects';
@@ -15,8 +17,6 @@
 
   /* ---------- small helpers ---------- */
   function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
-  function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
-  function clone(o){return o==null?o:JSON.parse(JSON.stringify(o))}
   function stable(o){
     if(o===undefined)return 'null';
     if(o===null||typeof o!=='object')return JSON.stringify(o);
@@ -25,12 +25,6 @@
   }
   function eq(a,b){return stable(a)===stable(b)}
   function today(){return new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Bangkok'})}
-  function el(tag,attrs){
-    var e=document.createElement(tag),k;
-    for(k in (attrs||{})){var v=attrs[k];if(k==='style')e.style.cssText=v;else if(k.indexOf('on')===0)e.addEventListener(k.slice(2),v);else if(v!=null&&v!==false)e.setAttribute(k,v===true?'':v)}
-    for(var i=2;i<arguments.length;i++){var c=arguments[i];if(c==null||c===false)continue;e.append(c.nodeType?c:document.createTextNode(c))}
-    return e;
-  }
 
   /* ---------- server API (one place for every Supabase call; tests can swap it) ---------- */
   function makeApi(){

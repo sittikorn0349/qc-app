@@ -3,47 +3,13 @@
    Receiver checks everything BEFORE writing anything, then writes all rows in one transaction. */
 (function(){
   'use strict';
-  var NAME_K='qc-sender-name',CODE_K='qc-code',EXT_K='qc-send-ext',SENT_K='qc-sent',RECV_K='qc-recv-log',BIG=15*1024*1024;
+  var U=window.QCU;  /* shared helpers: pwa-util.js */
+  var ls=U.ls,lsSet=U.lsSet,el=U.el,clone=U.clone,jget=U.jget,S=U.S,sha256js=U.sha256js,sha256=U.sha256,sha256Blob=U.sha256Blob,sha256Text=U.sha256Text,hex=U.hex;
+  var PKGS_K='qc-sent-pkgs',NAME_K='qc-sender-name',CODE_K='qc-code',EXT_K='qc-send-ext',SENT_K='qc-sent',RECV_K='qc-recv-log',BIG=15*1024*1024;
   var $=function(s,r){return (r||document).querySelector(s)};
-  function ls(k){try{return localStorage.getItem(k)}catch(e){return null}}
-  function lsSet(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}}
-  function el(tag,props){
-    var e=document.createElement(tag),k,v,i,c;
-    for(k in (props||{})){v=props[k];if(k==='class')e.className=v;else if(k==='style')e.style.cssText=v;else if(k.indexOf('on')===0)e.addEventListener(k.slice(2),v);else if(v===true)e.setAttribute(k,'');else if(v!==false&&v!=null)e.setAttribute(k,v)}
-    for(i=2;i<arguments.length;i++){c=arguments[i];if(c==null||c===false)continue;e.append(c.nodeType?c:document.createTextNode(c))}
-    return e;
-  }
 
-  /* ---------- SHA-256 (WebCrypto when present, pure JS otherwise: results are identical) ---------- */
-  var K=new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
-  function ror(x,n){return (x>>>n)|(x<<(32-n))}
-  function sha256js(data){
-    var h=new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
-    var l=data.length,padLen=(l+9+63)&~63,buf=new Uint8Array(padLen);buf.set(data);buf[l]=0x80;
-    var dv=new DataView(buf.buffer);dv.setUint32(padLen-8,Math.floor(l*8/4294967296));dv.setUint32(padLen-4,(l*8)>>>0);
-    var w=new Uint32Array(64),i,off;
-    for(off=0;off<padLen;off+=64){
-      for(i=0;i<16;i++)w[i]=dv.getUint32(off+i*4);
-      for(i=16;i<64;i++){var s0=ror(w[i-15],7)^ror(w[i-15],18)^(w[i-15]>>>3),s1=ror(w[i-2],17)^ror(w[i-2],19)^(w[i-2]>>>10);w[i]=(w[i-16]+s0+w[i-7]+s1)|0}
-      var a=h[0],b=h[1],c=h[2],d=h[3],e=h[4],f=h[5],g=h[6],hh=h[7];
-      for(i=0;i<64;i++){
-        var S1=ror(e,6)^ror(e,11)^ror(e,25),ch=(e&f)^(~e&g),t1=(hh+S1+ch+K[i]+w[i])|0,S0=ror(a,2)^ror(a,13)^ror(a,22),mj=(a&b)^(a&c)^(b&c),t2=(S0+mj)|0;
-        hh=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0;
-      }
-      h[0]=(h[0]+a)|0;h[1]=(h[1]+b)|0;h[2]=(h[2]+c)|0;h[3]=(h[3]+d)|0;h[4]=(h[4]+e)|0;h[5]=(h[5]+f)|0;h[6]=(h[6]+g)|0;h[7]=(h[7]+hh)|0;
-    }
-    return Array.prototype.map.call(h,function(x){return ('00000000'+(x>>>0).toString(16)).slice(-8)}).join('');
-  }
-  function hex(ab){return Array.prototype.map.call(new Uint8Array(ab),function(b){return ('0'+b.toString(16)).slice(-2)}).join('')}
-  function sha256(u8){
-    if(window.__qcForceJsSha||!(window.crypto&&crypto.subtle&&crypto.subtle.digest))return Promise.resolve(sha256js(u8));
-    return crypto.subtle.digest('SHA-256',u8).then(hex,function(){return sha256js(u8)});
-  }
-  function sha256Blob(b){return b.arrayBuffer().then(function(ab){return sha256(new Uint8Array(ab))})}
-  function sha256Text(t){return sha256(new TextEncoder().encode(t))}
 
   /* ---------- canonical content of a document (what "the same document" means) ---------- */
-  function S(x){return typeof x==='string'?x:(x==null?'':String(x))}
   function ids(a){return (Array.isArray(a)?a:[]).filter(function(x){return typeof x==='string'&&x})}
   function content(d){
     var m=d.meta||{},g=d.sign||{};
@@ -74,9 +40,7 @@
   function pad(n){return String(n).padStart(2,'0')}
   function stamp(){var d=new Date();return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes())}
   function newId(){return 'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
-  function clone(o){return JSON.parse(JSON.stringify(o))}
   function fmtShort(iso){var d=new Date(iso);if(isNaN(d))return '';try{return d.toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}catch(e){return ''}}
-  function jget(k,def){try{return JSON.parse(ls(k)||'')||def}catch(e){return def}}
 
   /* unanswered items / items still awaiting re-inspection, so the sender notices before sending */
   function gaps(d){
@@ -328,8 +292,17 @@
         var log=jget(RECV_K,[]);log.unshift({at:new Date().toISOString(),code:pl.code,from:pl.from,n:todo.length});lsSet(RECV_K,JSON.stringify(log.slice(0,50)));
         body.textContent='';
         body.appendChild(para('นำเข้าสำเร็จ ✓ '+todo.length+' ฉบับ · รูป '+pl.blobs.length+' รูป · ตรวจย้อนหลังแล้วข้อมูลครบ'));
-        body.appendChild(el('p',{style:'margin:6px 0'},'รหัสยืนยัน ',el('b',null,pl.code),' (แจ้งผู้ส่งเพื่อยืนยันว่าได้รับครบ)'));
-        body.appendChild(el('div',{class:'rb-actions',style:'margin-top:10px'},el('button',{class:'btn primary',type:'button',onclick:closeModal},'ปิด')));
+        body.appendChild(el('p',{style:'margin:6px 0'},'รหัสยืนยัน ',el('b',null,pl.code)));
+        /* receipt back to the sender, checked in the sender's app (not by reading digits aloud) */
+        var rName=el('input',{type:'text',id:'rc-name',value:ls(NAME_K)||'',placeholder:'ชื่อผู้รับ',autocomplete:'name'});
+        var rOut=el('pre',{id:'rc-text',style:'white-space:pre-wrap;margin:6px 0;padding:8px;border:1px solid var(--line);border-radius:6px;font:inherit'});
+        var mkR=async function(){var nm=rName.value.trim();if(!nm){rOut.textContent='กรอกชื่อผู้รับก่อน';return null}lsSet(NAME_K,nm);var rc=await receiptOf(an.manifest.code,an.manifest.files.map(function(f){return [f.name,f.sha256]}),nm);rOut.textContent=receiptText(an.manifest.code,rc,nm,todo.length+pl.items.filter(function(x){return x.kind==='same'}).length);return rOut.textContent};
+        var rShare=el('button',{class:'btn primary',type:'button',id:'rc-share'},'ส่งใบตอบรับกลับ (LINE / อีเมล)');
+        rShare.addEventListener('click',async function(){var t=await mkR();if(!t)return;if(navigator.share)navigator.share({text:t}).catch(function(){});else if(navigator.clipboard)navigator.clipboard.writeText(t).catch(function(){})});
+        rName.addEventListener('input',function(){mkR()});
+        body.appendChild(el('div',{style:'margin:10px 0 0'},el('label',{class:'fl',for:'rc-name'},'ส่งใบตอบรับให้ผู้ส่ง (ผู้ส่งกดยืนยันในแอปได้ทันที)'),rName,rOut));
+        body.appendChild(el('div',{class:'rb-actions',style:'margin-top:10px'},rShare,el('button',{class:'btn',type:'button',onclick:closeModal},'ปิด')));
+        mkR();
         dmsg('นำเข้าส่งงานแล้ว '+todo.length+' ฉบับ · รหัสยืนยัน '+pl.code);
       }catch(e){
         msg.textContent='นำเข้าไม่สำเร็จ ('+e.message+') ข้อมูลเดิมในเครื่องไม่ถูกแก้ ลองใหม่อีกครั้ง';cancel.disabled=false;
@@ -364,14 +337,34 @@
     if(z.names.indexOf('manifest.json')>=0)return receive(file,dmsg);
     return legacy(file,z,dmsg);
   };
-  window.__qcSend={sha256:sha256,sha256js:sha256js,hashDoc:hashDoc,build:build,analyze:analyze};
+  window.__qcSend={sha256:sha256,sha256js:sha256js,hashDoc:hashDoc,build:build,analyze:analyze,receiptOf:receiptOf,receiptText:receiptText,verifyReceipt:verifyReceipt,markSent:function(pkg){markSent(null,pkg,'test')}};
 
   /* ---------- send UI ---------- */
   function sentMap(){return jget(SENT_K,{})}
   function markSent(list,pkg,how){
     var m=sentMap(),at=new Date().toISOString();
     pkg.manifest.docs.forEach(function(d){m[d.id]={hash:d.hash,at:at,code:pkg.manifest.code,how:how}});
-    lsSet(SENT_K,JSON.stringify(m));refreshBadge();
+    lsSet(SENT_K,JSON.stringify(m));
+    /* keep what is needed to check the receiver's receipt later (file hashes, not content) */
+    var pk=jget(PKGS_K,{});pk[pkg.manifest.code]={at:at,files:pkg.manifest.files.map(function(f){return [f.name,f.sha256]}),n:pkg.manifest.docs.length+(pkg.manifest.forms||[]).length,ids:pkg.manifest.docs.map(function(d){return d.id})};
+    var keys=Object.keys(pk).sort(function(a,b){return S(pk[b].at)<S(pk[a].at)?-1:1});keys.slice(100).forEach(function(k){delete pk[k]});
+    lsSet(PKGS_K,JSON.stringify(pk));refreshBadge();
+  }
+  /* ---------- receipt (2.1): proves inside the app that the receiver imported this exact file ----------
+     receipt = hash of the package's file hashes + the receiver's name; someone who only heard the 8-digit
+     code cannot produce it, and the sender checks it against what was sent */
+  function receiptOf(code,files,name){return sha256Text(JSON.stringify(['qc-recv',code,files,S(name).trim()])).then(fmtCode)}
+  function receiptText(code,rc,name,n){return 'ใบตอบรับไฟล์ส่งงาน '+code+'\nผู้รับ: '+S(name).trim()+'\nได้รับครบ '+n+' ฉบับ\nรหัสตอบรับ '+rc}
+  async function verifyReceipt(text){
+    var t=S(text),mc=/ไฟล์ส่งงาน\s+([0-9A-F]{4}-[0-9A-F]{4})/i.exec(t),mr=/รหัสตอบรับ\s+([0-9A-F]{4}-[0-9A-F]{4})/i.exec(t),mn=/ผู้รับ:\s*([^\n]+)/.exec(t);
+    if(!mc||!mr||!mn)return {ok:false,msg:'อ่านใบตอบรับไม่ได้ ให้วางข้อความที่ผู้รับส่งกลับมาทั้งหมด'};
+    var code=mc[1].toUpperCase(),pk=jget(PKGS_K,{})[code];
+    if(!pk)return {ok:false,msg:'ไม่พบไฟล์ส่งงานรหัส '+code+' ที่ส่งจากเครื่องนี้'};
+    var want=await receiptOf(code,pk.files,mn[1]);
+    if(want!==mr[1].toUpperCase())return {ok:false,msg:'รหัสตอบรับไม่ตรง ผู้รับอาจได้ไฟล์ไม่ครบ หรือได้ไฟล์ฉบับอื่น ให้ส่งไฟล์ใหม่'};
+    var at=new Date().toISOString(),all=jget(PKGS_K,{});all[code].ack={by:mn[1].trim(),at:at};lsSet(PKGS_K,JSON.stringify(all));
+    var m=sentMap();Object.keys(m).forEach(function(id){if(m[id].code===code)m[id].ack={by:mn[1].trim(),at:at}});lsSet(SENT_K,JSON.stringify(m));refreshBadge();
+    return {ok:true,code:code,by:mn[1].trim(),n:pk.n,msg:'ยืนยันแล้ว: '+mn[1].trim()+' ได้รับไฟล์ '+code+' ครบ '+pk.n+' ฉบับ'};
   }
   function saveFile(blob,name){
     var url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
@@ -391,6 +384,10 @@
       el('small',{style:'display:block;color:var(--muted)'},'รหัสผู้ตรวจจะนำหน้าเลขที่เอกสารใหม่ เช่น A-INS-006 ผู้ตรวจแต่ละคนใช้รหัสต่างกัน'),
       el('div',{style:'margin-top:8px'},el('label',{class:'fl',for:'sd-ext'},'นามสกุลไฟล์'),extSel),
       el('h2',{style:'font-size:1rem;margin:12px 0 0'},'เอกสาร'),list,info,acts);
+    var rcIn=el('textarea',{id:'sd-receipt',rows:'3',placeholder:'วางข้อความใบตอบรับที่ผู้รับส่งกลับมา',style:'width:100%;box-sizing:border-box'}),rcMsg=el('div',{role:'status',id:'sd-receipt-msg',style:'margin:6px 0'});
+    var rcBtn=el('button',{class:'btn',type:'button',id:'sd-receipt-ok'},'ตรวจใบตอบรับ');
+    rcBtn.addEventListener('click',async function(){var r=await verifyReceipt(rcIn.value);rcMsg.textContent=r.msg;rcMsg.className=r.ok?'':'notice'});
+    body.appendChild(el('details',{style:'margin-top:12px'},el('summary',null,'ยืนยันว่าผู้รับได้ไฟล์ครบ (ใบตอบรับ)'),el('div',{style:'margin-top:6px'},rcIn,el('div',{class:'rb-actions',style:'margin-top:6px'},rcBtn),rcMsg)));
     var card=openModal('ส่งเอกสาร',body);
     function counts(){var n=Object.keys(sel).filter(function(k){return sel[k]}).length;go.disabled=!n;go.textContent=n?'สร้างไฟล์ส่ง ('+n+' ฉบับ)':'เลือกเอกสารก่อน'}
     if(!all.length)list.appendChild(el('div',{class:'empty'},'ยังไม่มีเอกสารในเครื่อง'));
@@ -445,7 +442,7 @@
     body.textContent='';
     var nDocs=pkg.manifest.docs.length+(pkg.manifest.forms||[]).length,fname=('ส่งงาน_'+(nDocs===1?((pkg.manifest.docs[0]&&pkg.manifest.docs[0].docno)||'1ฉบับ'):nDocs+'ฉบับ')+'_'+stamp()).replace(/[\\\/:*?"<>|\s]+/g,'_')+'.'+ext;
     body.appendChild(para('สร้างไฟล์และตรวจแล้ว ✓ ครบ '+nDocs+' ฉบับ · รูป '+pkg.photos+' รูป · ขนาด '+mb(pkg.size)+' MB'));
-    body.appendChild(el('p',{style:'margin:6px 0'},'รหัสยืนยัน ',el('b',null,pkg.manifest.code),' (ผู้รับจะเห็นรหัสเดียวกันหลังนำเข้า ใช้เทียบเพื่อยืนยันว่าได้รับครบ)'));
+    body.appendChild(el('p',{style:'margin:6px 0'},'รหัสยืนยัน ',el('b',null,pkg.manifest.code),' (หลังผู้รับนำเข้า แอปผู้รับจะสร้าง “ใบตอบรับ” ให้ส่งกลับ แล้วกด ส่งเอกสาร > ยืนยันว่าผู้รับได้ไฟล์ครบ เพื่อตรวจในแอป)'));
     body.appendChild(el('p',{style:'margin:6px 0;color:var(--muted)'},'ไฟล์: '+fname));
     if(pkg.size>BIG)body.appendChild(errBox('ไฟล์ใหญ่ '+mb(pkg.size)+' MB อีเมลหรือ LINE อาจรับไม่ได้ แนะนำให้กลับไปเลือกส่งทีละฉบับ'));
     var msg=el('div',{role:'status',style:'margin:8px 0'});
@@ -478,7 +475,7 @@
     var id=window.__qcForm.cur(),s=sentMap()[id],d=window.__qcGetDoc&&window.__qcGetDoc(id);
     if(!s||!d){badge.hidden=true;return}
     var h=await hashDoc(d);badge.hidden=false;
-    if(h===s.hash){badge.className='badge sub';badge.textContent='สร้างไฟล์ส่งแล้ว · '+s.code}
+    if(h===s.hash){badge.className='badge sub';badge.textContent=(s.ack?'ผู้รับยืนยันแล้ว ('+s.ack.by+') · ':'สร้างไฟล์ส่งแล้ว · รอใบตอบรับ · ')+s.code}
     else{badge.className='badge draft';badge.textContent='แก้ไขหลังส่ง · ส่งใหม่ได้'}
   }
   function mount(){

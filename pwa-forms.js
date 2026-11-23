@@ -4,20 +4,12 @@
    Public API: window.__qcForms = { builtins, customs(), get(id), newDoc(formId), openDoc(id), library(), builder(formId|null, copyFrom) } */
 (function(){
   'use strict';
+  var U=window.QCU;  /* shared helpers: pwa-util.js */
+  var $=U.$,el=U.el,ls=U.ls,lsSet=U.lsSet,clone=U.clone;
   /* ---------- helpers ---------- */
-  function $(s,r){return (r||document).querySelector(s)}
-  function el(tag,attrs){
-    var e=document.createElement(tag),a=attrs||{},k,i,c;
-    for(k in a){if(a[k]==null||a[k]===false)continue;if(k==='class')e.className=a[k];else if(k==='text')e.textContent=a[k];else if(k.slice(0,2)==='on')e[k]=a[k];else e.setAttribute(k,a[k]===true?'':a[k])}
-    for(i=2;i<arguments.length;i++){c=arguments[i];if(c==null||c===false)continue;if(Array.isArray(c)){c.forEach(function(x){if(x)e.appendChild(typeof x==='string'?document.createTextNode(x):x)});continue}e.appendChild(typeof c==='string'||typeof c==='number'?document.createTextNode(String(c)):c)}
-    return e;
-  }
   function uid(p){return (p||'')+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
   function today(){var d=new Date(),p=function(n){return String(n).padStart(2,'0')};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}
   function fmtDate(iso){if(!iso)return '';var p=String(iso).split('-');if(p.length!==3)return iso;return (+p[2])+'/'+(+p[1])+'/'+(+p[0]+543)}
-  function ls(k){try{return localStorage.getItem(k)}catch(e){return null}}
-  function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
-  function clone(o){return JSON.parse(JSON.stringify(o))}
   function lines(s){return String(s||'').split('\n').map(function(x){return x.trim()}).filter(Boolean)}
   function status(t){var s=$('#qcf-status');if(s)s.textContent=t||''}
 
