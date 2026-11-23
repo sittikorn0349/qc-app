@@ -400,6 +400,15 @@
     if(a&&a.openTrash){libFromHome=true;a.openTrash();return}
     openList();var t=$('.fd-trash .fd-open');if(t)t.click();
   }
+  /* offline -> online from inside the app (installed apps have no address bar to add ?mode=online) */
+  function toOnlineBtn(){
+    var b=el('button',{type:'button',class:'btn',id:'qs-online'},'ใช้โหมดออนไลน์ (ทำงานร่วมทีม)');
+    b.addEventListener('click',function(){
+      QCU.ask({title:'เปลี่ยนเป็นโหมดออนไลน์',text:'ต้องมีบัญชีที่ผู้ดูแลเพิ่มเข้าโครงการแล้ว และต้องมีอินเทอร์เน็ตตอนตั้งค่าครั้งแรก ฉบับที่ทำไว้ในโหมดออฟไลน์ยังอยู่ในเครื่องนี้ กลับมาใช้ได้จากปุ่ม “สลับไปโหมดออฟไลน์”',ok:'ไปโหมดออนไลน์',cancel:'ยังไม่เปลี่ยน',danger:false})
+        .then(function(y){if(y){lsSet('qc-mode','online');location.href=location.pathname+'?mode=online'}});
+    });
+    return b;
+  }
   function openSettings(){
     var code=el('input',{type:'text',id:'qs-code',maxlength:'6',value:ls(CODE_K)||'',placeholder:'เช่น A',autocapitalize:'characters'});
     var name=el('input',{type:'text',id:'qs-name',value:ls(NAME_K)||'',placeholder:'เช่น สมชาย ใจดี',autocomplete:'name'});
@@ -430,6 +439,7 @@
       el('div',{class:'qh-row'},el('label',{class:'qh-lbl','for':'qs-code'},'รหัสผู้ตรวจ (นำหน้าเลขที่เอกสาร สูงสุด 6 ตัว)'),code),
       el('div',{class:'qh-row'},el('label',{class:'qh-lbl','for':'qs-name'},'ชื่อผู้ส่งไฟล์'),name),
       save,saved,store,persist,ver,
+      window.__ONLINE?null:toOnlineBtn(),
       /[?&]dev=1\b/.test(location.search)?el('a',{href:'./share-test.html',class:'qh-kv'},'ทดสอบการส่งไฟล์จากมือถือ (หน้าทดสอบ)'):null   /* developers only */
     ]);
   }
