@@ -265,7 +265,8 @@
     var dup=mi('qf-dup','copy','ทำสำเนาเป็นฉบับใหม่',function(){run('dupRecord')});
     var fu=mi('qf-follow','recheck','ตรวจรอบใหม่จากรายการค้าง',function(){run('followUp')});
     var snd=$('#btn-send')?mi('qf-sendm','send',window.__ONLINE?'ส่งให้คนนอกโครงการ':'ส่งเอกสาร (ZIP)',function(){click('#btn-send')}):null;
-    menuEl=el('div',{class:'qf-menu',role:'menu'},dup,fu,snd,pm,pp,lib,del);
+    var B=window.__qcBin,bn=B?mi('qf-bin','trash','รายการที่ถูกลบ ('+B.count()+')',function(){B.open()}):null;   /* deleted items/photos of this document */
+    menuEl=el('div',{class:'qf-menu',role:'menu'},dup,fu,snd,pm,pp,bn,lib,del);
     formbar.appendChild(menuEl);anchor.setAttribute('aria-expanded','true');
   }
   function closeMenu(){

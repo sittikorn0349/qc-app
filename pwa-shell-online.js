@@ -111,7 +111,21 @@
     var m=d.meta||{};
     return {docno:m.docno||'',insp_date:validDate(m.date),site:m.site||'',work:m.work||'',weather:m.weather||'',
       meta:m,sign:d.sign||{},summary:d.summary||'',remarks:d.remarks||'',folder_id:d.folder||null,
-      extra:{v:d.v||2,rx:d.rx||null,plan:planToRow(d.plan)},deleted_at:d.deletedAt||null};
+      extra:extraOf(d),deleted_at:d.deletedAt||null};
+  }
+  /* header extra (jsonb, no schema change): plan pins, and the document's deleted items/photos (bin) + open
+     "deleted here, edited elsewhere" conflicts (cf). Photo ids become storage paths like everywhere else. */
+  function extraOf(d){
+    var x={v:d.v||2,rx:d.rx||null,plan:planToRow(d.plan)};
+    if(d.bin&&d.bin.length)x.bin=binMap(d.bin,idToPath);
+    if(d.cf&&Object.keys(d.cf).length)x.cf=d.cf;
+    return x;
+  }
+  function binMap(bin,f){
+    return (bin||[]).map(function(e){
+      if(e.t==='item'){var it=Object.assign({},e.item);it.before=(it.before||[]).map(function(a){return f(a)||a});it.after=(it.after||[]).map(function(a){return f(a)||a});return {t:'item',at:e.at,i:e.i,item:it}}
+      return {t:'ph',at:e.at,item:e.item,k:e.k,j:e.j,p:f(e.p)||e.p};
+    });
   }
   /* plan pins live in the header's extra (no schema change); drawing ids become storage paths like photos */
   function planToRow(p){if(!p||!p.sheets||!p.sheets.length)return null;return {sheets:p.sheets.map(function(x){return {a:idToPath(x.a)||x.a,name:x.name||'',w:x.w||0,h:x.h||0}}),pins:p.pins||{}}}
@@ -134,14 +148,15 @@
     });
     return {v:ex.v||2,kind:'inspection',meta:Object.assign({},h.meta||{}),sign:h.sign||{},summary:h.summary||'',remarks:h.remarks||'',
       items:its,createdAt:h.created_at||'',updatedAt:h.updated_at||'',rev:0,folder:h.folder_id||'',deletedAt:h.deleted_at||'',
-      rx:ex.rx||null,plan:planFromRow(ex.plan),_project:h.project_id,_owner:h.owner_id};
+      rx:ex.rx||null,plan:planFromRow(ex.plan),_project:h.project_id,_owner:h.owner_id,
+      bin:ex.bin?binMap(ex.bin,pathToId):undefined,cf:ex.cf||undefined};
   }
   function baseOf(h,items){
     var d=rowsToDoc(h,items),b={h:headerOf(d),items:itemsOf(h.id,d)};
     (items||[]).forEach(function(r){if(b.items[r.id])b.items[r.id].rchk_at=r.rchk_at||null});
     return b;
   }
-  function contentKey(d){var o={meta:d.meta,sign:d.sign,summary:d.summary,remarks:d.remarks,items:d.items,folder:d.folder||'',deletedAt:d.deletedAt||''};if(d.plan&&d.plan.sheets&&d.plan.sheets.length)o.plan=d.plan;return stable(o)}
+  function contentKey(d){var o={meta:d.meta,sign:d.sign,summary:d.summary,remarks:d.remarks,items:d.items,folder:d.folder||'',deletedAt:d.deletedAt||''};if(d.plan&&d.plan.sheets&&d.plan.sheets.length)o.plan=d.plan;if(d.bin&&d.bin.length)o.bin=d.bin;if(d.cf&&Object.keys(d.cf).length)o.cf=d.cf;return stable(o)}
 
   /* ---------- 3-way merge for saves made from an outdated copy ----------
      The form saves its whole document. If a sync updated our copy in the meantime (e.g. someone
@@ -153,7 +168,7 @@
   function remember(id,d){var h=hist.get(id);if(!h){h=new Map();hist.set(id,h)}h.delete(+d.rev||0);h.set(+d.rev||0,d);while(h.size>12)h.delete(h.keys().next().value)}
   function recall(id,rev){var h=hist.get(id);return h&&h.get(rev)}
   function syncRev(after){return (Math.floor((+after||0)/1000)+1)*1000}
-  var DOCF=['meta','sign','summary','remarks','folder','deletedAt'];
+  var DOCF=['meta','sign','summary','remarks','folder','deletedAt','bin','cf'];
   var ITF=['loc','chk','res','note','cat','ref','rres','rdate','rnote','before','after','asg','due','st','rat','fnote'];
   function mergeObj(b,m,t){
     if(!b||typeof m!=='object'||typeof t!=='object'||!m||!t||Array.isArray(m))return eq(m,b)?t:m;
@@ -173,6 +188,17 @@
       var y=Object.assign({},x);ITF.forEach(function(f){y[f]=eq(x[f],bx[f])?tx2[f]:x[f]});items.push(y);
     });
     (t.items||[]).forEach(function(x){if(!bi[x.id]&&!mi[x.id])items.push(x)});
+    /* deleted on this side, changed on the other since: never drop the other side's work silently.
+       Keep their version, take it out of our bin, and flag it (cf) so the user decides. */
+    (b.items||[]).forEach(function(bx){
+      var tx2=ti[bx.id];if(mi[bx.id]||!tx2)return;
+      if(ITF.every(function(f){return eq(tx2[f],bx[f])}))return;
+      var be=(out.bin||[]).filter(function(e){return e.t==='item'&&e.item&&e.item.id===bx.id})[0];
+      if(!be)return;
+      out.bin=out.bin.filter(function(e){return e!==be});
+      items.splice(Math.min(be.i||0,items.length),0,Object.assign({},tx2));
+      out.cf=Object.assign({},out.cf||{});out.cf[bx.id]=new Date().toISOString();
+    });
     out.items=items;
     return out;
   }
@@ -473,7 +499,27 @@
           }
           if(Object.keys(p).length)upd.push({id:k,p:p});
         });
-        if(B)Object.keys(B.items).forEach(function(k){if(!LI[k]&&SB.items[k])dels.push(k)});
+        var cfx=[];
+        if(B)Object.keys(B.items).forEach(function(k){
+          if(LI[k]||!SB.items[k])return;
+          /* we deleted it; was it changed on the server after our last sync? then it is a conflict, not a delete */
+          if(IF.some(function(f){return !eq(SB.items[k][f],B.items[k][f])}))cfx.push(k);else dels.push(k);
+        });
+        if(cfx.length){
+          var nd=clone(d),srv={},pre=id+'.';rowsToDoc(S.h,S.items).items.forEach(function(x){srv[x.id]=x});
+          nd.bin=nd.bin||[];nd.cf=Object.assign({},nd.cf||{});
+          cfx.forEach(function(k){
+            var iid=k.slice(pre.length),it=srv[iid];if(!it)return;
+            var be=nd.bin.filter(function(e){return e.t==='item'&&e.item&&e.item.id===iid})[0];
+            nd.bin=nd.bin.filter(function(e){return e!==be});
+            nd.items.splice(Math.min(be?be.i:nd.items.length,nd.items.length),0,it);
+            nd.cf[iid]=new Date().toISOString();
+          });
+          nd.rev=syncRev(d.rev);nd.by='sync';
+          cache.set(path,nd);remember(id,nd);ver[id]=(ver[id]||0)+1;notify();
+          /* nothing written to the server this round; the next push sends the document with the item kept + flagged */
+          return persist([['docs',path,nd]]).then(function(){schedule()});
+        }
         if(Object.keys(hp).length)work=work.then(function(){return api.updateHeader(id,hp).then(function(r){if(!r||!r.length)throw {code:'not_owner',message:'not owner'}})});
         work=work.then(function(){return api.insertItems(ins)});
         upd.forEach(function(u){work=work.then(function(){return api.updateItem(u.id,u.p)})});
