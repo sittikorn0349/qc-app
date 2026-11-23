@@ -161,13 +161,15 @@
     M.docs.forEach(function(d){
       var chs={};
       (d.data.items||[]).forEach(function(it){
+        if(!it.res&&!String(it.loc||'').trim()&&!String(it.chk||'').trim()&&!String(it.note||'').trim()&&!(it.before||[]).length)return;   /* blank row of a new form */
         var z=zoneOf(it.loc,zones),ch=byName[z]||'__nozone';chs[ch]=1;
         M.items.push({doc:d,it:it,zone:z,ch:ch,st:statusOf(it)});
       });
-      if(!Object.keys(chs).length)chs['__nozone']=1;
+      if(!Object.keys(chs).length&&!(d.data.items||[]).some(function(it){return it.res||String(it.loc||'').trim()}))chs[zoneOfDoc(d)||'__nozone']=1;
       Object.keys(chs).forEach(function(c){(M.byChannel[c]=M.byChannel[c]||[]).push(d)});
     });
   }
+  function zoneOfDoc(d){var z=String((d.data.meta||{}).zone||'').trim(),c=z&&M.channels.filter(function(c){return c.kind==='zone'&&c.name===z})[0];return c?c.id:null}
   function itemsIn(ch){return M.items.filter(function(x){return x.ch===ch})}
   function findItem(docId,itemId){return M.items.filter(function(x){return x.doc.id===docId&&x.it.id===itemId})[0]||null}
   function chById(id){return M.channels.filter(function(c){return c.id===id})[0]||(id==='__nozone'?{id:'__nozone',name:'ไม่ระบุโซน',kind:'zone',virtual:true}:null)}
@@ -595,6 +597,12 @@
       el('b',{style:'font-size:17px'},itemTitle(it)),
       el('div',{style:'font-size:14px;color:var(--qa-mu)'},'ตำแหน่ง: '+(it.loc||'ไม่ระบุ')+(it.asg?' · ผู้แก้: '+W.nameOf(it.asg):'')+(it.due?' · ครบกำหนด '+fmtDate(it.due):'')));
     if(it.note)card.appendChild(el('div',{style:'white-space:pre-wrap'},it.note));
+    /* where it is on the drawing (docs/PLAN-MARKING.md §6) */
+    (function(){var P=data.plan,q=P&&(P.pins&&P.pins[it.id]||[]).filter(function(q){return P.sheets[q.s]})[0];if(!q)return;var sh=P.sheets[q.s];
+      var box=el('button',{type:'button',class:'qa-mini','aria-label':'ดูตำแหน่งบนแบบ '+(sh.name||'')});
+      var im=photoImg(sh.a,'แบบ '+(sh.name||''));var wrap=el('span',{class:'qa-mini-in',style:'aspect-ratio:'+(sh.w||4)+'/'+(sh.h||3)},im,el('span',{class:'qa-mini-pin st-'+stKey(st),style:'left:'+(q.x*100)+'%;top:'+(q.y*100)+'%'}));
+      box.append(wrap,el('span',{class:'qa-mini-cap'},'ดูบนแบบ: '+(sh.name||'แบบแปลน')));
+      box.addEventListener('click',function(){openDoc(d.id,it.id,{plan:true})});card.appendChild(box)})();
     var pb=photoRow(it.before,'รูปที่พบ'),pa=photoRow(it.after,'รูปหลังแก้');if(pb)card.appendChild(pb);if(pa)card.appendChild(pa);
     feed.appendChild(card);
     /* actions by role and state */
@@ -604,7 +612,7 @@
     if(ONLINE&&!own&&st.k==='re'&&can('ins_recheck'))btn('ตรวจซ้ำ','pri big',function(){recheckSheet(x)});
     if(own&&st.open)btn(st.k==='re'?'ตรวจซ้ำในรายงาน':it.asg?'แก้การมอบหมาย':'มอบหมายผู้แก้',st.k==='re'?'pri big':'big',function(){openDoc(d.id,it.id)});
     btn('เปิดในรายงาน','',function(){openDoc(d.id,it.id)});
-    if(own)btn('ระบุบนแบบแปลน','',function(){openDoc(d.id,it.id,{plan:true})});
+    if(own)btn((data.plan&&data.plan.pins&&(data.plan.pins[it.id]||[]).length)?'แก้ตำแหน่งบนแบบ':'ระบุบนแบบแปลน','',function(){openDoc(d.id,it.id,{plan:true})});
     feed.appendChild(acts);
     /* history from the item itself (works offline) + server events + messages */
     var hist=el('div',{style:'display:flex;flex-direction:column;gap:6px'});feed.appendChild(el('h3',{style:'margin:8px 0 0;font-size:14px;color:var(--qa-mu)'},'ความเคลื่อนไหว'));feed.appendChild(hist);
