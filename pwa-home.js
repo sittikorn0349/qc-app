@@ -207,16 +207,20 @@
       if(menuEl)closeMenu();
     });
 
-    /* mirror status + title, auto-navigate after actions that open/create a document */
-    var NAV=/^(เปิดฉบับ|เริ่มฉบับใหม่|ทำสำเนาแล้ว|สร้างฉบับใหม่จากรายการค้าง)/,TRASHED=/^ย้ายไปถังขยะแล้ว/;
+    /* mirror status text; navigation comes only from the explicit 'qc-action' event fired by index.html */
+    var NAVT={open:1,'new':1,dup:1,followup:1},navSeen=false;
+    document.addEventListener('qc-action',function(e){
+      var d=(e&&e.detail)||{};
+      if(view==='home'&&pending&&NAVT[d.type]){
+        pending=false;clearTimeout(pendT);navSeen=true;closeSheet();goForm();setMsg('');
+        if(d.type==='new'){var f=$('#m-docno');if(f)f.focus({preventScroll:true})}
+      }else if(view!=='home'&&pending&&d.type==='trash'){pending=false;clearTimeout(pendT);goHome();setMsg(($('#status')||{}).textContent||'')}
+    });
     var s=$('#status');
     if(s)new MutationObserver(function(){
       var t=(s.textContent||'').trim();if(!t)return;
-      if(view==='home'){
-        if(!/^(กำลังเตรียม|โหลดข้อมูล)/.test(t))setMsg(NAV.test(t)&&pending?'':t);
-        if(pending&&NAV.test(t)){pending=false;closeSheet();goForm();if(/^เริ่มฉบับใหม่/.test(t)){var f=$('#m-docno');if(f)f.focus({preventScroll:true})}}
-      }else if(pending&&TRASHED.test(t)){pending=false;goHome();setMsg(t)}
-      refresh();
+      if(view==='home'&&!navSeen&&!/^(กำลังเตรียม|โหลดข้อมูล)/.test(t))setMsg(t);
+      navSeen=false;refresh();
     }).observe(s,{childList:true,characterData:true,subtree:true});
     var ct=$('#curtitle');
     function syncTitle(){var t=((ct&&ct.textContent)||'').replace(/\s*\(ยังไม่ได้บันทึก\)\s*$/,'');title.textContent=t||'ฉบับยังไม่ตั้งชื่อ';refresh()}

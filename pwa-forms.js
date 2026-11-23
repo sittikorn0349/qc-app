@@ -556,6 +556,28 @@
     builtins:BUILTINS,customs:function(){return CUSTOM},reload:loadCustom,get:get,
     newDoc:function(id){return newDoc(id).then(function(d){fill(d);return d})},
     openDoc:openDoc,library:library,builder:builder,close:close,
-    count:function(){return all('docs').then(function(a){return a.length}).catch(function(){return 0})}
+    count:function(){return all('docs').then(function(a){return a.length}).catch(function(){return 0})},
+    /* data access for backup / send / restore (index.html buildBackup, pwa-send.js) */
+    titleOf:function(d){var t=titleOf(d);return t.name+(t.no?' · '+t.no:'')},
+    listDocs:function(){return all('docs').then(function(a){return a.sort(function(x,y){return (y.updatedAt||'').localeCompare(x.updatedAt||'')})}).catch(function(){return []})},
+    getDocs:function(ids){return all('docs').then(function(a){var m={};a.forEach(function(d){m[d.id]=d});return ids.map(function(id){return m[id]||null})})},
+    exportAll:function(){return Promise.all([all('docs'),all('forms')]).then(function(r){return {docs:r[0],forms:r[1]}}).catch(function(){return {docs:[],forms:[]}})},
+    /* merge by id; an existing copy that is the same age or newer is kept (never overwrite newer local work) */
+    importAll:function(data){
+      data=data||{};var n={docs:0,forms:0,skipped:0};
+      return Promise.all([all('docs'),all('forms')]).then(function(r){
+        var have=[{},{}];r[0].forEach(function(d){have[0][d.id]=d});r[1].forEach(function(f){have[1][f.id]=f});
+        var chain=Promise.resolve();
+        [['docs',data.docs||[],0],['forms',data.forms||[],1]].forEach(function(g){
+          g[1].forEach(function(x){
+            if(!x||!x.id)return;var ex=have[g[2]][x.id];
+            if(ex&&(ex.updatedAt||'')>=(x.updatedAt||'')){n.skipped++;return}
+            chain=chain.then(function(){return put(g[0],x)}).then(function(){n[g[0]]++});
+          });
+        });
+        return chain;
+      }).then(function(){return loadCustom()}).then(function(){try{window.dispatchEvent(new Event('qc-change'))}catch(e){}return n});
+    },
+    putDocs:function(list){var chain=Promise.resolve();(list||[]).forEach(function(d){chain=chain.then(function(){return put('docs',d)})});return chain.then(function(){try{window.dispatchEvent(new Event('qc-change'))}catch(e){}})}
   };
 })();
