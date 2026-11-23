@@ -3,14 +3,14 @@ ManifestDPIAware true
 !include "MUI2.nsh"
 !define APPNAME "QC ตรวจงาน"
 !define APPID "QCApp"
-!define VERSION "0.1.0"
+!define VERSION "1.0.0"
 Name "${APPNAME}"
 OutFile "dist\QC-App-Setup-${VERSION}.exe"
 InstallDir "$LOCALAPPDATA\Programs\QC-App"
 InstallDirRegKey HKCU "Software\${APPID}" "InstallDir"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
-VIProductVersion "0.1.0.0"
+VIProductVersion "1.0.0.0"
 VIAddVersionKey /LANG=1033 "ProductName" "QC App"
 VIAddVersionKey /LANG=1033 "FileDescription" "QC App installer"
 VIAddVersionKey /LANG=1033 "FileVersion" "${VERSION}"

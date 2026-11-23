@@ -1,20 +1,53 @@
 {
   "name": "qc-app-desktop",
   "productName": "QC ตรวจงาน",
-  "version": "0.1.0",
-  "description": "QC App — แบบฟอร์มตรวจงานก่อสร้าง (ทดสอบ)",
+  "version": "1.0.0",
+  "description": "QC App — แบบฟอร์มตรวจงานก่อสร้าง",
   "author": "QC App",
   "main": "main.js",
-  "scripts": { "dist": "electron-builder --win nsis --x64" },
+  "scripts": {
+    "dist": "electron-builder --win nsis --x64"
+  },
   "build": {
     "appId": "io.github.sittikorn0349.qcapp",
     "productName": "QC ตรวจงาน",
     "artifactName": "QC-App-Setup-${version}.${ext}",
-    "directories": { "output": "dist", "buildResources": "build" },
-    "files": ["main.js", "preload.js", "offline.html"],
-    "protocols": [{ "name": "QC App", "schemes": ["qcapp"] }],
-    "win": { "target": "nsis", "icon": "build/icon.ico", "signAndEditExecutable": false },
-    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true, "shortcutName": "QC ตรวจงาน", "installerIcon": "build/icon.ico", "uninstallerIcon": "build/icon.ico", "language": "1054" }
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "offline.html"
+    ],
+    "protocols": [
+      {
+        "name": "QC App",
+        "schemes": [
+          "qcapp"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "QC ตรวจงาน",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "language": "1054"
+    }
   },
-  "devDependencies": { "electron": "45.4.1", "electron-builder": "26.18.0" }
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0"
+  }
 }

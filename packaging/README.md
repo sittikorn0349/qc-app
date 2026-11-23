@@ -1,6 +1,6 @@
 # Packaging
 
-Both packages wrap the installable web app (beta for now), so updates ship by pushing the site.
+Both packages wrap the installable web app (main app, /qc-app/; v1.0.0), so updates ship by pushing the site.
 
 ## Windows (`windows/`)
     npm i

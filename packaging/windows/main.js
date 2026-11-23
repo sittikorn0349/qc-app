@@ -5,8 +5,8 @@
 const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('path');
 
-const APP_URL = 'https://sittikorn0349.github.io/qc-app/beta/';
-const START = APP_URL + '?mode=online';
+const APP_URL = 'https://sittikorn0349.github.io/qc-app/';
+const START = APP_URL;   // opens in the mode the user chose last (offline by default; online from Settings)
 const AUTH_HOSTS = ['kcuhizrtegornpqtaijx.supabase.co', 'accounts.google.com'];
 let win = null;
 
