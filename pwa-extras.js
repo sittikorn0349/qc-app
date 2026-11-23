@@ -1,11 +1,12 @@
 /* Offline-app extras: backup reminder, install button, storage status. Pure UI; talks to the form only through its public buttons. */
 (function(){
   'use strict';
+  var U=window.QCU;  /* shared helpers: pwa-util.js */
+  var $=U.$;
   var DAY=864e5,WARN=7;
-  function $(s){return document.querySelector(s)}
   function lastBackup(){try{var v=+localStorage.getItem('qc-last-backup');return v>0?v:0}catch(e){return 0}}
   var isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent),standalone=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone;
-  var deferred=null,persisted=null;
+  var deferred=null,persisted=null,fLocal=0;
   var bar=document.createElement('section');bar.className='card noprint';bar.id='qc-bar';bar.hidden=true;
   bar.setAttribute('aria-label','สถานะการสำรองข้อมูล');
   bar.style.cssText='display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center;justify-content:space-between';
@@ -54,7 +55,8 @@
   }
   function ago(t){var d=Math.floor((Date.now()-t)/DAY);return d<=0?'วันนี้':d+' วันก่อน'}
   function render(){
-    var n=(window.__qcStats?window.__qcStats().docs:0),lb=lastBackup();
+    /* online: synced inspections do not need a file backup; what stays on this device (forms not yet synced) does */
+    var n=(window.__ONLINE?0:(window.__qcStats?window.__qcStats().docs:0))+fLocal,lb=lastBackup();
     var stale=n>0&&(!lb||(Date.now()-lb)>WARN*DAY);
     bar.hidden=!stale;
     if(stale){
@@ -67,7 +69,8 @@
     var wrap=$('.wrap'),actions=$('.top .actions');if(!wrap)return;
     var top=$('.top');top.insertAdjacentElement('afterend',bar);bar.insertAdjacentElement('beforebegin',card);
     try{if(navigator.storage&&navigator.storage.persisted)navigator.storage.persisted().then(function(v){persisted=v;render()})}catch(e){}
-    window.addEventListener('qc-change',render);render();
+    var fc=function(){var F=window.__qcForms,sy=window.__ONLINE&&window.__qcSync?window.__qcSync().forms:null;if(!F)return;F.count().then(function(c){fLocal=(sy&&sy.ready)?0:c;render()})};
+    window.addEventListener('qc-change',function(){render();fc()});window.addEventListener('qc-sync',fc);render();setTimeout(fc,800);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else setTimeout(mount,0);
 })();

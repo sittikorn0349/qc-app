@@ -63,12 +63,24 @@ button{font:inherit;cursor:pointer}
 .rb-cur{min-width:0;flex:1 1 16rem}
 .rb-cur strong{display:block;font-size:1.05rem;line-height:1.35;overflow-wrap:anywhere}
 .badge{display:inline-block;font-size:.72rem;padding:1px 9px;border-radius:99px;border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:middle;font-weight:500}
-.badge.cloud{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.badge.stored{background:var(--ok-bg);color:var(--ok);border-color:transparent}
 .rb-actions{display:flex;gap:8px;flex-wrap:wrap}
 .badge.sub{background:var(--ok-bg);color:var(--ok);border-color:transparent}
 .badge.draft{background:var(--warn-bg);color:var(--fg);border-color:var(--line)}
-.ro .wrap .card:not(.rb) :is(.tb,.addphoto,.addbar,.del,.re-toggle,.rb-actions){display:none!important}
-.ro .wrap .card:not(.rb) :is(input,textarea,select,button){pointer-events:none}
+.ro .wrap .card:not(.rb) :is(.plink,.sp-btn,.mic,.zsel,.tb,.addphoto,.addbar,.del,.re-toggle,.rb-actions):not(.act *){display:none!important}
+.ro .wrap .card:not(.rb) :is(input,textarea,select,button):not(.act *){pointer-events:none}
+/* online: status, assignment and actions on items */
+.wf{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.wf-chip{font-size:.78rem;padding:2px 10px;border-radius:99px;background:var(--bg);border:1px solid var(--line)}
+.wf-chip.s-fixed{background:#fef0c7;color:#93370d;border-color:transparent}.wf-chip.s-rejected,.wf-chip.late{background:#fee4e2;color:#b42318;border-color:transparent}
+.wf-chip.s-approved{background:#d1fadf;color:#05603a;border-color:transparent}.wf-chip.s-assigned{background:#d1e9ff;color:#175cd3;border-color:transparent}
+.item.flash{box-shadow:0 0 0 3px var(--accent);transition:box-shadow .3s}
+.act-box .hint,.re .hint{font-size:.85rem;color:var(--muted)}
+.asg{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:8px}
+.act-box{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+.act-box .big{min-height:56px;font-size:1.05rem;width:100%}
+.act-ph{display:flex;gap:6px;flex-wrap:wrap}.act-ph img{width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:zoom-in}
+@media (max-width:560px){.asg{grid-template-columns:1fr}}
 .notice{border:1px solid var(--line);background:var(--warn-bg);border-radius:8px;padding:10px 12px;display:flex;gap:10px 14px;flex-wrap:wrap;align-items:center;justify-content:space-between}
 .notice span{min-width:0;flex:1 1 16rem}
 .lp{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:10px}
@@ -81,6 +93,8 @@ button{font:inherit;cursor:pointer}
 .rec-s{font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
 .rec-chips{display:flex;gap:6px;flex-wrap:wrap;font-size:.74rem;margin-top:2px}
 .rec-chips span{padding:0 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.rec-chips .c-safe{background:#fee4e2;color:#b42318;border-color:transparent;font-weight:600}
+.form-safety .top h1{color:#b42318}
 .rec-chips .c-fix{background:var(--warn-bg);color:var(--warn);border-color:transparent}
 .rec-chips .c-ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
 
@@ -111,6 +125,9 @@ button{font:inherit;cursor:pointer}
 .fd-in{min-height:36px!important}
 .fd-add{margin-top:6px;justify-content:center}
 .rec.m3{grid-template-columns:auto minmax(0,1fr) auto auto}
+.rec .rec-cb{width:24px;height:24px;margin:10px;accent-color:var(--accent);cursor:pointer}.rec.picked{border-color:var(--accent);background:var(--accent-bg,#eaf2fb)}
+#sel-mode[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sel-bar{position:sticky;bottom:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px;margin-top:8px;border:1px solid var(--line);border-radius:10px;background:var(--card,#fff);box-shadow:0 -4px 14px rgba(0,0,0,.08)}.sel-bar select{min-height:40px;max-width:220px}.sel-bar #sel-n{font-weight:600;margin-right:auto}
 .rec.m2{grid-template-columns:minmax(0,1fr) auto auto}
 .dlg-opts{display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center;font-size:.85rem}
 .dlg-opts select{width:auto;min-height:34px;font-size:.85rem;padding:4px 8px}
@@ -163,11 +180,70 @@ button{font:inherit;cursor:pointer}
 .thumb{position:relative;aspect-ratio:4/3;border-radius:6px;overflow:hidden;border:1px solid var(--line);background:var(--bg)}
 .thumb[data-o=w]{aspect-ratio:16/9}.thumb[data-o=s]{aspect-ratio:1/1}.thumb[data-o=p]{aspect-ratio:3/4}
 .thumb img{width:100%;height:100%;object-fit:contain;display:block;cursor:zoom-in}
+.thumb.upq::after{content:'ยังไม่อัปโหลด';position:absolute;left:4px;bottom:4px;font-size:.7rem;line-height:1.4;background:rgba(0,0,0,.7);color:#fff;padding:1px 6px;border-radius:4px;pointer-events:none}
 .thumb .tb{position:absolute;width:28px;height:28px;border-radius:50%;border:0;background:rgba(0,0,0,.66);color:#fff;line-height:1;display:flex;align-items:center;justify-content:center;font-size:15px;padding:0;cursor:pointer}
 .thumb .tb:hover{background:rgba(0,0,0,.85)}
 .thumb .x{top:4px;right:4px}
 .thumb .rot{bottom:4px;left:4px}
 .thumb .rep{bottom:4px;right:4px}
+.thumb .ann{top:4px;left:4px}
+.thumb .tb{width:32px;height:32px}
+.thumb .tb::after{content:'';position:absolute;inset:-8px;border-radius:50%}   /* hit area >= 44px without a bigger icon (P3-2) */
+.thumb .tb.more{display:none;top:4px;right:4px;width:44px;height:44px;font-size:22px}
+@media (pointer:coarse){.thumb .tb{display:none}.thumb .tb.more{display:flex}}
+.ph-sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;background:var(--surface,#fff);color:var(--fg);border-radius:16px 16px 0 0;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 -6px 24px rgba(0,0,0,.3)}
+.ph-sheet h2{margin:0;font-size:1.1rem}
+.ph-sheet-b{display:grid;gap:8px}
+.ph-sheet-b .btn{min-height:56px;font-size:1.05rem;justify-content:flex-start}
+.ph-sheet-b .btn.armed{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+/* quick entry */
+.qfast{display:flex;gap:6px}
+.f.note{position:relative}
+.plink{display:block;width:100%;min-height:36px;margin-top:4px;padding:0 6px;border:0;background:none;color:var(--muted);font:inherit;font-size:.82rem;text-align:left;cursor:pointer}
+.plink.has{color:var(--accent)}
+.pl-back{position:fixed;inset:0;z-index:85;background:rgba(0,0,0,.6);display:flex;align-items:stretch;justify-content:center}
+.pl-card{width:100%;max-width:1100px;background:var(--surface,#fff);color:var(--fg);display:flex;flex-direction:column;gap:8px;padding:10px 12px}
+.pl-head{display:flex;align-items:center;gap:8px}.pl-head h2{flex:1;margin:0;font-size:1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-tabs{display:flex;gap:6px;overflow-x:auto}.pl-tab{flex:0 0 auto;min-height:40px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:none;color:var(--fg);font:inherit;font-size:.9rem;display:inline-flex;align-items:center;cursor:pointer}
+.pl-tab[aria-selected="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}.pl-tab.add{border-style:dashed;color:var(--accent)}
+.pl-view{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:8px;background:#f4f4f2}
+.pl-stage{position:relative;min-width:100%;cursor:crosshair}.pl-stage img{display:block;width:100%;user-select:none;-webkit-user-drag:none}
+.pl-pin{position:absolute;width:32px;height:32px;margin:-16px 0 0 -16px;border-radius:50%;border:2px solid #fff;background:#888;color:#fff;font:inherit;font-size:.85rem;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.45);cursor:pointer;padding:0}
+.pl-pin.mine{background:#c0261d;width:38px;height:38px;margin:-19px 0 0 -19px}
+.pl-empty{padding:24px;max-width:520px}.pl-empty .btn{margin:4px 6px 0 0}
+.pl-hint{font-size:.85rem;color:var(--muted);min-height:1.2em}.pl-foot{display:flex;gap:6px;align-items:center}.pl-foot .btn{min-height:44px}
+.zsel{width:100%;min-height:40px;margin-bottom:6px}
+.zadd{border:1px dashed var(--line);border-radius:8px;background:none;color:var(--accent);font:inherit;font-size:.85rem;text-align:left;padding:0 10px;cursor:pointer}
+.mic{position:absolute;right:6px;bottom:6px;min-width:44px;min-height:44px;padding:0 8px;border-radius:22px;border:1px solid var(--line);background:var(--surface,#fff);color:var(--accent);font:inherit;font-size:.85rem;cursor:pointer}
+.mic[aria-pressed="true"]{background:var(--bad);color:#fff;border-color:var(--bad)}
+.mic.armed{outline:2px solid var(--accent)}
+.mic-note{display:block;margin-top:4px;font-size:.8rem;color:var(--warn);line-height:1.4}
+.f.note textarea{padding-right:60px}
+.qfast .btn[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.qc-next{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));z-index:40;min-height:52px;padding:0 18px;border-radius:26px;border:0;background:var(--accent);color:#fff;font:inherit;font-size:1rem;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.28)}
+.qc-next b{display:inline-block;min-width:1.6em;margin-left:6px;padding:0 6px;border-radius:99px;background:rgba(255,255,255,.25)}
+.qc-home-on .qc-next{display:none}
+.xpand{display:none;justify-self:start;min-height:40px;padding:0 4px;border:0;background:none;color:var(--accent);font:inherit;font-size:.9rem;cursor:pointer}
+.compact-on .xpand{display:block}
+.item.compact .photos,.item.compact .loc,.item.compact .tagrow,.item.compact .note,.item.compact .del{display:none}
+.csum{display:none;font-size:.85rem;color:var(--muted);margin-top:2px}
+.item.compact .csum{display:block}
+.item.flash{outline:3px solid var(--accent);outline-offset:-3px}
+/* photo markup */
+.an-back{position:fixed;inset:0;z-index:70;background:#0d1113;display:flex;flex-direction:column;color:#fff;touch-action:none}
+.an-stage{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px;overflow:hidden}
+.an-stage canvas{max-width:100%;max-height:100%;touch-action:none;border-radius:4px;background:#222;transform-origin:center center}
+.an-bar{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;padding:8px;background:#161b1e;border-top:1px solid #2a3236}
+.an-bar button{min-width:48px;min-height:48px;border-radius:10px;border:1px solid #3a4448;background:#20272a;color:#fff;font:inherit;font-size:.9rem;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.an-bar button.on{background:#fff;color:#111;border-color:#fff}
+.an-bar .sw{width:48px;padding:0}.an-bar .sw i{display:block;width:24px;height:24px;border-radius:50%;border:2px solid #fff}
+.an-bar .sep{width:1px;height:32px;background:#3a4448;margin:0 2px}
+.an-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px;background:#161b1e;border-bottom:1px solid #2a3236}
+.an-head button{min-height:48px;min-width:72px;border-radius:10px;border:1px solid #3a4448;background:#20272a;color:#fff;font:inherit;padding:0 14px}
+.an-head .done{background:#1d5f7c;border-color:#1d5f7c;font-weight:600}
+.an-txt{display:flex;gap:6px;padding:8px;background:#161b1e}.an-txt input{flex:1;min-height:48px;font-size:1rem;color:#111;background:#fff;border-radius:8px;border:0;padding:0 12px}
+.an-txt[hidden]{display:none}
+.an-hint{font-size:.8rem;color:#9aa6ac;text-align:center;padding:4px 8px 0}
 .thumb.busy img{opacity:.45}
 .thumb.busy::after{content:'กำลังอัปโหลด…';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.78rem;color:var(--fg);text-align:center;padding:4px}
 .thumb.busy .tb{display:none}
@@ -206,6 +282,15 @@ button{font:inherit;cursor:pointer}
 .sign{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
 .sign .box{border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
 .sign .role{font-weight:600;font-size:.9rem}
+.sign .line img{max-height:64px;max-width:100%;display:block}
+.sign .line.has{height:auto;min-height:44px;flex-wrap:wrap;gap:6px}
+.sp-btn{min-height:44px;padding:0 12px;border-radius:8px;border:1px dashed var(--line);background:none;color:var(--accent);font:inherit;font-size:.9rem;cursor:pointer}
+.sp-back{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
+.sp-card{width:100%;max-width:640px;background:var(--surface,#fff);color:var(--fg);border-radius:16px 16px 0 0;padding:14px;display:flex;flex-direction:column;gap:10px}
+.sp-card canvas{width:100%;height:240px;background:#fff;border:1px solid var(--line);border-radius:8px;touch-action:none}
+.sp-card .row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.sp-card .row .btn{min-height:48px}
+.sheet .sigline img{max-height:46px;display:block;margin:0 auto}
 .sign .line{height:44px;border-bottom:1px solid var(--muted);font-size:.75rem;color:var(--muted);display:flex;align-items:flex-end;padding-bottom:2px}
 .foot{display:flex;justify-content:flex-end}
 
@@ -253,17 +338,30 @@ button{font:inherit;cursor:pointer}
 
 /* Photo viewer */
 #lb{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
-#lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px}
+/* soft delete: bin sheet + conflict note */
+.bin-back{position:fixed;inset:0;z-index:85;background:rgba(15,20,25,.5);display:flex;align-items:flex-end;justify-content:center}
+.bin-b{background:var(--card,#fff);width:100%;max-width:620px;max-height:85vh;overflow:auto;border-radius:14px 14px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom))}
+@media (min-width:700px){.bin-back{align-items:center}.bin-b{border-radius:12px}}
+.bin-b h2{margin:0 0 4px;font-size:1.1rem}.bin-list{display:grid;gap:8px;margin:10px 0}
+.bin-row{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px}
+.bin-row img{width:52px;height:52px;object-fit:cover;border-radius:6px}.bin-ic{width:52px;height:52px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted)}
+.bin-tx{display:flex;flex-direction:column;min-width:0}.bin-tx b{overflow-wrap:anywhere}.bin-tx span{font-size:.85rem;color:var(--muted)}
+.bin-row .btn{min-height:44px}.bin-acts{display:flex;justify-content:flex-end}
+.cf-note{margin:0 0 8px;padding:10px 12px;border:1px solid var(--bad);border-radius:8px;background:var(--bad-bg);display:flex;flex-direction:column;gap:4px}
+.cf-note .cf-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}.cf-note .btn{min-height:44px}
+#lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;touch-action:pan-y;user-select:none;-webkit-user-drag:none}
+#lb .lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:64px;border:0;border-radius:10px;background:rgba(0,0,0,.55);color:#fff;font-size:34px;line-height:1;cursor:pointer}#lb .lb-prev{left:8px}#lb .lb-next{right:8px}#lb .lb-nav:disabled{opacity:.3;cursor:default}
+#lb .lb-count{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);padding:4px 12px;border-radius:12px;background:rgba(0,0,0,.6);color:#fff;font-size:14px}
 
 @media screen and (max-width:760px){
   h1{font-size:1.4rem}
   .cols-head{display:none}
   .irow{
     grid-template-columns:2.4rem 1fr auto;
-    grid-template-areas:"no . del" "photos photos photos" "loc loc loc" "chk chk chk" "res res res" "note note note";
+    grid-template-areas:"no . del" "photos photos photos" "loc loc loc" "chk chk chk" "res res res" "note note note" "xp xp xp";
     gap:10px 8px; padding:14px 14px 10px;
   }
-  .no{grid-area:no}.photos{grid-area:photos}.loc{grid-area:loc}.chkcell{grid-area:chk}.chk{grid-area:chk}.chkcell .chk{grid-area:auto}.res{grid-area:res}.note{grid-area:note}.del{grid-area:del}
+  .xpand{grid-area:xp}.no{grid-area:no}.photos{grid-area:photos}.loc{grid-area:loc}.chkcell{grid-area:chk}.chk{grid-area:chk}.chkcell .chk{grid-area:auto}.res{grid-area:res}.note{grid-area:note}.del{grid-area:del}
   .table .lbl{display:block}
   .photos{flex-direction:row;flex-wrap:wrap}
   .thumb{width:calc(33.333% - 4px)}
@@ -353,6 +451,10 @@ button{font:inherit;cursor:pointer}
       <h2>รายการตรวจงาน</h2>
       <div class="counts" id="counts" aria-live="polite"></div>
       <select id="flt" aria-label="กรองรายการ" class="flt"></select>
+      <div class="qfast noprint" role="group" aria-label="โหมดกรอก">
+        <button type="button" class="btn sm" id="qf-fast" aria-pressed="false" title="กดผล “ผ่าน” แล้วเลื่อนไปรายการที่ยังไม่ตรวจถัดไปให้เอง">กรอกเร็ว</button>
+        <button type="button" class="btn sm" id="qf-compact" aria-pressed="false" title="แสดงเฉพาะ ลำดับ รายการตรวจ และปุ่มผลตรวจ กดแถวเพื่อดูรูป ตำแหน่ง หมายเหตุ">ย่อแถว</button>
+      </div>
     </div>
     <div class="cols-head" aria-hidden="true">
       <div>ลำดับ</div><div>รูปที่พบ</div><div>ตำแหน่ง</div><div>รายการตรวจ</div><div>ผลตรวจ</div><div>หมายเหตุ</div><div></div>
@@ -426,7 +528,7 @@ button{font:inherit;cursor:pointer}
           <span class="rb-actions" style="flex:0 0 auto"><button class="btn sm" id="lib-tip-ok" type="button">เข้าใจแล้ว</button></span>
         </div>
         <div class="dlg-tools">
-          <input type="search" id="q" placeholder="ค้นหาโครงการ / งานที่ตรวจ / เลขที่เอกสาร" aria-label="ค้นหาฉบับตรวจ">
+          <input type="search" id="q" placeholder="ค้นหาโครงการ / งาน / เลขที่ / ตำแหน่ง" aria-label="ค้นหาฉบับตรวจ (รวมตำแหน่งในรายการ)">
           <button class="btn primary sm" id="dlg-new" type="button">+ ฉบับใหม่</button>
         </div>
         <div class="dlg-opts" id="dlg-opts">
@@ -436,6 +538,7 @@ button{font:inherit;cursor:pointer}
             <option value="date">เรียง: วันที่ตรวจ (ใหม่ → เก่า)</option>
             <option value="docno">เรียง: เลขที่เอกสาร</option>
           </select>
+          <button class="btn sm" id="sel-mode" type="button" aria-pressed="false">เลือกหลายฉบับ</button>
           <span class="sp"></span>
           <button class="btn sm" id="exp-pdf" type="button" title="PDF รวมรายการค้างแก้ของฉบับที่แสดงอยู่">PDF รายการค้าง</button>
           <button class="btn sm" id="exp-csv" type="button" title="CSV รวมรายการค้างแก้ของฉบับที่แสดงอยู่">CSV รายการค้าง</button>
@@ -443,14 +546,32 @@ button{font:inherit;cursor:pointer}
         <div class="dlg-scope" id="scope"></div>
         <div class="dlg-msg" id="dlg-msg" role="status"></div>
         <div class="lp-list" id="reclist"></div>
+        <div class="sel-bar" id="sel-bar" hidden role="region" aria-label="จัดการฉบับที่เลือก">
+          <span id="sel-n" aria-live="polite">เลือก 0 ฉบับ</span>
+          <select id="sel-mv" aria-label="ย้ายฉบับที่เลือกไปโฟลเดอร์"></select>
+          <button class="btn sm" id="sel-move" type="button">ย้าย</button>
+          <button class="btn sm del" id="sel-del" type="button">ลบที่เลือก</button>
+          <button class="btn sm" id="sel-all" type="button">เลือกทั้งหมด</button>
+          <button class="btn sm" id="sel-cancel" type="button">เสร็จ</button>
+        </div>
       </div>
     </div>
   </div>
 </div>
+<button type="button" id="qc-next" class="qc-next noprint" hidden aria-label="ไปรายการที่ยังไม่ตรวจถัดไป">ไปรายการถัดไปที่ยังไม่ตรวจ <b id="qc-next-n"></b></button>
+<div class="dlg-back noprint" id="phsheet" hidden><div class="ph-sheet" role="dialog" aria-modal="true" aria-labelledby="phsheet-t"><h2 id="phsheet-t">ตัวเลือกรูป</h2><div id="phsheet-b" class="ph-sheet-b"></div><button type="button" class="btn" id="phsheet-x">ปิด</button></div></div>
 <div id="lb" hidden><img alt="รูปขยาย"></div>
 <div id="pdfroot" aria-hidden="true"></div>
 
-<script src="./pwa-shell.js"></script>
+<script src="./pwa-util.js"></script>
+<script>
+/* storage shell: offline (default, this device only) or online (?mode=online, Supabase). The choice is remembered. */
+(function(){
+  var m=/[?&]mode=(online|offline)\b/.exec(location.search),on=false;
+  try{if(m)localStorage.setItem('qc-mode',m[1]);on=localStorage.getItem('qc-mode')==='online'}catch(e){}
+  document.write(on?'<script src="./libs/supabase.min.js"><\/script><script src="./pwa-shell-online.js"><\/script>':'<script src="./pwa-shell.js"><\/script>');
+})();
+</script>
 <script>
 /* QC library: normalised data model helpers + backup ZIP (shared by the hosted form and the offline PWA) */
 (function(){
@@ -471,8 +592,10 @@ button{font:inherit;cursor:pointer}
     var insp={id:id,schema:2,
       projectId:proj?proj.id:null,inspectorId:ip?partyId('inspector',ip):null,contractorId:cn?partyId('contractor',cn):null,
       folderId:d.folder||null,docno:m.docno||'',date:m.date||'',site:m.site||'',work:m.work||'',weather:m.weather||'',
-      summary:d.summary||'',remarks:d.remarks||'',sign:d.sign||{},meta:m,
+      summary:d.summary||'',remarks:d.remarks||'',sign:d.sign||{},meta:m,plan:d.plan||null,
       createdAt:d.createdAt||'',updatedAt:upd,deletedAt:d.deletedAt||null,rev:+d.rev||0,by:d.by||''};
+    if(d.bin&&d.bin.length)insp.bin=d.bin;          /* deleted items/photos travel in the backup (restorable after restore) */
+    if(d.cf&&Object.keys(d.cf).length)insp.cf=d.cf;
     var items=(d.items||[]).map(function(it,i){
       return {id:it.id,inspectionId:id,order:i,loc:it.loc||'',chk:it.chk||'',res:it.res||'',note:it.note||'',cat:it.cat||'',ref:it.ref||'',
         rres:it.rres||'',rdate:it.rdate||'',rnote:it.rnote||'',before:(it.before||[]).slice(),after:(it.after||[]).slice(),
@@ -482,9 +605,10 @@ button{font:inherit;cursor:pointer}
   }
   /* rows -> the document the form works with */
   function implode(r,items){
-    return {v:2,meta:r.meta||{},sign:r.sign||{},summary:r.summary||'',remarks:r.remarks||'',
+    return {v:2,meta:r.meta||{},sign:r.sign||{},summary:r.summary||'',remarks:r.remarks||'',plan:r.plan||null,
       items:items.map(function(i){return {id:i.id,loc:i.loc,chk:i.chk,res:i.res,note:i.note,cat:i.cat,ref:i.ref,rres:i.rres,rdate:i.rdate,rnote:i.rnote,before:i.before||[],after:i.after||[]}}),
-      createdAt:r.createdAt||'',updatedAt:r.updatedAt||'',rev:+r.rev||0,folder:r.folderId||'',deletedAt:r.deletedAt||'',by:r.by||''};
+      createdAt:r.createdAt||'',updatedAt:r.updatedAt||'',rev:+r.rev||0,folder:r.folderId||'',deletedAt:r.deletedAt||'',by:r.by||'',
+      bin:Array.isArray(r.bin)?r.bin:undefined,cf:r.cf||undefined};
   }
 
   /* ---------- ZIP: write (stored) / read (stored or deflate) ---------- */
@@ -565,6 +689,8 @@ button{font:inherit;cursor:pointer}
       e.parties.forEach(function(p){parties[p.id]=p});
     });
     items.forEach(function(it){it.before.concat(it.after).forEach(function(x){ids[x]=1})});
+    inspections.forEach(function(r){(r.plan&&r.plan.sheets||[]).forEach(function(x){if(x&&x.a&&x.a.indexOf('data:')!==0)ids[x.a]=1})});   /* plan images */
+    inspections.forEach(function(r){(r.bin||[]).forEach(function(e){(e.t==='item'?(e.item.before||[]).concat(e.item.after||[]):[e.p]).forEach(function(x){if(typeof x==='string'&&x&&x.indexOf('data:')!==0)ids[x]=1})})});   /* photos of deleted-but-restorable items */
     var folders=(o.folders||[]).concat(o.trashFolders||[]).map(function(f){return {id:f.id,name:f.name,createdAt:f.createdAt||'',updatedAt:f.createdAt||'',deletedAt:f.deletedAt||null}});
     var entries=[],list=[],missing=0,keys=Object.keys(ids),n=0;
     for(var i=0;i<keys.length;i++){
@@ -575,17 +701,61 @@ button{font:inherit;cursor:pointer}
       entries.push({name:file,blob:b});list.push({id:id,file:file,mime:b.type||'image/jpeg',size:b.size});
       if(o.onProgress)o.onProgress(++n,keys.length);
     }
+    /* documents from the form engine (pwa-forms.js, own database 'qc-forms'): photos are data URLs inside the values,
+       moved out to form-photos/ so data.json stays small; readers that predate this simply ignore the extra keys */
+    var fdocs=[],fforms=[],flist=[],fseen={};
+    if(o.forms){
+      var outF=function(v){
+        if(typeof v==='string'&&v.indexOf('data:image')===0){
+          var pid='fp_'+h32(v);
+          if(!fseen[pid]){fseen[pid]=1;var fb=dataURLBlob(v),fx=/png/.test(fb.type)?'png':(/webp/.test(fb.type)?'webp':'jpg'),ff='form-photos/'+pid+'.'+fx;
+            entries.push({name:ff,blob:fb});flist.push({id:pid,file:ff,mime:fb.type||'image/jpeg',size:fb.size})}
+          return 'qcph:'+pid;
+        }
+        if(Array.isArray(v))return v.map(outF);
+        if(v&&typeof v==='object'){var r={};Object.keys(v).forEach(function(k){r[k]=outF(v[k])});return r}
+        return v;
+      };
+      fdocs=(o.forms.docs||[]).map(outF);fforms=JSON.parse(JSON.stringify(o.forms.forms||[]));
+    }
     var data={format:'qc-inspection-backup',version:1,exportedAt:new Date().toISOString(),source:o.source||'',
       projects:Object.keys(projects).map(function(k){return projects[k]}),parties:Object.keys(parties).map(function(k){return parties[k]}),
-      folders:folders,inspections:inspections,items:items,photos:list};
-    var txt='QC inspection backup\nformat: qc-inspection-backup v1\nนำเข้าได้ที่แอปตรวจงานก่อสร้าง > คลังเอกสาร > นำเข้า\ndata.json = ข้อมูลแยกตาราง (projects, parties, folders, inspections, items, photos)\nphotos/ = รูปถ่าย\n';
+      folders:folders,inspections:inspections,items:items,photos:list,
+      formDocs:fdocs,customForms:fforms,formPhotos:flist,zones:o.zones||{}};
+    var txt='QC inspection backup\nformat: qc-inspection-backup v1\nนำเข้าได้ที่แอปตรวจงานก่อสร้าง > คลังเอกสาร > นำเข้า\ndata.json = ข้อมูลแยกตาราง (projects, parties, folders, inspections, items, photos, formDocs, customForms, formPhotos)\nphotos/ = รูปถ่าย\nform-photos/ = รูปในรายงานแบบอื่น (รายงานประจำวัน ใบขอเท ตรวจรับวัสดุ แบบฟอร์มที่สร้างเอง)\n';
     entries.unshift({name:'data.json',blob:new Blob([JSON.stringify(data)],{type:'application/json'})});
     entries.push({name:'README.txt',blob:new Blob([txt],{type:'text/plain'})});
     return {blob:await makeZip(entries),missing:missing,
-      counts:{inspections:inspections.length,items:items.length,photos:list.length,folders:folders.length}};
+      counts:{inspections:inspections.length,items:items.length,photos:list.length,folders:folders.length,formDocs:fdocs.length,formPhotos:flist.length,zones:Object.keys(o.zones||{}).length}};
   }
 
-  window.QC={h32:h32,explode:explode,implode:implode,makeZip:makeZip,readZip:readZip,buildBackup:buildBackup,dataURLBlob:dataURLBlob,projectId:projectId,partyId:partyId};
+  /* restore form-engine documents from a backup zip (no-op for backups without them) */
+  async function restoreForms(z,data){
+    if(!window.__qcForms||!data||!((data.formDocs||[]).length||(data.customForms||[]).length))return null;
+    var map={};
+    for(var i=0;i<(data.formPhotos||[]).length;i++){
+      var ph=data.formPhotos[i],b=await z.read(ph.file,ph.mime);
+      if(!b)throw new Error('form photo missing: '+ph.file);
+      map['qcph:'+ph.id]=await new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){res(fr.result)};fr.onerror=function(){rej(fr.error)};fr.readAsDataURL(b)});
+    }
+    var back=function(v){
+      if(typeof v==='string'&&v.indexOf('qcph:')===0){if(!(v in map))throw new Error('form photo not listed: '+v);return map[v]}
+      if(Array.isArray(v))return v.map(back);
+      if(v&&typeof v==='object'){var r={};Object.keys(v).forEach(function(k){r[k]=back(v[k])});return r}
+      return v;
+    };
+    return window.__qcForms.importAll({docs:(data.formDocs||[]).map(back),forms:data.customForms||[]});
+  }
+
+  /* standard zone lists per project (localStorage 'qc-zones:<project>') travel in the backup; restore = union, nothing removed */
+  function zonesAll(){var o={};try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('qc-zones:')===0){var v=JSON.parse(localStorage.getItem(k)||'[]');if(Array.isArray(v)&&v.length)o[k.slice(9)]=v}}}catch(e){}return o}
+  function restoreZones(data){
+    var z=data&&data.zones,n=0;if(!z||typeof z!=='object')return 0;
+    Object.keys(z).forEach(function(p){if(!Array.isArray(z[p]))return;var k='qc-zones:'+p,cur=[];try{cur=JSON.parse(localStorage.getItem(k)||'[]')}catch(e){}
+      var add=z[p].filter(function(x){return typeof x==='string'&&x.trim()&&cur.indexOf(x)<0});if(add.length){try{localStorage.setItem(k,JSON.stringify(cur.concat(add)));n++}catch(e){}}});
+    return n;
+  }
+  window.QC=Object.assign(window.QC||{},{zonesAll:zonesAll,restoreZones:restoreZones,restoreForms:restoreForms,h32:h32,explode:explode,implode:implode,makeZip:makeZip,readZip:readZip,buildBackup:buildBackup,dataURLBlob:dataURLBlob,projectId:projectId,partyId:partyId});
 })();
 </script>
 <script src="./libs/jspdf.umd.min.js"></script>
@@ -609,6 +779,22 @@ button{font:inherit;cursor:pointer}
 
   /* ---------- data model ---------- */
   var CATS=['เหล็กเสริม','แบบหล่อ / นั่งร้าน','คอนกรีต','งานก่ออิฐ / ฉาบ','งานไฟฟ้า','งานสุขาภิบาล','งานสถาปัตย์ / อื่นๆ'];
+  /* safety inspection: same document shape, meta.form = 'safety', its own checklist and categories */
+  var SAFETY_NAME='แบบตรวจความปลอดภัย',QC_NAME='แบบฟอร์มตรวจงานก่อสร้าง';
+  var SCATS=['นั่งร้าน','ราวกันตก / ช่องเปิด','ประชุมความปลอดภัยก่อนเริ่มงาน','อุปกรณ์ป้องกันส่วนบุคคล','ไฟฟ้าชั่วคราว / เครื่องจักร'];
+  var SAFETY_TPL=[
+    ['นั่งร้าน',['ฐานนั่งร้านมั่นคง มีแผ่นรองฐาน/ล็อกล้อ','ค้ำยันทแยงครบ และยึดติดกับตัวอาคาร','พื้นทางเดินปูเต็ม ยึดแน่น ไม่มีช่องว่าง','ราวกันตกบน-กลาง และแผงกันของตกครบ','บันไดขึ้นลงมั่นคง ไม่ปีนโครงนั่งร้าน','ป้ายสถานะนั่งร้าน (ใช้ได้/ห้ามใช้) ลงวันที่ตรวจล่าสุด']],
+    ['ราวกันตก / ช่องเปิด',['ราวกันตกขอบพื้นและขอบอาคารแข็งแรง ต่อเนื่อง','ช่องเปิดพื้น/ช่องลิฟต์ปิดด้วยฝายึดแน่นหรือราวกั้น พร้อมป้ายเตือน','ขอบพื้นมีแผงกันของตก','ผู้ทำงานที่สูงสวมเข็มขัดนิรภัยแบบเต็มตัวและคล้องจุดยึด','ตาข่ายกันตก/กันของตก (ถ้ามี) ติดตั้งสมบูรณ์']],
+    ['ประชุมความปลอดภัยก่อนเริ่มงาน',['จัดประชุมก่อนเริ่มงาน (ระบุหัวข้อในหมายเหตุ)','ผู้เข้าร่วมครบทุกทีม (ระบุจำนวนคนในหมายเหตุ)','ชี้แจงงานเสี่ยงของวันนี้และวิธีป้องกัน','มีรูปการประชุมและใบลงชื่อ']],
+    ['อุปกรณ์ป้องกันส่วนบุคคล',['สวมหมวกนิรภัย รองเท้านิรภัย เสื้อสะท้อนแสงครบ','อุปกรณ์เฉพาะงาน (แว่น ถุงมือ ที่ครอบหู) ตามลักษณะงาน']],
+    ['ไฟฟ้าชั่วคราว / เครื่องจักร',['สายไฟชั่วคราวไม่ชำรุด ยกพ้นพื้นเปียก มีเบรกเกอร์กันไฟรั่ว','เครื่องจักร/ปั้นจั่น ผ่านการตรวจ มีผู้ให้สัญญาณ']]
+  ];
+  function isSafety(d){return !!(d&&d.meta&&d.meta.form==='safety')}
+  function formName(d){return isSafety(d)?SAFETY_NAME:QC_NAME}
+  function catsFor(d){return isSafety(d)?SCATS:CATS}
+  function safetyItems(){
+    var out=[];SAFETY_TPL.forEach(function(g){g[1].forEach(function(c){var it=blankItem();it.cat=g[0];it.chk=c;out.push(it)})});return out;
+  }
   function blankItem(){return {id:uid(),loc:'',chk:'',res:'',note:'',cat:'',ref:'',before:[],after:[],rres:'',rdate:'',rnote:''}}
   function normPh(a){
     return (Array.isArray(a)?a:[]).filter(function(x){return typeof x==='string'&&x}).map(function(x){return x.indexOf('data:')===0?{d:x}:{a:x}});
@@ -616,7 +802,8 @@ button{font:inherit;cursor:pointer}
   function normItem(r){
     r=r||{};
     return {id:r.id||uid(),loc:r.loc||'',chk:r.chk||'',res:r.res||'',note:r.note||'',cat:r.cat||'',ref:r.ref||'',
-      before:normPh(r.before||r.photos),after:normPh(r.after),rres:r.rres||'',rdate:r.rdate||'',rnote:r.rnote||''};
+      before:normPh(r.before||r.photos),after:normPh(r.after),rres:r.rres||'',rdate:r.rdate||'',rnote:r.rnote||'',
+      asg:r.asg||'',due:r.due||'',st:r.st||'',rat:r.rat||'',pend:r.pend||'',fnote:r.fnote||''};
   }
   function norm(raw,id){
     raw=raw||{};
@@ -628,8 +815,30 @@ button{font:inherit;cursor:pointer}
       items:Array.isArray(raw.items)?raw.items.map(normItem):[blankItem(),blankItem(),blankItem()],
       createdAt:raw.createdAt||'',updatedAt:raw.updatedAt||'',rev:+raw.rev||0,folder:raw.folder||'',deletedAt:raw.deletedAt||'',
       sub:(raw.sub&&raw.sub.at)?{rev:+raw.sub.rev||0,at:raw.sub.at}:null,
-      rx:(raw.rx&&raw.rx.hash)?raw.rx:null
+      rx:(raw.rx&&raw.rx.hash)?raw.rx:null,
+      plan:normPlan(raw.plan),
+      bin:normBin(raw.bin),cf:(raw.cf&&typeof raw.cf==='object'&&!Array.isArray(raw.cf))?Object.assign({},raw.cf):{}
     };
+  }
+  /* deleted items and photos of this document (soft delete): kept here, out of the live lists, for BIN_DAYS.
+     bin=[{t:'item',at,i,item} | {t:'ph',at,item:itemId,k:'before'|'after',j,p}] · cf={itemId:at} = "you deleted it,
+     someone changed it on another device" (online), waiting for the user's decision */
+  var BIN_DAYS=30;
+  function normBin(b){
+    return (Array.isArray(b)?b:[]).map(function(e){
+      if(!e||typeof e!=='object')return null;
+      if(e.t==='item'&&e.item&&typeof e.item==='object')return {t:'item',at:String(e.at||''),i:Math.max(0,+e.i||0),item:normItem(e.item)};
+      if(e.t==='ph'&&typeof e.p==='string'&&e.p){var q=normPh([e.p])[0];return q?{t:'ph',at:String(e.at||''),item:String(e.item||''),k:e.k==='after'?'after':'before',j:Math.max(0,+e.j||0),p:q}:null}
+      return null;
+    }).filter(Boolean);
+  }
+  /* plan pins (8.1, optional): plan={sheets:[{a,name,w,h}], pins:{itemId:[{s,x,y}]}} · x,y = 0..1 of the sheet */
+  function normPlan(p){
+    if(!p||!Array.isArray(p.sheets))return null;
+    var sh=p.sheets.filter(function(x){return x&&typeof x.a==='string'&&x.a}).map(function(x){return {a:x.a,name:String(x.name||''),w:+x.w||0,h:+x.h||0}});
+    if(!sh.length)return null;
+    var pins={};Object.keys(p.pins||{}).forEach(function(k){var l=(p.pins[k]||[]).filter(function(q){return q&&q.s>=0&&q.s<sh.length&&q.x>=0&&q.x<=1&&q.y>=0&&q.y<=1}).map(function(q){return {s:+q.s,x:+q.x,y:+q.y}});if(l.length)pins[k]=l});
+    return {sheets:sh,pins:pins};
   }
   function carryOf(s){
     var m=s.meta||{},g=s.sign||{};
@@ -646,7 +855,7 @@ button{font:inherit;cursor:pointer}
   }
   function freshState(carry){
     var s=norm(carry||{},newId());
-    if(mode==='cloud'&&!s.meta.docno)s.meta.docno=nextDocno();
+    if(mode==='store'&&!s.meta.docno)s.meta.docno=nextDocno();
     return s;
   }
   function hasContent(d){
@@ -657,6 +866,7 @@ button{font:inherit;cursor:pointer}
     return (d.items||[]).some(function(it){return (it.loc||it.chk||it.note||it.res||it.rres||it.rnote||'').toString().trim()||(it.before||it.photos||[]).length||(it.after||[]).length});
   }
   var flt='all';
+  var FAST=lsGet('qc-fast')==='1',COMPACT=lsGet('qc-compact')==='1';   /* quick entry (7.1) */
   function isPend(it){return (it.res==='fix'||it.res==='bad')&&it.rres!=='ok'}
   function matches(it){
     if(flt==='all')return true;
@@ -677,7 +887,7 @@ button{font:inherit;cursor:pointer}
   }
 
   /* ---------- runtime ---------- */
-  var mode='boot';                 /* boot | cloud | local */
+  var mode='boot';                 /* boot | store | local · store = records kept in the document store (IndexedDB, or the online shell); local = single-draft fallback in localStorage. Not related to the online/cloud sync of beta. */
   var DB=null,UID=null,ASSETS=null,col=null;
   var records=[];                  /* [{id,data}] newest first, from the live listener */
   var state=freshState();
@@ -686,6 +896,8 @@ button{font:inherit;cursor:pointer}
   var PH={};                       /* asset id -> data URL (cache for PDF and rotate) */
   var pendDel={};                  /* asset ids to delete once the save that dropped them has landed */
 
+  /* explicit action signal for the home shell (pwa-home.js) - do not infer navigation from status text */
+  function qcAction(type,extra){try{document.dispatchEvent(new CustomEvent('qc-action',{detail:Object.assign({type:type},extra||{})}))}catch(e){}}
   function setStatus(t){
     $('#status').textContent=t+(suffix?' · '+suffix:'');
     if(dlg&&!dlg.hidden){var dm=$('#dlg-msg');if(dm){dm.textContent=t;dm.className='dlg-msg'}}
@@ -710,21 +922,42 @@ button{font:inherit;cursor:pointer}
   }
 
   /* ---------- serialising ---------- */
-  function ser(cloud){
+  function ser(inStore){
     function ph(list){
-      return list.filter(function(p){return cloud?!!p.a:!!p.d}).map(function(p){return cloud?p.a:p.d});
+      return list.filter(function(p){return inStore?!!p.a:!!p.d}).map(function(p){return inStore?p.a:p.d});
     }
-    return {
+    function serItem(it){
+      var o={id:it.id,loc:(it.loc||'').replace(/ · $/,''),chk:it.chk,res:it.res,note:it.note,cat:it.cat,ref:it.ref,rres:it.rres,rdate:it.rdate,rnote:it.rnote,before:ph(it.before),after:ph(it.after)};
+      if(window.__ONLINE){o.asg=it.asg||'';o.due=it.due||'';o.st=it.st||'';o.rat=it.rat||'';o.fnote=it.fnote||''}
+      return o;
+    }
+    var o={
       v:2,meta:Object.assign({},state.meta),sign:JSON.parse(JSON.stringify(state.sign)),
       summary:state.summary,remarks:state.remarks,
-      items:state.items.map(function(it){
-        return {id:it.id,loc:it.loc,chk:it.chk,res:it.res,note:it.note,cat:it.cat,ref:it.ref,rres:it.rres,rdate:it.rdate,rnote:it.rnote,before:ph(it.before),after:ph(it.after)};
-      }),
-      createdAt:state.createdAt,updatedAt:state.updatedAt,rev:state.rev,folder:state.folder||'',deletedAt:state.deletedAt||'',sub:state.sub||null,rx:state.rx||null,by:CLIENT
+      items:state.items.map(serItem),
+      createdAt:state.createdAt,updatedAt:state.updatedAt,rev:state.rev,folder:state.folder||'',deletedAt:state.deletedAt||'',sub:state.sub||null,rx:state.rx||null,by:CLIENT,
+      plan:inStore?planOut():null
     };
+    /* only written when used, so documents without deletions stay byte-for-byte as before */
+    var bin=(state.bin||[]).map(function(e){
+      if(e.t==='item')return {t:'item',at:e.at,i:e.i,item:serItem(e.item)};
+      var q=ph([e.p])[0];return q?{t:'ph',at:e.at,item:e.item,k:e.k,j:e.j,p:q}:null;
+    }).filter(Boolean);
+    if(bin.length)o.bin=bin;
+    if(state.cf&&Object.keys(state.cf).length)o.cf=Object.assign({},state.cf);
+    return o;
+  }
+  function planOut(){
+    var p=state.plan;if(!p||!p.sheets.length)return null;
+    var ids={},pins={};state.items.forEach(function(it){ids[it.id]=1});(state.bin||[]).forEach(function(e){if(e.t==='item')ids[e.item.id]=1});   /* a restored item gets its pins back */
+    Object.keys(p.pins).forEach(function(k){if(ids[k]&&p.pins[k].length)pins[k]=p.pins[k].map(function(q){return {s:q.s,x:Math.round(q.x*10000)/10000,y:Math.round(q.y*10000)/10000}})});
+    return {sheets:p.sheets.map(function(x){return {a:x.a,name:x.name,w:x.w,h:x.h}}),pins:pins};
   }
   function photosOf(d){
-    var out=[];(d&&d.items||[]).forEach(function(it){(it.before||[]).concat(it.after||[]).forEach(function(a){if(typeof a==='string'&&a.indexOf('data:')!==0)out.push(a)})});
+    var out=[];function add(a){if(typeof a==='string'&&a.indexOf('data:')!==0)out.push(a)}
+    (d&&d.items||[]).forEach(function(it){(it.before||[]).concat(it.after||[]).forEach(add)});
+    (d&&d.bin||[]).forEach(function(e){if(e.t==='item'&&e.item)(e.item.before||[]).concat(e.item.after||[]).forEach(add);else if(e.t==='ph')add(e.p)});   /* deleted but restorable: still in use */
+    (d&&d.plan&&d.plan.sheets||[]).forEach(function(x){if(x&&x.a)out.push(x.a)});   /* plan images are in use too (never collected as orphans) */
     return out;
   }
 
@@ -732,7 +965,7 @@ button{font:inherit;cursor:pointer}
   function save(){
     if(viewing)return;
     touched=true;
-    if(mode==='cloud'){
+    if(mode==='store'){
       dirty=true;
       if(booted){setStatus('กำลังบันทึก…');clearTimeout(saveTimer);saveTimer=setTimeout(flush,800)}
     }else if(mode==='local'){
@@ -745,7 +978,7 @@ button{font:inherit;cursor:pointer}
   function flush(){
     clearTimeout(saveTimer);
     if(viewing)return Promise.resolve();
-    if(mode!=='cloud'||!booted||!dirty)return writing||Promise.resolve();
+    if(mode!=='store'||!booted||!dirty)return writing||Promise.resolve();
     if(writing)return writing;
     dirty=false;
     var now=new Date().toISOString();
@@ -772,7 +1005,7 @@ button{font:inherit;cursor:pointer}
   /* wait until nothing is pending; resolves false if the last write failed */
   function drain(){
     clearTimeout(saveTimer);
-    if(mode!=='cloud'||!booted)return Promise.resolve(true);
+    if(mode!=='store'||!booted)return Promise.resolve(true);
     if(writing)return writing.then(drain);
     if(!dirty)return Promise.resolve(true);
     return flush().then(function(){return lastErr?false:drain()});
@@ -787,6 +1020,7 @@ button{font:inherit;cursor:pointer}
     trashRecs.forEach(function(r){if(photosOf(r.data).indexOf(id)>=0)hit=true});
     Object.keys(subDocs).forEach(function(u){subDocs[u].forEach(function(r){if(photosOf(r.data).indexOf(id)>=0)hit=true})});
     if(!hit)state.items.forEach(function(it){it.before.concat(it.after).forEach(function(p){if(p.a===id)hit=true})});
+    if(!hit)(state.bin||[]).forEach(function(e){(e.t==='item'?e.item.before.concat(e.item.after):[e.p]).forEach(function(p){if(p&&p.a===id)hit=true})});
     return hit;
   }
   function processDeletes(){
@@ -873,7 +1107,7 @@ button{font:inherit;cursor:pointer}
       });
     });
   }
-  var canUpload=function(){return mode==='cloud'&&!!ASSETS};
+  var canUpload=function(){return mode==='store'&&!!ASSETS};
   /* put image s={blob,dataURL} into photo slot p (new photo, replacement or rotation) */
   function putImage(p,s){
     var old=p.a;
@@ -890,6 +1124,107 @@ button{font:inherit;cursor:pointer}
     var c=e&&e.code;
     flash(c==='too_large'?'รูปใหญ่เกินกำหนด':c==='quota_or_state'?'พื้นที่เก็บรูปของบัญชีเต็ม':c==='rate_limited'?'อัปโหลดถี่เกินไป รอสักครู่แล้วลองใหม่':'อัปโหลดรูปไม่สำเร็จ ลองอีกครั้ง');
   }
+
+  /* ---------- photo markup: circle / arrow / pen / text, drawn into the photo ---------- */
+  function annotate(src){
+    return new Promise(function(resolve){
+      var img=new Image();
+      img.onload=function(){
+        var W=img.naturalWidth,H=img.naturalHeight,k=Math.min(1,LONG/Math.max(W,H));W=Math.round(W*k);H=Math.round(H*k);
+        var lw=Math.max(4,Math.round(Math.max(W,H)/110)),fs=Math.max(20,Math.round(Math.max(W,H)/22));
+        var cv=el('canvas',{width:W,height:H,'aria-label':'รูปสำหรับขีดเขียน'}),cx=cv.getContext('2d');
+        var shapes=[],cur=null,tool='circle',color='#ff3b30',pendText=null;
+        var COLORS=[['#ff3b30','แดง'],['#ffcc00','เหลือง'],['#ffffff','ขาว'],['#0a84ff','น้ำเงิน']];
+        function arrow(a,b,c){
+          var dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);if(len<2)return;var ang=Math.atan2(dy,dx),hl=Math.max(lw*4,len*0.18);
+          c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();
+          c.beginPath();c.moveTo(b.x,b.y);c.lineTo(b.x-hl*Math.cos(ang-0.45),b.y-hl*Math.sin(ang-0.45));
+          c.lineTo(b.x-hl*Math.cos(ang+0.45),b.y-hl*Math.sin(ang+0.45));c.closePath();c.fill();
+        }
+        function drawShape(sh){
+          cx.save();cx.strokeStyle=sh.c;cx.fillStyle=sh.c;cx.lineWidth=lw;cx.lineCap='round';cx.lineJoin='round';
+          cx.shadowColor='rgba(0,0,0,.55)';cx.shadowBlur=lw;
+          if(sh.t==='pen'){cx.beginPath();sh.p.forEach(function(q,j){j?cx.lineTo(q.x,q.y):cx.moveTo(q.x,q.y)});cx.stroke()}
+          else if(sh.t==='circle'){var rx=Math.abs(sh.b.x-sh.a.x)/2,ry=Math.abs(sh.b.y-sh.a.y)/2;if(rx>1||ry>1){cx.beginPath();cx.ellipse((sh.a.x+sh.b.x)/2,(sh.a.y+sh.b.y)/2,Math.max(rx,1),Math.max(ry,1),0,0,Math.PI*2);cx.stroke()}}
+          else if(sh.t==='arrow')arrow(sh.a,sh.b,cx);
+          else if(sh.t==='text'){
+            cx.shadowBlur=0;cx.font='600 '+fs+'px '+getComputedStyle(document.body).fontFamily;
+            var lines=sh.s.split('\n'),pad=Math.round(fs*0.3),wmax=0;lines.forEach(function(l){wmax=Math.max(wmax,cx.measureText(l).width)});
+            var bh=lines.length*fs*1.25+pad*2,x=Math.min(Math.max(0,sh.a.x),W-wmax-pad*2),y=Math.min(Math.max(0,sh.a.y),H-bh);
+            cx.fillStyle=sh.c;cx.fillRect(x,y,wmax+pad*2,bh);
+            cx.fillStyle=(sh.c==='#ffffff'||sh.c==='#ffcc00')?'#111':'#fff';cx.textBaseline='top';
+            lines.forEach(function(l,j){cx.fillText(l,x+pad,y+pad+j*fs*1.25)});
+          }
+          cx.restore();
+        }
+        function draw(){cx.drawImage(img,0,0,W,H);shapes.forEach(drawShape);if(cur)drawShape(cur)}
+        function pt(e){var r=cv.getBoundingClientRect();return {x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+        /* two fingers = pinch-zoom / pan (P3-7); pt() reads the transformed box, so drawing stays exact at any zoom */
+        var ptrs={},pinch=null,Z=1,TX=0,TY=0;
+        function np(){return Object.keys(ptrs).length}
+        function two(){var k=Object.keys(ptrs),a=ptrs[k[0]],b=ptrs[k[1]];return {d:Math.hypot(a.x-b.x,a.y-b.y)||1,x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
+        function applyZ(){if(Z<=1.01){Z=1;TX=0;TY=0}cv.style.transform=Z===1?'':'translate('+TX+'px,'+TY+'px) scale('+Z+')';zoomB.hidden=Z===1;zoomB.textContent='พอดีจอ ('+Math.round(Z*100)+'%)'}
+        cv.addEventListener('pointerdown',function(e){
+          e.preventDefault();ptrs[e.pointerId]={x:e.clientX,y:e.clientY};
+          try{cv.setPointerCapture(e.pointerId)}catch(x){}
+          if(np()===2){cur=null;draw();var t=two();pinch={d:t.d,x:t.x,y:t.y,z:Z,tx:TX,ty:TY};return}
+          if(np()>2||pinch)return;
+          var q=pt(e);
+          if(tool==='text'){pendText=q;txtBar.hidden=false;txtIn.value='';txtIn.focus();return}
+          cur=tool==='pen'?{t:'pen',c:color,p:[q]}:{t:tool,c:color,a:q,b:q};draw();
+        });
+        cv.addEventListener('pointermove',function(e){
+          if(ptrs[e.pointerId])ptrs[e.pointerId]={x:e.clientX,y:e.clientY};
+          if(pinch&&np()>=2){var t=two();Z=Math.max(1,Math.min(5,pinch.z*t.d/pinch.d));TX=pinch.tx+(t.x-pinch.x);TY=pinch.ty+(t.y-pinch.y);applyZ();return}
+          if(!cur)return;var q=pt(e);if(cur.t==='pen')cur.p.push(q);else cur.b=q;draw()});
+        function up(e){
+          if(e&&e.pointerId!=null)delete ptrs[e.pointerId];
+          if(pinch){if(np()<2)pinch=null;if(!np())cur=null;return}
+          if(!cur)return;var ok=cur.t==='pen'?cur.p.length>1:Math.hypot(cur.b.x-cur.a.x,cur.b.y-cur.a.y)>lw*2;if(ok)shapes.push(cur);cur=null;draw();sync()}
+        cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+        cv.addEventListener('wheel',function(e){if(!e.ctrlKey)return;e.preventDefault();Z=Math.max(1,Math.min(5,Z*(e.deltaY<0?1.15:1/1.15)));applyZ()},{passive:false});
+        var zoomB=el('button',{type:'button',hidden:true,onclick:function(){Z=1;applyZ()}},'พอดีจอ');
+        var back=el('div',{class:'an-back',role:'dialog','aria-modal':'true','aria-label':'ขีดเขียนบนรูป'});
+        var bar=el('div',{class:'an-bar'}),tb={};
+        [['circle','◯ วงกลม'],['arrow','➜ ลูกศร'],['pen','✎ ปากกา'],['text','T ข้อความ']].forEach(function(t){
+          tb[t[0]]=el('button',{type:'button','aria-pressed':'false',onclick:function(){tool=t[0];if(t[0]!=='text')txtBar.hidden=true;sync()}},t[1]);bar.appendChild(tb[t[0]]);
+        });
+        bar.appendChild(el('span',{class:'sep'}));
+        var sw={};COLORS.forEach(function(c){sw[c[0]]=el('button',{type:'button',class:'sw','aria-label':'สี'+c[1],'aria-pressed':'false',onclick:function(){color=c[0];sync()}},el('i',{style:'background:'+c[0]}));bar.appendChild(sw[c[0]])});
+        bar.appendChild(el('span',{class:'sep'}));
+        var undo=el('button',{type:'button','aria-label':'ย้อนกลับ',onclick:function(){shapes.pop();draw();sync()}},'↶ ย้อน');
+        var cancel=el('button',{type:'button',onclick:function(){finish(false)}},'ยกเลิก');
+        var doneB=el('button',{type:'button',class:'done',onclick:function(){finish(true)}},'เสร็จ');
+        bar.append(undo,zoomB);
+        var head=el('div',{class:'an-head'},cancel,el('strong',null,'ขีดเขียนบนรูป'),doneB);
+        var txtIn=el('input',{type:'text',placeholder:'พิมพ์ข้อความ เช่น ระยะหุ้มไม่พอ','aria-label':'ข้อความบนรูป'});
+        var txtOk=el('button',{type:'button',class:'btn primary',style:'min-height:48px'},'ใส่ข้อความ');
+        var txtBar=el('div',{class:'an-txt',hidden:true},txtIn,txtOk);
+        function addText(){var v=txtIn.value.trim();if(v&&pendText){shapes.push({t:'text',c:color,a:pendText,s:v});draw()}pendText=null;txtBar.hidden=true;sync()}
+        txtOk.addEventListener('click',addText);txtIn.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();addText()}});
+        var hint=el('div',{class:'an-hint'},'');
+        function sync(){
+          Object.keys(tb).forEach(function(k){tb[k].classList.toggle('on',k===tool);tb[k].setAttribute('aria-pressed',k===tool?'true':'false')});
+          Object.keys(sw).forEach(function(k){sw[k].classList.toggle('on',k===color);sw[k].setAttribute('aria-pressed',k===color?'true':'false')});
+          undo.disabled=!shapes.length;
+          hint.textContent=(tool==='text'?'แตะตรงที่จะวางข้อความ':tool==='pen'?'ลากนิ้วเพื่อวาด':'ลากนิ้วเพื่อวาด'+(tool==='circle'?'วงกลมรอบจุดที่พบ':'ลูกศรชี้จุดที่พบ'))+' · ใช้สองนิ้วถ่างเพื่อซูม';
+        }
+        back.append(head,el('div',{class:'an-stage'},cv),hint,txtBar,bar);
+        document.body.appendChild(back);draw();sync();
+        function key(e){if(e.key==='Escape'&&txtBar.hidden){e.stopPropagation();finish(false)}}
+        document.addEventListener('keydown',key,true);
+        function finish(ok){
+          document.removeEventListener('keydown',key,true);
+          if(!ok||!shapes.length){back.remove();resolve(null);return}
+          cur=null;draw();
+          var d=cv.toDataURL('image/jpeg',0.85);
+          cv.toBlob(function(b){back.remove();resolve(b?{blob:b,dataURL:d,w:W,h:H}:null)},'image/jpeg',0.85);
+        }
+      };
+      img.onerror=function(){resolve(null)};
+      img.src=src;
+    });
+  }
   /* let the user glance at a full-size preview and confirm/retake before the photo is saved */
   function confirmPhoto(file){
     return new Promise(function(resolve){
@@ -898,10 +1233,14 @@ button{font:inherit;cursor:pointer}
       var img=el('img',{src:url,style:'max-width:100%;max-height:62vh;display:block;margin:0 auto 12px;object-fit:contain;border-radius:6px'});
       var use=el('button',{class:'btn primary',type:'button'},'ใช้รูปนี้');
       var cancel=el('button',{class:'btn',type:'button'},'ไม่ใช้ / ถ่ายใหม่');
+      var mark=el('button',{class:'btn',type:'button',title:'วงกลม ลูกศร หรือข้อความชี้จุดที่พบ'},'✎ ขีดเขียน'),marked=null;
+      mark.addEventListener('click',function(){
+        annotate(marked?marked.dataURL:url).then(function(r){if(!r)return;marked=r;img.src=r.dataURL;mark.textContent='✎ ขีดเขียนเพิ่ม'});
+      });
       var box=el('div',{class:'dlg',style:'max-width:520px;width:92%;height:auto;max-height:90vh;padding:16px'},
-        img,el('div',{class:'rb-actions',style:'justify-content:flex-end'},cancel,use));
+        img,el('div',{class:'rb-actions',style:'justify-content:flex-end'},mark,cancel,use));
       back.appendChild(box);document.body.appendChild(back);
-      function done(ok){URL.revokeObjectURL(url);back.remove();resolve(ok)}
+      function done(ok){URL.revokeObjectURL(url);back.remove();resolve(ok&&marked?marked.blob:ok)}
       use.addEventListener('click',function(){done(true)});
       cancel.addEventListener('click',function(){done(false)});
       back.addEventListener('click',function(e){if(e.target===back)done(false)});
@@ -914,7 +1253,7 @@ button{font:inherit;cursor:pointer}
       chain=chain.then(function(){
         return (arr.length===1?confirmPhoto(f):Promise.resolve(true)).then(function(ok){
           if(!ok)return;
-          return shrink(f).then(function(s){
+          return shrink(ok===true?f:ok).then(function(s){
           var p={d:s.dataURL,busy:true};it[key].push(p);refreshRow(it);
           return putImage(p,s).then(function(){delete p.busy;refreshRow(it);save()},function(e){
             var i=it[key].indexOf(p);if(i>=0)it[key].splice(i,1);refreshRow(it);uploadErr(e);
@@ -934,24 +1273,42 @@ button{font:inherit;cursor:pointer}
     });
   }
   function removePhoto(it,key,j){
-    var p=it[key][j];if(p.a)queueDel(p.a);
-    it[key].splice(j,1);refreshRow(it);save();
+    var p=it[key].splice(j,1)[0];if(!p)return;
+    var e={t:'ph',at:nowIso(),item:it.id,k:key,j:j,p:p};
+    state.bin.unshift(e);refreshRow(it);save();
+    undoToast((key==='after'?'ลบรูปหลังแก้แล้ว':'ลบรูปแล้ว'),e);
   }
-  var lb=$('#lb');
-  lb.addEventListener('click',function(){lb.hidden=true});
-  document.addEventListener('keydown',function(e){if(e.key==='Escape')lb.hidden=true});
-  function openPhoto(src){lb.querySelector('img').src=src;lb.hidden=false}
+  /* lightbox: swipe left/right (or ‹ › / arrow keys) through the photos of the same set (P3-6) */
+  var lb=$('#lb'),lbList=[],lbI=0,lbX=null,lbMoved=false;
+  var lbPrev=el('button',{type:'button',class:'lb-nav lb-prev','aria-label':'รูปก่อนหน้า'},'‹'),lbNext=el('button',{type:'button',class:'lb-nav lb-next','aria-label':'รูปถัดไป'},'›'),lbCount=el('div',{class:'lb-count','aria-live':'polite'});
+  lb.append(lbPrev,lbNext,lbCount);
+  function lbShow(){lb.querySelector('img').src=lbList[lbI];var many=lbList.length>1;lbPrev.hidden=lbNext.hidden=lbCount.hidden=!many;lbCount.textContent=(lbI+1)+' / '+lbList.length;lbPrev.disabled=lbI<=0;lbNext.disabled=lbI>=lbList.length-1}
+  function lbGo(d){var n=lbI+d;if(n<0||n>=lbList.length)return;lbI=n;lbShow()}
+  lbPrev.addEventListener('click',function(e){e.stopPropagation();lbGo(-1)});lbNext.addEventListener('click',function(e){e.stopPropagation();lbGo(1)});
+  lb.addEventListener('pointerdown',function(e){lbX=e.clientX;lbMoved=false});
+  lb.addEventListener('pointerup',function(e){if(lbX==null)return;var dx=e.clientX-lbX;lbX=null;if(Math.abs(dx)>40&&lbList.length>1){lbMoved=true;lbGo(dx<0?1:-1)}});
+  lb.addEventListener('click',function(e){if(lbMoved){lbMoved=false;return}if(e.target.closest&&e.target.closest('.lb-nav'))return;lb.hidden=true});
+  document.addEventListener('keydown',function(e){if(lb.hidden)return;if(e.key==='Escape')lb.hidden=true;else if(e.key==='ArrowLeft')lbGo(-1);else if(e.key==='ArrowRight')lbGo(1)});
+  function openPhoto(src,list,i){lbList=list&&list.length?list:[src];lbI=list&&list.length?Math.max(0,Math.min(i||0,list.length-1)):0;lbShow();lb.hidden=false}
 
   function thumb(it,key,j,tag){
     var p=it[key][j],th=el('div',{class:'thumb'});
     var img=el('img',{src:photoSrc(p),alt:tag+' รูปที่ '+(j+1)});
-    img.addEventListener('click',function(){openPhoto(photoSrc(p))});
+    img.addEventListener('click',function(){openPhoto(photoSrc(p),it[key].map(photoSrc),j)});
     img.addEventListener('error',function(){th.classList.add('broken')});
     function shape(){if(img.naturalWidth&&img.naturalHeight){var d={w:img.naturalWidth,h:img.naturalHeight};DIM[dimKey(p)]=d;th.setAttribute('data-o',orient(d.w,d.h))}}
     img.addEventListener('load',shape);if(DIM[dimKey(p)])th.setAttribute('data-o',orientOf(p));
     th.appendChild(img);
     if(p.busy)th.classList.add('busy');
+    /* online: a photo still waiting in the upload queue is marked on its own thumbnail (not just a total) */
+    if(p.a&&window.__qcPendingUpload){th.setAttribute('data-aid',p.a);if(window.__qcPendingUpload(p.a))th.classList.add('upq')}
     th.appendChild(el('button',{type:'button',class:'tb x','aria-label':'ลบรูปที่ '+(j+1),title:'ลบรูป',onclick:function(){removePhoto(it,key,j)}},'×'));
+    th.appendChild(el('button',{type:'button',class:'tb ann','aria-label':'ขีดเขียนบนรูปที่ '+(j+1),title:'ขีดเขียน (วงกลม ลูกศร ข้อความ)',onclick:function(){
+      getDataURL(p).then(function(d){
+        if(!d)throw new Error('src');
+        return annotate(d).then(function(r){if(r)editPhoto(it,key,p,function(){return Promise.resolve(r)})});
+      }).catch(function(){flash('เปิดรูปไม่ได้')});
+    }},'✎'));
     th.appendChild(el('button',{type:'button',class:'tb rot','aria-label':'หมุนรูปที่ '+(j+1),title:'หมุน 90°',onclick:function(){
       editPhoto(it,key,p,function(){return getDataURL(p).then(function(d){if(!d)throw new Error('src');return rotateImage(d,1)})});
     }},'↻'));
@@ -961,7 +1318,232 @@ button{font:inherit;cursor:pointer}
       editPhoto(it,key,p,function(){return shrink(f)});
     });
     th.appendChild(el('label',{class:'tb rep',title:'เปลี่ยนรูป','aria-label':'เปลี่ยนรูปที่ '+(j+1)},'⇄',inp));
+    /* touch screens: one 44 px button opens large choices (the four small buttons are hidden by CSS on coarse pointers) */
+    th.appendChild(el('button',{type:'button',class:'tb more','aria-label':'ตัวเลือกรูปที่ '+(j+1)+' (ขีดเขียน หมุน เปลี่ยน ลบ)',title:'ตัวเลือกรูป',onclick:function(){photoSheet(th,tag+' รูปที่ '+(j+1))}},'⋯'));
     return th;
+  }
+  /* ---------- standard zones per project (7.4): pick a zone, then type the detail after it ---------- */
+  function zoneKey(){return 'qc-zones:'+((state.meta&&state.meta.project)||'').trim()}
+  function zonesFor(){try{return JSON.parse(lsGet(zoneKey())||'[]')}catch(e){return []}}
+  function zoneOf(loc,zs){loc=loc||'';var hit='';zs.forEach(function(z){if(loc===z||loc.indexOf(z+' · ')===0)if(z.length>hit.length)hit=z});return hit}
+  function zonePick(it,i){
+    var zs=zonesFor(),cur=zoneOf(it.loc,zs);
+    if(!zs.length)return i===0?el('button',{type:'button',class:'zsel zadd',onclick:zoneEditor},'+ ตั้งรายชื่อโซน / ชั้นของโครงการ'):document.createTextNode('');
+    var sel=el('select',{class:'zsel','aria-label':'โซน/ชั้นมาตรฐาน รายการที่ '+(i+1)},el('option',{value:''},zs.length?'เลือกโซน / ชั้น…':'+ ตั้งรายชื่อโซน / ชั้นของโครงการ'));
+    zs.forEach(function(z){sel.appendChild(el('option',{value:z},z))});
+    if(zs.length)sel.appendChild(el('option',{value:'__edit'},'แก้รายชื่อโซน…'));
+    sel.value=cur;
+    sel.addEventListener('change',function(){
+      if(sel.value==='__edit'){sel.value=cur;zoneEditor();return}
+      var detail=cur?it.loc.slice(cur.length).replace(/^ · /,''):it.loc;
+      it.loc=sel.value?(sel.value+' · '+detail):detail;   /* the separator stays so the detail can be typed straight after */save();var n=refreshRow(it);var ta=n&&n.querySelector('.loc textarea');if(ta){ta.focus({preventScroll:true});ta.setSelectionRange(ta.value.length,ta.value.length)}
+    });
+    return sel;
+  }
+  function zoneEditor(){
+    var bk=$('#phsheet'),b=$('#phsheet-b');b.textContent='';
+    var pj=((state.meta&&state.meta.project)||'').trim();
+    $('#phsheet-t').textContent='โซน / ชั้นมาตรฐาน'+(pj?' · '+pj:'');
+    if(!pj){b.appendChild(el('p',null,'กรอกชื่อโครงการในส่วน “ข้อมูลโครงการ” ก่อน รายชื่อโซนผูกกับชื่อโครงการ'));bk.hidden=false;$('#phsheet-x').onclick=function(){bk.hidden=true};return}
+    var ta=el('textarea',{rows:8,'aria-label':'รายชื่อโซน หนึ่งบรรทัดต่อหนึ่งโซน',placeholder:'ฐานราก\nชั้น 1\nชั้น 2\nชั้น 3\nหลังคา'});ta.value=zonesFor().join('\n');
+    var ok=el('button',{type:'button',class:'btn primary'},'บันทึกรายชื่อโซน');
+    ok.addEventListener('click',function(){
+      var z=ta.value.split('\n').map(function(x){return x.trim()}).filter(Boolean);lsSet(zoneKey(),JSON.stringify(z));bk.hidden=true;renderItems();
+      var O=window.__qcOnline;
+      if(!O||!O.saveZones){setStatus('บันทึกรายชื่อโซน '+z.length+' โซน · ใช้กับทุกฉบับของโครงการ “'+pj+'” ในเครื่องนี้ และอยู่ในไฟล์สำรอง');return}
+      O.saveZones(pj,z).then(function(r){
+        setStatus(r.ok?'บันทึกรายชื่อโซน '+z.length+' โซน ให้ทุกคนในโครงการแล้ว':r.denied?'บันทึกในเครื่องนี้แล้ว · รายชื่อโซนของโครงการ PM หรือโฟร์แมนเป็นคนตั้ง':'บันทึกในเครื่องนี้แล้ว'+(r.why?' · ยังไม่ขึ้นเซิร์ฟเวอร์ ('+r.why+')':''));
+      });
+    });
+    b.append(el('p',{style:'margin:0;color:var(--muted)'},'หนึ่งบรรทัดต่อหนึ่งโซน ช่องตำแหน่งจะให้เลือกโซนก่อนแล้วพิมพ์รายละเอียดต่อท้าย เช่น “ชั้น 3 · เสา C-3” ทุกคนเขียนตำแหน่งตรงกัน'),ta,ok);
+    bk.hidden=false;ta.focus();$('#phsheet-x').onclick=function(){bk.hidden=true};bk.onclick=function(e){if(e.target===bk)bk.hidden=true};
+  }
+  /* ---------- finger signatures (8.6): drawn on screen, stored with the document (sign.<role>.img, PNG) ---------- */
+  var SIGNK=['inspector','supervisor','contractor'],SIGNL={inspector:'ผู้ตรวจ',supervisor:'ผู้ควบคุมงาน',contractor:'ผู้รับเหมา'};
+  function renderSignPads(){
+    document.querySelectorAll('.sign .box').forEach(function(box,i){
+      var k=SIGNK[i],line=box.querySelector('.line');if(!k||!line)return;
+      var g=(state.sign&&state.sign[k])||{};line.textContent='';line.classList.toggle('has',!!g.img);
+      if(g.img){
+        line.appendChild(el('img',{src:g.img,alt:'ลายมือชื่อ '+SIGNL[k]}));
+        line.appendChild(el('button',{type:'button',class:'sp-btn',onclick:function(){signPad(k)}},'เซ็นใหม่'));
+        line.appendChild(el('button',{type:'button',class:'sp-btn',onclick:function(){delete state.sign[k].img;save();renderSignPads()}},'ลบลายเซ็น'));
+      }else line.appendChild(el('button',{type:'button',class:'sp-btn','aria-label':'เซ็นชื่อด้วยนิ้ว '+SIGNL[k],onclick:function(){signPad(k)}},'เซ็นชื่อด้วยนิ้ว'));
+    });
+  }
+  function signPad(k){
+    var cv=el('canvas',{width:'600',height:'240','aria-label':'ช่องเซ็นชื่อ ลากนิ้วเพื่อเซ็น'}),cx=cv.getContext('2d'),drawn=false,down=false,last=null;
+    cx.lineWidth=3;cx.lineCap='round';cx.lineJoin='round';cx.strokeStyle='#111';
+    function pt(e){var r=cv.getBoundingClientRect();return [(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]}
+    cv.addEventListener('pointerdown',function(e){down=true;last=pt(e);try{cv.setPointerCapture(e.pointerId)}catch(x){}cx.beginPath();cx.arc(last[0],last[1],1.4,0,7);cx.fill();drawn=true});
+    cv.addEventListener('pointermove',function(e){if(!down)return;var p=pt(e);cx.beginPath();cx.moveTo(last[0],last[1]);cx.lineTo(p[0],p[1]);cx.stroke();last=p;drawn=true});
+    ['pointerup','pointercancel','pointerleave'].forEach(function(t){cv.addEventListener(t,function(){down=false})});
+    var nm=((state.sign||{})[k]||{}).name||'';
+    var msg=el('div',{role:'status',style:'min-height:1.2em;color:var(--muted)'});
+    var back=el('div',{class:'sp-back noprint',role:'dialog','aria-modal':'true','aria-label':'เซ็นชื่อ '+SIGNL[k]});
+    var close=function(){back.remove()};
+    var ok=el('button',{type:'button',class:'btn primary'},'บันทึกลายเซ็น');
+    ok.addEventListener('click',function(){
+      if(!drawn){msg.textContent='ยังไม่ได้เซ็น';return}
+      state.sign[k]=Object.assign({},state.sign[k]||{name:'',date:''},{img:cv.toDataURL('image/png')});
+      if(!state.sign[k].date){var t=new Date();state.sign[k].date=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');bindValues()}
+      save();close();renderSignPads();setStatus('บันทึกลายเซ็น'+SIGNL[k]+'แล้ว');
+    });
+    back.appendChild(el('div',{class:'sp-card'},el('h2',{style:'margin:0;font-size:1.1rem'},'เซ็นชื่อ '+SIGNL[k]+(nm?' · '+nm:'')),cv,msg,
+      el('div',{class:'row'},el('button',{type:'button',class:'btn',onclick:function(){cx.clearRect(0,0,cv.width,cv.height);drawn=false}},'ล้าง'),el('button',{type:'button',class:'btn',onclick:close},'ยกเลิก'),ok)));
+    back.addEventListener('mousedown',function(e){if(e.target===back)close()});
+    document.body.appendChild(back);
+  }
+  /* ---------- 8.1 plan pins (optional): mark where an item is on a drawing; printed as an A3 sheet for the crew ---------- */
+  var PLAN_LONG=2400;
+  function pinsOf(it){return (state.plan&&state.plan.pins[it.id])||[]}
+  function planLink(it,i){
+    if(!canUpload())return null;
+    var pn=pinsOf(it),sh=state.plan&&state.plan.sheets;
+    var txt=pn.length?('บนแบบ: '+pn.map(function(q){return (sh[q.s]&&sh[q.s].name)||('แผ่น '+(q.s+1))}).filter(function(v,k,a){return a.indexOf(v)===k}).join(', ')+' · หมุด '+(i+1)+(pn.length>1?' ('+pn.length+' จุด)':'')):'+ ระบุบนแบบแปลน (ไม่บังคับ)';
+    return el('button',{type:'button',class:'plink'+(pn.length?' has':''),'aria-label':(pn.length?'แก้ตำแหน่งบนแบบ':'ระบุตำแหน่งบนแบบแปลน')+' รายการที่ '+(i+1),onclick:function(){openPlan(it.id)}},txt);
+  }
+  function shrinkPlan(file){
+    return new Promise(function(res,rej){
+      var url=URL.createObjectURL(file),img=new Image();
+      img.onload=function(){
+        var W=img.naturalWidth,H=img.naturalHeight;URL.revokeObjectURL(url);if(!W||!H){rej(new Error('image'));return}
+        var k=Math.min(1,PLAN_LONG/Math.max(W,H)),w=Math.round(W*k),h=Math.round(H*k),c=document.createElement('canvas');c.width=w;c.height=h;
+        var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.imageSmoothingQuality='high';x.drawImage(img,0,0,w,h);
+        c.toBlob(function(b){if(!b){rej(new Error('blob'));return}blobToDataURL(b).then(function(d){res({blob:b,dataURL:d,w:w,h:h})},rej)},'image/jpeg',0.8);
+      };
+      img.onerror=function(){URL.revokeObjectURL(url);rej(new Error('image'))};img.src=url;
+    });
+  }
+  /* drawings already used in other documents of the same project, so a sheet is uploaded once */
+  function projectSheets(){
+    var pj=((state.meta&&state.meta.project)||'').trim(),seen={},out=[];
+    (state.plan&&state.plan.sheets||[]).forEach(function(x){seen[x.a]=1});
+    records.forEach(function(r){var d=r.data||{};if(r.id===state.id||((d.meta||{}).project||'').trim()!==pj||!d.plan)return;
+      (d.plan.sheets||[]).forEach(function(x){if(x&&x.a&&!seen[x.a]){seen[x.a]=1;out.push(x)}})});
+    return out;
+  }
+  function openPlan(itemId){
+    if(!canUpload()){setStatus('ระบุบนแบบแปลนใช้ได้เมื่อเก็บข้อมูลในแอป (ไม่ใช่โหมดฉบับร่างชั่วคราว)');return}
+    /* follow the item by id: a remote update can replace state and its item objects while this screen is open */
+    var curId=(state.items.filter(function(x){return x.id===itemId})[0]||state.items[0]||{}).id;if(!curId)return;
+    var itm=function(){return state.items.filter(function(x){return x.id===curId})[0]||state.items[0]};
+    var cur=0,zoom=1;
+    (pinsOf(itm())[0])&&(cur=pinsOf(itm())[0].s);
+    var back=el('div',{class:'pl-back noprint',role:'dialog','aria-modal':'true','aria-label':'ระบุตำแหน่งบนแบบแปลน'});
+    var title=el('h2',null,''),tabs=el('div',{class:'pl-tabs',role:'tablist','aria-label':'แผ่นแบบ'}),stage=el('div',{class:'pl-stage'}),view=el('div',{class:'pl-view'},stage),hint=el('div',{class:'pl-hint',role:'status'});
+    var file=el('input',{type:'file',accept:'image/*',class:'sr','aria-label':'เพิ่มรูปแบบแปลน'});
+    var close=function(){back.remove();renderItems()};
+    function idx(){return state.items.indexOf(itm())+1}
+    function draw(){
+      var P=state.plan,sh=P&&P.sheets[cur],it=itm();
+      title.textContent='ระบุตำแหน่งบนแบบ · รายการที่ '+idx()+(it.loc?' · '+it.loc:'');
+      tabs.textContent='';
+      (P?P.sheets:[]).forEach(function(x,k){var b=el('button',{type:'button',role:'tab','aria-selected':k===cur?'true':'false',class:'pl-tab'},x.name||('แผ่น '+(k+1)));b.addEventListener('click',function(){cur=k;draw()});tabs.appendChild(b)});
+      tabs.appendChild(el('label',{class:'pl-tab add'},'+ เพิ่มแบบแปลน',file));
+      stage.textContent='';stage.style.width=(zoom*100)+'%';
+      if(!sh){
+        var reuse=projectSheets();
+        stage.appendChild(el('div',{class:'pl-empty'},el('p',null,'ยังไม่มีแบบแปลนในฉบับนี้ เพิ่มรูปแบบแปลน (ถ่ายจากแบบ หรือไฟล์ภาพ) แล้วแตะจุดบนแบบเพื่อวางหมุด ส่วนนี้ไม่บังคับ'),
+          reuse.length?el('div',null,el('p',{style:'margin:8px 0 4px'},'ใช้แบบที่มีในโครงการนี้แล้ว:'),reuse.map(function(x){return el('button',{type:'button',class:'btn',onclick:function(){addSheet(x)}},x.name||'แบบแปลน')})):null));
+        hint.textContent='';return;
+      }
+      var img=el('img',{alt:'แบบ '+(sh.name||''),draggable:'false'});
+      getDataURL({a:sh.a}).then(function(d){if(d)img.src=d;else hint.textContent='โหลดรูปแบบแปลนไม่ได้ (ยังไม่ได้ดาวน์โหลดลงเครื่อง)'});
+      stage.appendChild(img);
+      state.items.forEach(function(x,k){(P.pins[x.id]||[]).forEach(function(q,j){
+        if(q.s!==cur)return;
+        var mine=x.id===curId,b=el('button',{type:'button',class:'pl-pin'+(mine?' mine':''),style:'left:'+(q.x*100)+'%;top:'+(q.y*100)+'%','aria-label':(mine?'ลบหมุดรายการที่ ':'หมุดรายการที่ ')+(k+1)},String(k+1));
+        b.addEventListener('click',function(e){e.stopPropagation();if(!mine){curId=x.id;draw();return}P.pins[x.id].splice(j,1);if(!P.pins[x.id].length)delete P.pins[x.id];save();draw()});
+        stage.appendChild(b);
+      })});
+      hint.textContent='แตะบนแบบเพื่อวางหมุดเลข '+idx()+' · แตะหมุดเลข '+idx()+' เพื่อลบ · แตะหมุดเลขอื่นเพื่อสลับรายการ · ไม่บังคับ';
+    }
+    stage.addEventListener('click',function(e){
+      var P=state.plan;if(!P||!P.sheets[cur]||e.target.closest('.pl-pin'))return;
+      var r=stage.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;if(x<0||x>1||y<0||y>1)return;
+      (P.pins[curId]=P.pins[curId]||[]).push({s:cur,x:x,y:y});save();draw();
+    });
+    function addSheet(x){state.plan=state.plan||{sheets:[],pins:{}};state.plan.sheets.push({a:x.a,name:x.name,w:x.w,h:x.h});cur=state.plan.sheets.length-1;save();draw()}
+    file.addEventListener('change',function(){
+      var f=file.files&&file.files[0];file.value='';if(!f)return;
+      hint.textContent='กำลังเตรียมรูปแบบ…';
+      shrinkPlan(f).then(function(sx){return ASSETS.upload(sx.blob).then(function(r){PH[r.id]=sx.dataURL;addSheet({a:r.id,name:(f.name||'แบบ').replace(/\.[a-z0-9]+$/i,'').slice(0,30),w:sx.w,h:sx.h})})})
+        .catch(function(e){hint.textContent='เพิ่มแบบไม่สำเร็จ'+(e&&e.code==='too_large'?' (ไฟล์ใหญ่เกิน)':'')});
+    });
+    var zo=el('button',{type:'button',class:'btn','aria-label':'ย่อ'},'−'),zi=el('button',{type:'button',class:'btn','aria-label':'ขยาย'},'+');
+    zo.addEventListener('click',function(){zoom=Math.max(1,zoom/1.5);draw()});zi.addEventListener('click',function(){zoom=Math.min(4,zoom*1.5);draw()});
+    var prev=el('button',{type:'button',class:'btn'},'‹ รายการก่อน'),next=el('button',{type:'button',class:'btn'},'รายการถัดไป ›');
+    prev.addEventListener('click',function(){var k=state.items.indexOf(itm());if(k>0){curId=state.items[k-1].id;draw()}});
+    next.addEventListener('click',function(){var k=state.items.indexOf(itm());if(k<state.items.length-1){curId=state.items[k+1].id;draw()}});
+    back.appendChild(el('div',{class:'pl-card'},
+      el('div',{class:'pl-head'},title,el('button',{type:'button',class:'btn primary',onclick:close},'เสร็จ')),
+      tabs,view,hint,el('div',{class:'pl-foot'},prev,next,el('span',{style:'flex:1'}),zo,zi)));
+    document.body.appendChild(back);draw();
+    back.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
+  }
+  /* A3 landscape sheet(s) for the crew: drawing + pins of items still to fix + a table to tick off */
+  function printPlan(all){
+    var P=state.plan;
+    if(!P||!P.sheets.length){setStatus('ยังไม่มีแบบแปลนในฉบับนี้ (ระบุบนแบบได้จากช่องตำแหน่งของแต่ละรายการ · ไม่บังคับ)');return Promise.resolve(false)}
+    var O=window.__qcOnline,m=state.meta||{};
+    var rows=state.items.map(function(it,k){return {it:it,n:k+1}}).filter(function(r){return all?!!r.it.res:isPend(r.it)});
+    if(!rows.length){setStatus('ไม่มีรายการค้างแก้ในฉบับนี้');return Promise.resolve(false)}
+    return Promise.all(P.sheets.map(function(x){return getDataURL({a:x.a})})).then(function(srcs){
+      var E=function(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+      var who=function(it){return it.asg?(O&&O.name?O.name(it.asg):'')||'':''};
+      var used=P.sheets.map(function(x,s){return rows.some(function(r){return (P.pins[r.it.id]||[]).some(function(q){return q.s===s})})});
+      var pages=[];
+      P.sheets.forEach(function(x,s){
+        if(!used[s])return;
+        var mine=rows.filter(function(r){return (P.pins[r.it.id]||[]).some(function(q){return q.s===s})});
+        var pins=mine.map(function(r){return (P.pins[r.it.id]||[]).filter(function(q){return q.s===s}).map(function(q){var done=!isPend(r.it);return '<span class="pin'+(done?' done':'')+'" style="left:'+(q.x*100)+'%;top:'+(q.y*100)+'%">'+r.n+'</span>'}).join('')}).join('');
+        pages.push({s:s,x:x,src:srcs[s],pins:pins,rows:mine});
+      });
+      var loose=rows.filter(function(r){return !(P.pins[r.it.id]||[]).length});
+      if(!pages.length){pages.push({s:-1,x:{name:''},src:'',pins:'',rows:[]})}
+      if(loose.length)pages[0].rows=pages[0].rows.concat(loose);
+      var tbl=function(list){return '<table><thead><tr><th>ที่</th><th>ตำแหน่ง / สิ่งที่ต้องแก้</th><th>ผู้แก้ · กำหนด</th><th>เสร็จ</th></tr></thead><tbody>'+list.map(function(r){var it=r.it,np=!(P.pins[it.id]||[]).length;
+        return '<tr><td class="n">'+r.n+'</td><td><b>'+E(it.loc||'-')+'</b><br>'+E(it.note||it.chk||'')+(np?'<br><i>ไม่ได้ระบุบนแบบ · ดูตำแหน่งตามข้อความ</i>':'')+'</td><td>'+E(who(it))+(it.due?'<br>ครบ '+E(it.due):'')+'</td><td class="c">☐</td></tr>'}).join('')+'</tbody></table>'};
+      var html='<!doctype html><html lang="th"><head><meta charset="utf-8"><title>แผ่นแผนผังสำหรับช่าง</title><style>'+
+        '@page{size:A3 landscape;margin:10mm}body{margin:0;font-family:Sarabun,"Noto Sans Thai",sans-serif;color:#111}'+
+        '.pg{display:flex;gap:12px;height:277mm;page-break-after:always;box-sizing:border-box}.pg:last-child{page-break-after:auto}'+
+        '.dw{flex:1;min-width:0;border:1.5px solid #111;display:flex;align-items:center;justify-content:center;overflow:hidden}.dw .wrap{position:relative;display:inline-block;max-width:100%;max-height:100%}.dw img{display:block;max-width:100%;max-height:273mm}'+
+        '.pin{position:absolute;width:9mm;height:9mm;margin:-4.5mm 0 0 -4.5mm;border-radius:50%;border:2.5px solid #c0261d;background:#fff;color:#c0261d;font-weight:700;font-size:12pt;display:flex;align-items:center;justify-content:center;box-sizing:border-box}.pin.done{border-color:#888;color:#888}'+
+        '.side{width:105mm;display:flex;flex-direction:column;gap:6px;font-size:9.5pt}h1{font-size:14pt;margin:0;border-bottom:2px solid #111;padding-bottom:4px}'+
+        'table{width:100%;border-collapse:collapse}th,td{border:1px solid #555;padding:3px 4px;vertical-align:top;text-align:left}th{background:#eef1f5}td.n{font-weight:700;width:7mm}td.c{text-align:center;width:9mm}i{color:#555}'+
+        '.tb{margin-top:auto;border:1.5px solid #111}.tb div{padding:3px 6px;border-bottom:1px solid #111}.tb div:last-child{border-bottom:0}'+
+        '</style></head><body>'+pages.map(function(pg,k){
+          return '<section class="pg"><div class="dw">'+(pg.src?'<div class="wrap"><img src="'+pg.src+'">'+pg.pins+'</div>':'<p>ไม่มีหมุดบนแบบ</p>')+'</div><div class="side"><h1>แผ่นแผนผังสำหรับช่าง</h1>'+
+            '<div>'+(all?'ทุกรายการที่ตรวจ':'เฉพาะจุดที่ยังต้องแก้')+' · '+pg.rows.length+' รายการ</div>'+tbl(pg.rows)+
+            '<div class="tb"><div><b>โครงการ</b> '+E(m.project)+'</div><div><b>อ้างอิงรายงาน</b> '+E(m.docno)+' · ตรวจ '+E(m.date)+'</div><div><b>แบบ</b> '+E(pg.x.name||'-')+'</div><div>พิมพ์ '+E(new Date().toLocaleDateString('th-TH'))+' · หน้า '+(k+1)+'/'+pages.length+' · A3</div></div></div></section>'}).join('')+'</body></html>';
+      var fr=document.getElementById('plan-print');if(fr)fr.remove();
+      fr=el('iframe',{id:'plan-print',title:'แผ่นแผนผังสำหรับช่าง',style:'position:fixed;right:0;bottom:0;width:0;height:0;border:0'});
+      document.body.appendChild(fr);
+      var doc=fr.contentWindow.document;doc.open();doc.write(html);doc.close();
+      window.__qcPlanHTML=html;
+      return new Promise(function(res){
+        var imgs=doc.images,left=imgs.length,go=function(){try{fr.contentWindow.focus();if(!window.__qcNoPrint)fr.contentWindow.print()}catch(e){}res(true)};
+        if(!left){setTimeout(go,50);return}
+        Array.prototype.forEach.call(imgs,function(im){if(im.complete){if(!--left)go()}else{im.onload=im.onerror=function(){if(!--left)go()}}});
+      });
+    });
+  }
+  window.__qcPlan={open:function(id){openPlan(id||((state.items.filter(isPend)[0]||state.items[0]||{}).id))},print:printPlan,has:function(){return !!(state.plan&&state.plan.sheets.length)}};
+  function photoSheet(th,title){
+    var bk=$('#phsheet'),b=$('#phsheet-b');b.textContent='';$('#phsheet-t').textContent=title;
+    var close=function(){bk.hidden=true;try{th.querySelector('.tb.more').focus()}catch(e){}};
+    var go=function(sel){return function(){close();var t=th.querySelector(sel);if(t)t.click()}};
+    var del=el('button',{type:'button',class:'btn'},'ลบรูปนี้'),armT;
+    del.addEventListener('click',function(){
+      if(del.classList.contains('armed')){clearTimeout(armT);close();var x=th.querySelector('.tb.x');if(x)x.click();return}
+      del.classList.add('armed');del.textContent='กดอีกครั้งเพื่อลบ';armT=setTimeout(function(){del.classList.remove('armed');del.textContent='ลบรูปนี้'},3500);
+    });
+    b.append(el('button',{type:'button',class:'btn',onclick:go('.tb.ann')},'ขีดเขียนบนรูป (วงกลม ลูกศร ข้อความ)'),
+      el('button',{type:'button',class:'btn',onclick:go('.tb.rot')},'หมุน 90°'),
+      el('button',{type:'button',class:'btn',onclick:function(){close();var i=th.querySelector('.tb.rep input');if(i)i.click()}},'เปลี่ยนรูป'),del);
+    bk.hidden=false;b.firstChild.focus();
+    $('#phsheet-x').onclick=close;bk.onclick=function(e){if(e.target===bk)close()};
   }
   function photoStrip(it,key,tag,addLabel){
     var box=el('div',{class:'photos'});
@@ -981,21 +1563,57 @@ button{font:inherit;cursor:pointer}
     var ta=el('textarea',{rows:2,placeholder:ph,'aria-label':label});
     ta.value=it[key];
     ta.addEventListener('input',function(){it[key]=ta.value;autosize(ta);save()});
-    return el('label',{class:'f '+cls},el('span',{class:'lbl'},label),ta);
+    var lab=el('label',{class:'f '+cls},el('span',{class:'lbl'},label),ta);
+    if(key==='note'&&SR)lab.appendChild(micBtn(ta,label));
+    return lab;
+  }
+  /* ---------- dictation (7.3): only where the browser supports it; it needs internet while speaking, said up front ---------- */
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition||null,recNow=null;
+  function micBtn(ta,label){
+    var b=el('button',{type:'button',class:'mic noprint','aria-label':'พูดเพื่อพิมพ์ '+label,title:'พูดเพื่อพิมพ์ (ต้องใช้อินเทอร์เน็ตขณะพูด)','aria-pressed':'false'},'ไมค์');
+    b.addEventListener('click',function(e){
+      e.preventDefault();
+      if(recNow){try{recNow.stop()}catch(x){}return}
+      if(!navigator.onLine){setStatus('พูดเพื่อพิมพ์ต้องใช้อินเทอร์เน็ตขณะพูด ตอนนี้ไม่มีสัญญาณ ให้พิมพ์ไปก่อน');return}
+      if(lsGet('qc-voice-ok')!=='1'){
+        if(!b.classList.contains('armed')){
+          var tx='พูดเพื่อพิมพ์: เสียงจะถูกส่งไปแปลงเป็นข้อความผ่านอินเทอร์เน็ตโดยเบราว์เซอร์ (ไม่ได้ทำในเครื่อง) กดไมค์อีกครั้งเพื่อเริ่ม';
+          b.classList.add('armed');setStatus(tx);
+          if(!b.parentNode.querySelector('.mic-note'))b.parentNode.appendChild(el('small',{class:'mic-note',role:'note'},tx));   /* stays visible even when the status line moves on */
+          return;
+        }
+        var mn=b.parentNode.querySelector('.mic-note');if(mn)mn.remove();
+        lsSet('qc-voice-ok','1');
+      }
+      b.classList.remove('armed');
+      var r=new SR();r.lang='th-TH';r.interimResults=false;r.continuous=false;recNow=r;
+      b.setAttribute('aria-pressed','true');b.textContent='หยุด';setStatus('กำลังฟัง… พูดได้เลย');
+      r.onresult=function(ev){
+        var t='';for(var i=ev.resultIndex;i<ev.results.length;i++)if(ev.results[i].isFinal)t+=ev.results[i][0].transcript;
+        if(t){ta.value=(ta.value?ta.value.replace(/\s*$/,' '):'')+t.trim();ta.dispatchEvent(new Event('input',{bubbles:true}))}
+      };
+      r.onerror=function(ev){setStatus(ev&&ev.error==='network'?'แปลงเสียงไม่ได้: สัญญาณอินเทอร์เน็ตไม่พอ':ev&&ev.error==='not-allowed'?'ไม่ได้รับอนุญาตให้ใช้ไมโครโฟน':'แปลงเสียงไม่สำเร็จ ลองอีกครั้ง')};
+      r.onend=function(){recNow=null;b.setAttribute('aria-pressed','false');b.textContent='ไมค์'};
+      try{r.start()}catch(x){recNow=null;b.textContent='ไมค์';setStatus('เริ่มฟังไม่ได้ ลองอีกครั้ง')}
+    });
+    return b;
   }
   function isOpen(it){
     if(typeof it._open==='boolean')return it._open;
     return hasRecheck(it)||it.res==='fix'||it.res==='bad';
   }
   function recheck(it,i){
+    if(window.__ONLINE&&window.__qcOnline&&viewing)return actPanel(it,i);
     var open=isOpen(it),frag=document.createDocumentFragment(),bits=[];
     if(it.after.length)bits.push('รูปหลังแก้ '+it.after.length);
     if(it.rres)bits.push('ตรวจซ้ำ'+(it.rres==='ok'?'ผ่าน':'ยังไม่ผ่าน'));
+    else if(window.__ONLINE&&wfState(it)==='fixed')bits.push('แจ้งแก้แล้ว รอตรวจซ้ำ');
     frag.appendChild(el('button',{type:'button',class:'re-toggle','aria-expanded':open?'true':'false',onclick:function(){it._open=!isOpen(it);refreshRow(it)}},
       (open?'▾ ':'▸ ')+'ตรวจซ้ำหลังแก้ไข / รูปหลังแก้'+(bits.length&&!open?' ('+bits.join(' · ')+')':'')));
     if(!open)return frag;
     var p=el('div',{class:'re'});
     p.appendChild(el('div',{class:'re-h'},'ตรวจซ้ำหลังแก้ไข: เพิ่มรูปหลังแก้ ผลตรวจซ้ำ และวันที่'));
+    if(window.__ONLINE&&window.__qcOnline&&(it.res==='fix'||it.res==='bad'))p.appendChild(assignRow(it,i));
     p.appendChild(el('div',{class:'f'},el('span',{class:'lbl'},'รูปหลังแก้ไข'),photoStrip(it,'after','หลังแก้ รายการที่ '+(i+1),'+ รูปหลังแก้')));
     var sg=el('div',{class:'seg',role:'group','aria-label':'ผลตรวจซ้ำรายการที่ '+(i+1)});
     RRES.forEach(function(r){
@@ -1014,6 +1632,90 @@ button{font:inherit;cursor:pointer}
     frag.appendChild(p);
     return frag;
   }
+
+  /* ---------- online: workflow status, assignment, actions on someone else's document ---------- */
+  var WF_TH={open:'ยังไม่มอบหมาย',assigned:'มอบหมายแล้ว',fixed:'แจ้งแก้แล้ว รอตรวจซ้ำ',approved:'ตรวจซ้ำผ่าน',rejected:'ตรวจซ้ำไม่ผ่าน'};
+  var ROLE_SHORT={pm:'PM',foreman:'โฟร์แมน',headman:'เฮดแมน',viewer:'ผู้ดู'};
+  function wfState(it){
+    if(it.rres==='ok')return 'approved';if(it.rres==='bad'&&it.st!=='fixed')return 'rejected';
+    if(it.st==='fixed')return 'fixed';return it.asg?'assigned':'open';
+  }
+  function onl(){return window.__qcOnline}
+  function wfChips(it){
+    var s=wfState(it),box=el('div',{class:'wf'}),late=it.due&&it.due<today()&&s!=='approved'&&s!=='fixed';
+    box.appendChild(el('span',{class:'wf-chip s-'+s},WF_TH[s]));
+    if(it.asg)box.appendChild(el('span',{class:'wf-chip'},'ผู้แก้: '+onl().name(it.asg)));
+    if(it.due)box.appendChild(el('span',{class:'wf-chip'+(late?' late':'')},(late?'เลยกำหนด ':'กำหนด ')+fmtDate(it.due)));
+    if(it.pend)box.appendChild(el('span',{class:'wf-chip'},'รอส่งขึ้นระบบ'));
+    return box;
+  }
+  function assignRow(it,i){
+    var wrap=el('div',{class:'f'},el('span',{class:'lbl'},'สถานะงานแก้'),wfChips(it));
+    if(it.st==='fixed'&&it.fnote)wrap.appendChild(el('div',{class:'hint'},'ผู้แก้แจ้งว่า: '+it.fnote));
+    var sel=el('select',{'aria-label':'มอบหมายรายการที่ '+(i+1)+' ให้'},el('option',{value:''},'— ยังไม่มอบหมาย —'));
+    var ms=onl().members().filter(function(m){return m.role!=='viewer'});
+    ms.sort(function(a,b){var o={headman:0,foreman:1,pm:2};return (o[a.role]-o[b.role])||a.name.localeCompare(b.name,'th')});
+    ms.forEach(function(m){sel.appendChild(el('option',{value:m.id},m.name+' ('+(ROLE_SHORT[m.role]||m.role)+')'))});
+    if(it.asg&&!ms.some(function(m){return m.id===it.asg}))sel.appendChild(el('option',{value:it.asg},onl().name(it.asg)));
+    sel.value=it.asg||'';
+    sel.addEventListener('change',function(){it.asg=sel.value;save();refreshRow(it)});
+    var dt=el('input',{type:'date','aria-label':'กำหนดแก้เสร็จรายการที่ '+(i+1)});dt.value=it.due||'';
+    var fn=function(){if(it.due===dt.value)return;it.due=dt.value;save();refreshRow(it)};dt.addEventListener('change',fn);
+    wrap.appendChild(el('div',{class:'asg'},el('label',{class:'f'},el('span',{class:'lbl'},'มอบหมายให้'),sel),el('label',{class:'f'},el('span',{class:'lbl'},'กำหนดแก้เสร็จ'),dt)));
+    if(!ms.length)wrap.appendChild(el('div',{class:'hint'},'ยังไม่มีสมาชิกในโครงการให้มอบหมาย (PM เพิ่มได้ที่ปุ่มสถานะมุมล่างซ้าย › จัดการสมาชิก)'));
+    return wrap;
+  }
+  function actPanel(it,i){
+    var box=el('div',{class:'act'});
+    if(!(it.res==='fix'||it.res==='bad')){return box}
+    var s=wfState(it),me=onl().uid(),mine=it.asg===me&&(s==='assigned'||s==='rejected');
+    it._na=it._na||[];if(it._rr==null)it._rr='';if(it._n==null)it._n='';
+    var p=el('div',{class:'act-box'});
+    p.appendChild(el('div',{class:'re-h'},'ติดตามงานแก้ รายการที่ '+(i+1)));
+    p.appendChild(wfChips(it));
+    if(it.st==='fixed'&&it.fnote)p.appendChild(el('div',{class:'hint'},'ผู้แก้แจ้งว่า: '+it.fnote));
+    if(it.rnote&&it.rres)p.appendChild(el('div',{class:'hint'},'หมายเหตุตรวจซ้ำล่าสุด: '+it.rnote));
+    if(it.after.length){
+      var ph=el('div',{class:'act-ph'});
+      it.after.forEach(function(x,j){var im=el('img',{src:photoSrc(x),alt:'รูปหลังแก้ '+(j+1)});im.addEventListener('click',function(){openPhoto(photoSrc(x),it.after.map(photoSrc),j)});ph.appendChild(im)});
+      p.appendChild(el('div',{class:'f'},el('span',{class:'lbl'},'รูปหลังแก้ที่มีอยู่'),ph));
+    }
+    p.appendChild(el('div',{class:'f'},el('span',{class:'lbl'},'ถ่ายรูปหลังแก้เพิ่ม'),photoStrip(it,'_na','หลังแก้ (ใหม่) รายการที่ '+(i+1),'+ ถ่าย/เลือกรูป')));
+    var ta=el('textarea',{rows:2,placeholder:mine?'เช่น แก้ระยะหุ้มเหล็กแล้ว':'เช่น ตรวจแล้ว ระยะหุ้ม 3 ซม. ตามแบบ','aria-label':'หมายเหตุ รายการที่ '+(i+1)});
+    ta.value=it._n;ta.addEventListener('input',function(){it._n=ta.value;autosize(ta)});
+    p.appendChild(el('label',{class:'f'},el('span',{class:'lbl'},'หมายเหตุ'),ta));
+    function ready(){if(it._na.some(function(x){return x.busy})){flash('รอรูปบันทึกเสร็จก่อน');return false}return true}
+    function after(){return it._na.map(function(x){return x.a}).filter(Boolean)}
+    function sent(msg){it._na=[];it._n='';it._rr='';setStatus(msg);refreshRow(it)}
+    if(mine){
+      var fx=el('button',{type:'button',class:'btn primary big'},'แจ้งแก้แล้ว');
+      fx.addEventListener('click',function(){
+        if(!ready())return;
+        var go=function(){fx.disabled=true;
+        onl().reportFixed(state.id,it.id,it._n,after()).then(function(){sent('แจ้งแก้แล้ว · ส่งให้ผู้ตรวจตรวจซ้ำ')},function(e){fx.disabled=false;flash(e.message||'แจ้งไม่สำเร็จ')})};
+        if(it._na.length||it.after.length){go();return}
+        QCU.ask({title:'ยังไม่มีรูปหลังแก้',text:'ผู้ตรวจจะไม่มีรูปไว้เทียบ ต้องการแจ้งแก้แล้วโดยไม่มีรูปใช่ไหม',ok:'แจ้งโดยไม่มีรูป',cancel:'กลับไปถ่ายรูป'}).then(function(y){if(y)go()});
+      });
+      p.appendChild(fx);
+      p.appendChild(el('div',{class:'hint'},'หรือบันทึกผลตรวจซ้ำเองด้านล่าง'));
+    }
+    var sg=el('div',{class:'seg',role:'group','aria-label':'ผลตรวจซ้ำรายการที่ '+(i+1)});
+    RRES.forEach(function(r){
+      var on=it._rr===r[0];
+      sg.appendChild(el('button',{type:'button','data-k':r[0],class:on?'on':'','aria-pressed':on?'true':'false',onclick:function(){it._rr=it._rr===r[0]?'':r[0];var n=refreshRow(it);var b=n&&n.querySelector('.act .seg button[data-k="'+r[0]+'"]');if(b)b.focus()}},r[1]));
+    });
+    p.appendChild(el('div',{class:'f'},el('span',{class:'lbl'},'ผลตรวจซ้ำ'),sg));
+    var rx=el('button',{type:'button',class:'btn'+(mine?'':' primary big')},'บันทึกผลตรวจซ้ำ');
+    rx.addEventListener('click',function(){
+      if(!it._rr){flash('เลือก “ผ่าน” หรือ “ยังไม่ผ่าน” ก่อน');return}
+      if(!ready())return;
+      rx.disabled=true;
+      onl().recheck(state.id,it.id,it._rr,it._n,after()).then(function(){sent('บันทึกผลตรวจซ้ำแล้ว'+(navigator.onLine?'':' · จะส่งขึ้นระบบเมื่อมีสัญญาณ'))},function(e){rx.disabled=false;flash(e.message||'บันทึกไม่สำเร็จ')});
+    });
+    p.appendChild(rx);
+    box.appendChild(p);
+    return box;
+  }
   function row(it,i){
     var art=el('article',{class:'item','data-id':it.id});
     art.dataset.res=(it.rres==='ok'&&(it.res==='fix'||it.res==='bad'))?'ok':it.res;
@@ -1024,31 +1726,27 @@ button{font:inherit;cursor:pointer}
     RES.forEach(function(r){
       var b=el('button',{type:'button','data-k':r[0],class:it.res===r[0]?'on':'','aria-pressed':it.res===r[0]?'true':'false'},r[1]);
       b.addEventListener('click',function(){
+        var was=it.res;
         it.res=it.res===r[0]?'':r[0];
+        if(it.res==='fix'||it.res==='bad')it._exp=true;          /* needs a photo / note: open the details */
         save();var n=refreshRow(it);var nb=n&&n.querySelector('.irow .seg button[data-k="'+r[0]+'"]');if(nb)nb.focus();
+        if(FAST&&!was&&it.res==='ok')goNext(it);
+        else if(FAST&&!was&&it.res&&n){var ta=n.querySelector('.note textarea');if(ta){ta.focus({preventScroll:true});n.scrollIntoView({block:'center',behavior:'smooth'})}}
       });
       seg.appendChild(b);
     });
 
     var del=el('button',{type:'button',class:'del','aria-label':'ลบรายการที่ '+(i+1)},'ลบ');
-    var armedTimer;
-    del.addEventListener('click',function(){
-      if(del.classList.contains('armed')){
-        clearTimeout(armedTimer);
-        it.before.concat(it.after).forEach(function(p){if(p.a)queueDel(p.a)});
-        state.items=state.items.filter(function(x){return x!==it});
-        renderItems();save();return;
-      }
-      del.classList.add('armed');del.textContent='ยืนยัน?';
-      armedTimer=setTimeout(function(){del.classList.remove('armed');del.textContent='ลบ'},3000);
-    });
+    QCU.arm(del,{armed:'ยืนยัน?',timeoutMs:3000,onConfirm:function(){binItem(it)}});
 
     main.appendChild(el('div',{class:'no'},String(i+1)));
     main.appendChild(photoStrip(it,'before','ที่พบ รายการที่ '+(i+1),'+ เพิ่มรูป'));
     var locCell=el('div',{class:'loc'});
+    locCell.appendChild(zonePick(it,i));
+    var pl=planLink(it,i);if(pl)locCell.appendChild(pl);
     locCell.appendChild(textField('ตำแหน่ง','','loc',it,'เช่น เสา C-3 ชั้น 1'));
     var cs=el('select',{'aria-label':'หมวดงาน (แนะนำให้เลือก ช่วยค้นหาภายหลัง)'},el('option',{value:''},'+ เลือกหมวดงาน (แนะนำ)'));
-    var cats=CATS.slice();if(it.cat&&cats.indexOf(it.cat)<0)cats.push(it.cat);
+    var cats=catsFor(state).slice();if(it.cat&&cats.indexOf(it.cat)<0)cats.push(it.cat);
     cats.forEach(function(c){cs.appendChild(el('option',{value:c},c))});
     cs.value=it.cat;
     cs.classList.toggle('empty',!it.cat);
@@ -1060,16 +1758,102 @@ button{font:inherit;cursor:pointer}
     main.appendChild(el('div',{class:'f res'},el('span',{class:'lbl'},'ผลตรวจ'),seg));
     main.appendChild(textField('หมายเหตุ','note','note',it,'สิ่งที่พบ และข้อแก้ไข'));
     main.appendChild(del);
+    /* compact rows: number + check + result; tap to show photos, location, note */
+    var sumTxt=[it.loc,(it.before.length?it.before.length+' รูป':''),it.note?'มีหมายเหตุ':''].filter(Boolean).join(' · ');
+    var chkc=main.querySelector('.chkcell');if(chkc)chkc.appendChild(el('div',{class:'csum'},sumTxt||'ยังไม่มีตำแหน่ง / รูป'));
+    main.appendChild(el('button',{type:'button',class:'xpand','aria-expanded':it._exp?'true':'false',onclick:function(){it._exp=!it._exp;var n=refreshRow(it);if(n&&it._exp){var ta=n.querySelector('.loc textarea');if(ta)ta.focus({preventScroll:true})}}},it._exp?'ย่อรายละเอียด ▴':'รูป ตำแหน่ง หมายเหตุ ▾'));
+    if(COMPACT&&!it._exp)art.classList.add('compact');
+    if(state.cf&&state.cf[it.id]){
+      var keep=el('button',{type:'button',class:'btn sm primary'},'เก็บรายการไว้');
+      var again=el('button',{type:'button',class:'btn sm'},'ลบต่อ');
+      keep.addEventListener('click',function(){delete state.cf[it.id];refreshRow(it);save();setStatus('เก็บรายการที่ '+(i+1)+' ไว้แล้ว')});
+      again.addEventListener('click',function(){delete state.cf[it.id];binItem(it)});
+      art.appendChild(el('div',{class:'cf-note',role:'alert'},
+        el('b',null,'คุณลบรายการนี้ไว้ แต่มีการแก้ไขจากอีกเครื่องหลังจากนั้น'),
+        el('span',null,'ระบบจึงยังไม่ลบ เพื่อไม่ให้งานที่แก้ไว้หายเงียบ ๆ · ตรวจดูแล้วเลือก'),el('div',{class:'cf-acts'},keep,again)));
+    }
     art.appendChild(main);
     art.appendChild(recheck(it,i));
     return art;
   }
+  /* ---------- soft delete: bin, undo, restore ---------- */
+  function binItem(it){
+    var i=state.items.indexOf(it);if(i<0)return;
+    state.items.splice(i,1);
+    var e={t:'item',at:nowIso(),i:i,item:it};
+    state.bin.unshift(e);if(state.cf)delete state.cf[it.id];
+    renderItems();save();
+    undoToast('ลบรายการที่ '+(i+1)+' แล้ว',e);
+  }
+  function undoToast(msg,e){
+    var docId=state.id;
+    QC.showUndoToast(msg,function(){
+      if(state.id!==docId||!restoreBin(e))setStatus('กู้คืนจาก “รายการที่ถูกลบ” ในเมนู ⋯ ของฉบับนั้นได้');
+    });
+  }
+  function restoreBin(e){
+    if(viewing)return false;
+    var k=state.bin.indexOf(e);if(k<0)return false;
+    if(e.t==='item'){
+      state.bin.splice(k,1);
+      state.items.splice(Math.min(e.i,state.items.length),0,e.item);
+      renderItems();save();setStatus('กู้คืนรายการแล้ว');
+      var n=$('#items .item[data-id="'+e.item.id+'"]');if(n)n.scrollIntoView({block:'center',behavior:'smooth'});
+      return true;
+    }
+    var it=state.items.filter(function(x){return x.id===e.item})[0];
+    if(!it){   /* its item was deleted too: bring the item back first */
+      var ie=state.bin.filter(function(x){return x.t==='item'&&x.item.id===e.item})[0];
+      if(!ie||!restoreBin(ie))return false;
+      it=ie.item;k=state.bin.indexOf(e);
+    }
+    state.bin.splice(k,1);
+    it[e.k].splice(Math.min(e.j,it[e.k].length),0,e.p);
+    if(e.k==='after')it._exp=true;
+    refreshRow(it);save();setStatus('กู้คืนรูปแล้ว');
+    return true;
+  }
+  function binLabel(e){
+    if(e.t==='item'){var x=e.item;return 'รายการ: '+((x.chk||x.loc||x.note||'').trim().split('\n')[0]||'(ยังไม่มีข้อความ)')}
+    var it=state.items.filter(function(x){return x.id===e.item})[0]||((state.bin.filter(function(x){return x.t==='item'&&x.item.id===e.item})[0]||{}).item)||{};
+    return (e.k==='after'?'รูปหลังแก้':'รูปที่พบ')+' · '+(((it.chk||it.loc||'').trim().split('\n')[0])||'รายการที่ถูกลบ');
+  }
+  function binDays(at){var d=new Date(at);return isNaN(d)?BIN_DAYS:Math.max(0,BIN_DAYS-Math.floor((Date.now()-d.getTime())/864e5))}
+  function openBin(){
+    var back=el('div',{class:'bin-back',role:'dialog','aria-modal':'true','aria-labelledby':'bin-t'});
+    var box=el('div',{class:'bin-b'});
+    function close(){document.removeEventListener('keydown',key,true);back.remove()}
+    function key(e){if(e.key==='Escape'){e.stopPropagation();close()}}
+    function draw(){
+      box.textContent='';
+      box.appendChild(el('h2',{id:'bin-t'},'รายการที่ถูกลบ ('+state.bin.length+')'));
+      box.appendChild(el('p',{class:'hint'},'ของฉบับนี้ · เก็บไว้ '+BIN_DAYS+' วันนับจากวันที่ลบ แล้วลบถาวรเอง'));
+      if(!state.bin.length)box.appendChild(el('div',{class:'empty'},'ไม่มีรายการหรือรูปที่ถูกลบในฉบับนี้'));
+      var list=el('div',{class:'bin-list'});
+      state.bin.slice().sort(function(a,b){return a.at<b.at?1:a.at>b.at?-1:0}).forEach(function(e){
+        var th=e.t==='ph'?el('img',{src:photoSrc(e.p),alt:''}):el('span',{class:'bin-ic','aria-hidden':'true'},'#');
+        var nph=e.t==='item'?e.item.before.length+e.item.after.length:0;
+        var rs=el('button',{type:'button',class:'btn sm',disabled:viewing?true:null},'กู้คืน');
+        rs.addEventListener('click',function(){if(restoreBin(e))draw()});
+        list.appendChild(el('div',{class:'bin-row'},th,el('div',{class:'bin-tx'},el('b',null,binLabel(e)),
+          el('span',null,'ลบเมื่อ '+fmtShort(e.at)+' · เหลือ '+binDays(e.at)+' วัน'+(nph?' · มีรูป '+nph+' รูป':''))),rs));
+      });
+      box.appendChild(list);
+      var c=el('button',{type:'button',class:'btn'},'ปิด');c.addEventListener('click',close);
+      box.appendChild(el('div',{class:'bin-acts'},c));
+    }
+    back.appendChild(box);back.addEventListener('mousedown',function(e){if(e.target===back)close()});
+    document.addEventListener('keydown',key,true);draw();document.body.appendChild(back);
+    var f=box.querySelector('button');if(f)f.focus();
+  }
+  window.__qcBin={count:function(){return viewing?0:(state.bin||[]).length},open:openBin,restore:restoreBin,state:function(){return state.bin}};
   function refreshRow(it){
     var i=state.items.indexOf(it);if(i<0)return null;
     var list=$('#items'),old=list.querySelector('.item[data-id="'+it.id+'"]'),n=row(it,i);
     if(old)old.replaceWith(n);else list.appendChild(n);
     n.querySelectorAll('textarea').forEach(autosize);
     updateCounts();
+    if(viewing)lockForm(true);
     return n;
   }
   function renderItems(){
@@ -1095,6 +1879,24 @@ button{font:inherit;cursor:pointer}
     if(pend)c.appendChild(el('span',{class:'c-fix'},'รอตรวจซ้ำ '+pend));
     if(done)c.appendChild(el('span',{class:'c-ok'},'ตรวจซ้ำผ่าน '+done));
     if(flt!=='all')c.appendChild(el('span',null,'แสดง '+state.items.filter(matches).length+' รายการ'));
+    var nx=$('#qc-next'),left=state.items.filter(function(x){return !x.res&&matches(x)}).length;
+    if(nx){nx.hidden=!left||!!viewing||state.items.length<2;$('#qc-next-n').textContent=left}
+  }
+  /* ---------- quick entry (field use): next unchecked item, auto-advance, compact rows ---------- */
+  function goNext(from){
+    var list=state.items.filter(matches),start=from?list.indexOf(from)+1:0,nxt=null;
+    for(var k=0;k<list.length;k++){var c2=list[(start+k)%list.length];if(!c2.res&&c2!==from){nxt=c2;break}}
+    if(!nxt)return false;
+    var node=document.querySelector('.item[data-id="'+nxt.id+'"]');if(!node)return false;
+    node.scrollIntoView({block:'center',behavior:'smooth'});
+    node.classList.add('flash');setTimeout(function(){node.classList.remove('flash')},900);
+    var b=node.querySelector('.irow .seg button');if(b)b.focus({preventScroll:true});
+    return true;
+  }
+  function setQuick(){
+    var f=$('#qf-fast'),c=$('#qf-compact');if(!f)return;
+    f.setAttribute('aria-pressed',FAST?'true':'false');c.setAttribute('aria-pressed',COMPACT?'true':'false');
+    document.body.classList.toggle('compact-on',COMPACT);
   }
   $('#add').addEventListener('click',function(){
     if(flt!=='all'){flt='all';$('#flt').value='all'}
@@ -1164,29 +1966,26 @@ button{font:inherit;cursor:pointer}
 
   /* ---------- saved inspections: bar, list, open / new / copy / delete ---------- */
   var resetBtn=$('#reset'),newBtn=$('#btn-new'),dupBtn=$('#btn-dup'),followBtn=$('#btn-follow'),listBtn=$('#btn-list'),dlg=$('#docdlg');
-  function armBtn(btn,armedText,fn,need){
-    var t;
-    btn.addEventListener('click',function(){
-      if(need&&!need()){fn();return}
-      if(btn.classList.contains('armed')){clearTimeout(t);btn.classList.remove('armed');btn.textContent=btn._label;fn();return}
-      btn.classList.add('armed');btn.textContent=armedText;
-      t=setTimeout(function(){btn.classList.remove('armed');btn.textContent=btn._label},3500);
-    });
-  }
+  function armBtn(btn,armedText,fn,need){QCU.arm(btn,{armed:armedText,onConfirm:function(){fn()},need:need})}   /* one confirm pattern app-wide (pwa-util.js) */
   function setLabel(btn,t){btn._label=t;if(!btn.classList.contains('armed'))btn.textContent=t}
   function persisted(){return records.some(function(r){return r.id===state.id})}
   function renderBar(){
-    var cloud=mode==='cloud';
-    $('#curtitle').textContent=titleOf(state)+((cloud&&!viewing&&!persisted()&&!touched)?' (ยังไม่ได้บันทึก)':'');
-    var b=$('#badge');b.textContent=cloud?'ออฟไลน์ · เก็บในเครื่อง':(mode==='local'?'เฉพาะเครื่องนี้':'กำลังเชื่อมต่อ…');
-    b.className='badge'+(cloud?' cloud':'');
-    b.title=cloud?'ข้อมูลฉบับนี้อยู่ในมือถือ/คอมพิวเตอร์เครื่องนี้เท่านั้น เพื่อนร่วมทีมที่ใช้เครื่องอื่นจะไม่เห็นข้อมูลนี้ จนกว่าจะส่งไฟล์ให้โดยตรง (ปุ่ม “ส่งเอกสาร”)':'';
-    listBtn.hidden=!cloud;dupBtn.hidden=!cloud;followBtn.hidden=!cloud;
+    var inStore=mode==='store';
+    $('#curtitle').textContent=titleOf(state)+((inStore&&!viewing&&!persisted()&&!touched)?' (ยังไม่ได้บันทึก)':'');
+    var b=$('#badge');b.textContent=inStore?'ออฟไลน์ · เก็บในเครื่อง':(mode==='local'?'เฉพาะเครื่องนี้':'กำลังเชื่อมต่อ…');
+    b.className='badge'+(inStore?' stored':'');
+    b.title=inStore?'ข้อมูลฉบับนี้อยู่ในมือถือ/คอมพิวเตอร์เครื่องนี้เท่านั้น เพื่อนร่วมทีมที่ใช้เครื่องอื่นจะไม่เห็นข้อมูลนี้ จนกว่าจะส่งไฟล์ให้โดยตรง (ปุ่ม “ส่งเอกสาร”)':'';
+    if(inStore&&window.__ONLINE&&window.__qcSync){
+      var sy=window.__qcSync();
+      b.textContent=sy.state==='offline'?'ออฟไลน์ · รอส่ง '+sy.pending:sy.state==='error'?'ซิงก์ไม่สำเร็จ':sy.state==='pending'?'ออนไลน์ · กำลังซิงก์':'ออนไลน์ · ซิงก์แล้ว';
+      b.title=viewing?'เอกสารของคนอื่นในโครงการ (ดูอย่างเดียว)':'บันทึกในเครื่องนี้ก่อนเสมอ แล้วส่งขึ้นระบบให้ทุกคนในโครงการเห็นเมื่อมีสัญญาณ';
+    }
+    listBtn.hidden=!inStore;dupBtn.hidden=!inStore;followBtn.hidden=!inStore;
     setLabel(listBtn,'คลังเอกสาร ('+records.length+')');
     setLabel(newBtn,'+ ฉบับใหม่');
     setLabel(dupBtn,'ทำสำเนา');setLabel(followBtn,'ตรวจรอบใหม่จากรายการค้าง');
-    setLabel(resetBtn,cloud?'ย้ายไปถังขยะ':'ล้างแบบฟอร์ม');
-    $('#cpy').hidden=!(cloud&&records.some(function(r){return r.id!==state.id}));
+    setLabel(resetBtn,inStore?'ย้ายไปถังขยะ':'ล้างแบบฟอร์ม');
+    $('#cpy').hidden=!(inStore&&records.some(function(r){return r.id!==state.id}));
     renderSubUi();
   }
   function fmtShort(iso){
@@ -1212,9 +2011,11 @@ button{font:inherit;cursor:pointer}
   }
   function closeList(){
     if(dlg.hidden)return;
+    if(selMode){selMode=false;selIds={};$('#sel-mode').setAttribute('aria-pressed','false');$('#sel-bar').hidden=true}
     dlg.hidden=true;listBtn.setAttribute('aria-expanded','false');document.body.style.overflow='';
     renamingF=null;addingF=false;
     try{listBtn.focus({preventScroll:true})}catch(e){}
+    qcAction('list-close');
   }
   function inlineInput(o){
     var done=false;
@@ -1293,6 +2094,17 @@ button{font:inherit;cursor:pointer}
   function purgeExpired(){
     var lim=Date.now()-30*864e5;
     function old(t){var d=new Date(t);return !isNaN(d)&&d.getTime()<lim}
+    /* deleted items/photos inside documents: permanently removed after the same 30 days */
+    var binOld=function(e){return old(e.at)};
+    var pend=[];
+    records.forEach(function(r){
+      var cur=r.id===state.id,b=cur?state.bin:(r.data.bin||[]);if(!b||!b.some(binOld))return;
+      var gone=b.filter(binOld),keep=b.filter(function(e){return !binOld(e)});
+      gone.forEach(function(e){(e.t==='item'?(e.item.before||[]).concat(e.item.after||[]):[e.p]).forEach(function(p){var a=typeof p==='string'?p:(p&&p.a);if(a&&a.indexOf('data:')!==0)queueDel(a)})});
+      if(cur){state.bin=keep;save()}
+      else{r.data.bin=keep;pend.push(col.doc(r.id).update({bin:keep}).catch(function(){}))}
+    });
+    if(pend.length)Promise.all(pend).then(function(){processDeletes()});else processDeletes();
     trashRecs.filter(function(r){return old(r.data.deletedAt)}).forEach(function(r){permDeleteRecord(r.id,true)});
     trashFolders.filter(function(f){return old(f.deletedAt)}).forEach(function(f){permDeleteFolder(f.id,true)});
   }
@@ -1350,7 +2162,7 @@ button{font:inherit;cursor:pointer}
       host.appendChild(w);
     });
     cnt.shared=sharedList().length;
-    if(!window.__PWA)host.appendChild(el('div',{class:'fd'+(activeF==='shared'?' on':'')},openBtn('shared','ส่งแล้วทั้งทีม (ดูอย่างเดียว)')));
+    if(!window.__PWA||window.__ONLINE)host.appendChild(el('div',{class:'fd'+(activeF==='shared'?' on':'')},openBtn('shared',window.__ONLINE?'ของคนอื่นในโครงการ (ดู + ตรวจซ้ำ)':'ส่งแล้วทั้งทีม (ดูอย่างเดียว)')));
     folders.forEach(function(f){
       var w=el('div',{class:'fd'+(activeF===f.id?' on':'')});
       if(renamingF===f.id){
@@ -1403,6 +2215,7 @@ button{font:inherit;cursor:pointer}
     var a=$('#exp-pdf'),c=$('#exp-csv');if(!a||!c)return;
     a.disabled=c.disabled=!!pdfBusy||!expN;
   }
+  var formsGen=0;
   function renderList(){
     if(dlg.hidden)return;
     var act=document.activeElement;
@@ -1411,6 +2224,7 @@ button{font:inherit;cursor:pointer}
     if(!trashV&&activeF!=='all'&&activeF!=='none'&&activeF!=='shared'&&!m[activeF])activeF='none';
     var sharedV=activeF==='shared',real=activeF!=='all'&&activeF!=='none'&&!trashV&&!sharedV;
     var q=($('#q').value||'').trim().toLowerCase(),host=$('#reclist'),shown=0;
+    var canSel=!trashV&&!sharedV;if(!canSel&&selMode)setSel(false);$('#sel-mode').hidden=!canSel;
     host.textContent='';
     $('#dlg-new').hidden=trashV||sharedV;$('#dlg-opts').hidden=trashV||sharedV;
     if(trashV){$('#scope').textContent='ถังขยะ';renderTrash(host);return}
@@ -1418,7 +2232,7 @@ button{font:inherit;cursor:pointer}
     var list=[];
     records.forEach(function(r){
       var d=r.id===state.id?state:r.data,inf=info(d),fid=recFolder(r,m);
-      var hay=(inf.title+' '+inf.sub+' '+((d.meta||{}).work||'')).toLowerCase();
+      var hay=(inf.title+' '+inf.sub+' '+((d.meta||{}).work||'')+' '+(d.items||[]).map(function(it){return it.loc||''}).join(' ')).toLowerCase();   /* locations searchable too (P3-5) */
       if(q){if(hay.indexOf(q)<0)return}
       else if(activeF==='none'){if(fid)return}
       else if(real){if(fid!==activeF)return}
@@ -1437,12 +2251,13 @@ button{font:inherit;cursor:pointer}
       shown++;
       var cur=r.id===state.id;
       var chips=el('div',{class:'rec-chips'},el('span',null,inf.n+' รายการ'));
+      if(isSafety(d))chips.appendChild(el('span',{class:'c-safe'},'ความปลอดภัย'));
       if(inf.pend)chips.appendChild(el('span',{class:'c-fix'},'รอตรวจซ้ำ '+inf.pend));
       else if(inf.fix)chips.appendChild(el('span',{class:'c-ok'},'ตรวจซ้ำผ่านครบ'));
       if(inf.date)chips.appendChild(el('span',null,'ตรวจ '+fmtDate(inf.date)));
       if(!window.__PWA)chips.appendChild(el('span',d.sub?{class:'c-ok'}:null,d.sub?'ส่งแล้ว':'ร่าง'));
       if(fid&&(q||activeF==='all'))chips.appendChild(el('span',null,'โฟลเดอร์: '+fname(fid)));
-      var open=el('button',{type:'button',class:'rec-open','aria-label':'เปิดฉบับ '+inf.title,onclick:function(){if(!cur)openRecord(r.id);else closeList()}},
+      var open=el('button',{type:'button',class:'rec-open','aria-label':'เปิดฉบับ '+inf.title,onclick:function(){if(selMode)return;if(!cur)openRecord(r.id);else closeList()}},
         el('span',{class:'rec-t'},inf.title+(cur?'  ● เปิดอยู่':'')),
         el('span',{class:'rec-s'},[inf.sub,fmtShort((d.updatedAt||'')||'')?('แก้ไขล่าสุด '+fmtShort(d.updatedAt)):''].filter(Boolean).join(' · ')),chips);
       var sel=el('select',{class:'rec-mv','aria-label':'ย้ายฉบับ '+inf.title+' ไปโฟลเดอร์',onchange:function(){moveRecord(r.id,sel.value)}},
@@ -1452,19 +2267,57 @@ button{font:inherit;cursor:pointer}
       var del=el('button',{type:'button',class:'del','aria-label':'ย้ายฉบับ '+inf.title+' ไปถังขยะ',title:'ย้ายไปถังขยะ'},'ลบ');
       del._label='ลบ';armBtn(del,'ยืนยัน?',function(){deleteRecord(r.id)});
       var grip=el('span',{class:'grip',draggable:'true',title:'ลากไปวางที่โฟลเดอร์','aria-hidden':'true'},'⠿');
-      var row=el('div',{class:'rec m3'+(cur?' cur':'')},grip,open,sel,del);
+      var picked=!!selIds[r.id];
+      if(selMode){
+        var cb=el('input',{type:'checkbox',class:'rec-cb','aria-label':'เลือก '+inf.title});cb.checked=picked;
+        cb.addEventListener('change',function(){if(cb.checked)selIds[r.id]=1;else delete selIds[r.id];row.classList.toggle('picked',cb.checked);selCount()});
+        open.addEventListener('click',function(e){e.preventDefault();cb.checked=!cb.checked;cb.dispatchEvent(new Event('change'))});
+        grip=cb;
+      }
+      var row=el('div',{class:'rec m3'+(cur?' cur':'')+(selMode&&picked?' picked':'')},grip,open,sel,del);
       grip.addEventListener('dragstart',function(e){
         e.dataTransfer.setData('text/plain',r.id);e.dataTransfer.effectAllowed='move';
         try{e.dataTransfer.setDragImage(row,16,16)}catch(x){}
       });
       host.appendChild(row);
     });
+    selCount();
     if(!shown)host.appendChild(el('div',{class:'empty'},records.length?(q?'ไม่พบฉบับที่ค้นหา':(onlyPend?'ไม่มีฉบับที่มีรายการค้างในมุมมองนี้':'ไม่มีฉบับในโฟลเดอร์นี้')):'ยังไม่มีฉบับที่บันทึก'));
+    /* documents from the form engine (pwa-forms.js) in the same library: shown under all / search / no-folder */
+    if(window.__qcForms&&(activeF==='all'||activeF==='none'||q)&&!onlyPend){
+      var gen=++formsGen;
+      window.__qcForms.listDocs().then(function(fl){
+        if(gen!==formsGen||dlg.hidden)return;
+        var F=window.__qcForms,rows=fl.filter(function(d){return !q||F.titleOf(d).toLowerCase().indexOf(q)>=0});
+        if(!rows.length)return;
+        var emp=host.querySelector('.empty');if(emp&&!shown)emp.remove();
+        host.appendChild(el('div',{class:'fd-h',id:'lib-forms-h',style:'margin:12px 0 4px;font-weight:600'},'รายงานแบบอื่น ('+rows.length+')'));
+        rows.forEach(function(d){
+          var b=el('button',{class:'btn sm',type:'button'},'เปิด');
+          b.addEventListener('click',function(){closeList();F.openDoc(d.id)});
+          var when=(d.updatedAt||'').slice(0,10);
+          host.appendChild(el('div',{class:'rec lib-form','data-fid':d.id},el('span',{class:'rec-t'},F.titleOf(d)),el('div',{class:'rec-chips'},el('span',null,d.form&&d.form.name||'แบบฟอร์ม'),when?el('span',null,'แก้ไข '+when):null),b));
+        });
+      });
+    }
   }
-  function renderAll(){bindValues();renderItems();renderBar();renderList();if(viewing)lockForm(true)}
+  function renderAll(){var h1=document.querySelector('.top h1');if(h1)h1.textContent=formName(state);document.body.classList.toggle('form-safety',isSafety(state));bindValues();renderItems();renderSignPads();renderBar();renderList();if(viewing)lockForm(true)}
 
   listBtn.addEventListener('click',function(){if(dlg.hidden)openList();else closeList()});
   $('#q').addEventListener('input',renderList);
+  /* multi-select (P3-5): move to a folder / move to trash for many documents at once */
+  var selMode=false,selIds={};
+  function setSel(on){selMode=on;selIds={};$('#sel-mode').setAttribute('aria-pressed',on?'true':'false');$('#sel-bar').hidden=!on;if(on){var mv=$('#sel-mv');mv.textContent='';mv.appendChild(el('option',{value:''},'ไม่ได้จัดโฟลเดอร์'));folders.forEach(function(f){mv.appendChild(el('option',{value:f.id},f.name))})}}
+  function selList(){return Object.keys(selIds).filter(function(id){return records.some(function(x){return x.id===id})})}
+  function selCount(){if(!selMode)return;var n=selList().length;$('#sel-n').textContent='เลือก '+n+' ฉบับ';$('#sel-move').disabled=$('#sel-del').disabled=!n}
+  $('#sel-mode').addEventListener('click',function(){setSel(!selMode);renderList()});
+  $('#sel-cancel').addEventListener('click',function(){setSel(false);renderList()});
+  $('#sel-all').addEventListener('click',function(){(shownRecs||[]).forEach(function(x){selIds[x.r.id]=1});renderList()});
+  $('#sel-move').addEventListener('click',function(){var ids=selList(),fid=$('#sel-mv').value;ids.forEach(function(id){moveRecord(id,fid)});dmsg('ย้าย '+ids.length+' ฉบับไปที่ “'+fname(fid)+'”');setSel(false);renderList()});
+  armBtn($('#sel-del'),'ยืนยันลบที่เลือก?',function(){
+    var ids=selList();if(!ids.length)return;
+    ids.reduce(function(p,id){return p.then(function(){return deleteRecord(id)})},Promise.resolve()).then(function(){dmsg('ย้าย '+ids.length+' ฉบับไปถังขยะแล้ว · กู้คืนได้ 30 วัน');setSel(false);renderList()});
+  });
   $('#dlg-close').addEventListener('click',closeList);
   $('#f-pend').addEventListener('change',function(){onlyPend=this.checked;renderList()});
   $('#sortby').addEventListener('change',function(){sortBy=this.value;renderList()});
@@ -1506,53 +2359,58 @@ button{font:inherit;cursor:pointer}
 
   function openRecord(id){
     return drain().then(function(ok){
-      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่เปลี่ยนฉบับ');return}
-      var r=records.filter(function(x){return x.id===id})[0];if(!r)return;
+      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่เปลี่ยนฉบับ');return false}
+      var r=records.filter(function(x){return x.id===id})[0];if(!r)return false;
       state=norm(r.data,id);touched=false;dirty=false;lsSet(LAST,id);
       renderAll();closeList();window.scrollTo({top:0});
-      setStatus('เปิดฉบับ “'+titleOf(state)+'” แล้ว');
+      setStatus('เปิดฉบับ “'+titleOf(state)+'” แล้ว');qcAction('open');return true;
     });
   }
   function newRecord(){
     return drain().then(function(ok){
-      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่เริ่มฉบับใหม่');return}
+      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่เริ่มฉบับใหม่');return false}
       var base=hasContent(state)?state:((records[0]&&records[0].data)||state);
       state=freshState(carryOf(base));touched=false;dirty=false;
+      if(lsGet('qc-form')==='safety'){state.meta.form='safety';state.meta.work='ตรวจความปลอดภัยประจำวัน';state.items=safetyItems()}
       if(mode==='local')lsDel(KEY);
       renderAll();closeList();window.scrollTo({top:0});
-      setStatus('เริ่มฉบับใหม่ ยกข้อมูลโครงการ ผู้ตรวจ ผู้รับเหมา และชื่อผู้ลงนามมาให้แล้ว');
+      setStatus(isSafety(state)?'เริ่มฉบับใหม่ (แบบตรวจความปลอดภัย) พร้อมเช็กลิสต์นั่งร้าน ราวกันตก และการประชุมก่อนเริ่มงาน':'เริ่มฉบับใหม่ ยกข้อมูลโครงการ ผู้ตรวจ ผู้รับเหมา และชื่อผู้ลงนามมาให้แล้ว');
       var f=$('#m-docno');if(f)f.focus({preventScroll:true});
+      qcAction('new');return true;
     });
   }
   function dupRecord(){
     return drain().then(function(ok){
-      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่ทำสำเนา');return}
+      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่ทำสำเนา');return false}
       var copy=norm(ser(true),newId());
-      copy.rev=0;copy.createdAt='';copy.updatedAt='';copy.sub=null;copy.rx=null;
+      copy.rev=0;copy.createdAt='';copy.updatedAt='';copy.sub=null;copy.rx=null;copy.bin=[];copy.cf={};
       var m=copy.meta;
       if(m.docno)m.docno+=' (สำเนา)';else if(m.work)m.work+=' (สำเนา)';else m.project+=' (สำเนา)';
       state=copy;touched=true;
       renderAll();save();closeList();window.scrollTo({top:0});
-      setStatus('ทำสำเนาแล้ว (รูปใช้ร่วมกับฉบับเดิม)');
+      setStatus('ทำสำเนาแล้ว (รูปใช้ร่วมกับฉบับเดิม)');qcAction('dup');return true;
     });
   }
   function followUp(){
     return drain().then(function(ok){
-      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่สร้างฉบับใหม่');return}
+      if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่สร้างฉบับใหม่');return false}
       var pend=state.items.filter(isPend);
-      if(!pend.length){setStatus('ฉบับนี้ไม่มีรายการค้าง (ต้องแก้ไข/ไม่ผ่าน ที่ยังตรวจซ้ำไม่ผ่าน)');return}
+      if(!pend.length){setStatus('ฉบับนี้ไม่มีรายการค้าง (ต้องแก้ไข/ไม่ผ่าน ที่ยังตรวจซ้ำไม่ผ่าน)');return false}
       var prev=titleOf(state),work=state.meta.work;
       var s=freshState(carryOf(state));
-      s.meta.work=work;s.folder=state.folder||'';
+      s.meta.work=work;s.folder=state.folder||'';if(isSafety(state))s.meta.form='safety';
+      var op=state.plan,np=op?{sheets:op.sheets.slice(),pins:{}}:null;
       s.items=pend.map(function(it){
         var n=normItem({loc:it.loc,chk:it.chk,note:it.note,cat:it.cat,ref:it.ref});
         n.before=(it.after.length?it.after:it.before).filter(function(p){return p.a}).map(function(p){return {a:p.a}});
+        if(np&&op.pins[it.id])np.pins[n.id]=op.pins[it.id].slice();   /* pins follow the open items */
         return n;
       });
+      s.plan=np;
       s.remarks='ตรวจรอบใหม่ต่อจากฉบับ: '+prev;
       state=s;touched=true;flt='all';$('#flt').value='all';
       renderAll();save();closeList();window.scrollTo({top:0});
-      setStatus('สร้างฉบับใหม่จากรายการค้าง '+pend.length+' รายการ (ใช้รูปล่าสุดเป็นรูปตั้งต้น)');
+      setStatus('สร้างฉบับใหม่จากรายการค้าง '+pend.length+' รายการ (ใช้รูปล่าสุดเป็นรูปตั้งต้น)');qcAction('followup');return true;
     });
   }
   function deleteRecord(id){
@@ -1571,7 +2429,7 @@ button{font:inherit;cursor:pointer}
     }).then(function(){
       if(isCur){var base=state;state=freshState(carryOf(base));touched=false;dirty=false;renderAll()}
       else{renderBar();renderList()}
-      setStatus('ย้ายไปถังขยะแล้ว กู้คืนได้ภายใน 30 วันที่ คลังเอกสาร > ถังขยะ');
+      setStatus('ย้ายไปถังขยะแล้ว กู้คืนได้ภายใน 30 วันที่ คลังเอกสาร > ถังขยะ');qcAction('trash',{current:!!isCur});
     }).catch(function(){setStatus('ย้ายไปถังขยะไม่สำเร็จ ลองอีกครั้ง')});
   }
   function clearLocal(){
@@ -1581,9 +2439,31 @@ button{font:inherit;cursor:pointer}
   armBtn(newBtn,'ฉบับเดิมในเครื่องนี้จะถูกแทนที่ กดอีกครั้ง',newRecord,function(){return mode==='local'&&hasContent(state)});
   armBtn(followBtn,'',followUp,function(){return false});
   armBtn(dupBtn,'กดอีกครั้งเพื่อทำสำเนา',dupRecord,function(){return false});
-  armBtn(resetBtn,'กดอีกครั้งเพื่อยืนยัน',function(){mode==='cloud'?deleteRecord(state.id):clearLocal()});
+  armBtn(resetBtn,'กดอีกครั้งเพื่อยืนยัน',function(){mode==='store'?deleteRecord(state.id):clearLocal()});
+  /* direct actions for the home shell (pwa-home.js): each resolves true when it opened/created a document */
+  window.__qcActions={
+    newRecord:function(){if(mode==='local'&&hasContent(state)){newBtn.click();return Promise.resolve(false)}return newRecord().then(function(r){return r===true})},
+    dupRecord:function(){return dupRecord().then(function(r){return r===true})},
+    followUp:function(){return followUp().then(function(r){return r===true})},
+    openRecord:function(id){return openRecord(id).then(function(r){return r===true})},
+    trashCurrent:function(){return Promise.resolve(mode==='store'?deleteRecord(state.id):clearLocal()).then(function(){return true},function(){return false})},
+    openList:function(){if(dlg.hidden)openList()},closeList:closeList,listOpen:function(){return !dlg.hidden},
+    /* direct calls (no timed synthetic clicks from other modules) */
+    openTrash:function(){if(dlg.hidden)openList();activeF='trash';renamingF=null;addingF=false;var mm=$('#dlg-msg');if(mm)mm.textContent='';renderList()},
+    exportBackup:function(){if(dlg.hidden)openList();var b=$('#bk-export');if(b&&!b.disabled)b.click()}
+  };
 
-  window.__qcForm={cur:function(){return state.id},drain:function(){return drain()},viewing:function(){return !!viewing}};
+  window.__qcForm={cur:function(){return state.id},drain:function(){return drain()},viewing:function(){return !!viewing},
+    openDoc:function(id,iid){
+      var own=records.filter(function(x){return x.id===id})[0],p;
+      if(own)p=(viewing?(viewing=null,lockForm(false),Promise.resolve()):Promise.resolve()).then(function(){return openRecord(id)});
+      else{var u=null;Object.keys(subDocs).forEach(function(k){if(findSub(k,id))u=k});if(!u){setStatus('ยังไม่พบเอกสารนี้ในเครื่อง ลองซิงก์อีกครั้ง');return Promise.resolve()}p=openShared(u,id)}
+      return Promise.resolve(p).then(function(){
+        var it=state.items.filter(function(x){return x.id===iid})[0];if(!it)return;
+        it._open=true;var n=refreshRow(it);
+        if(n){n.scrollIntoView({block:'center',behavior:'smooth'});n.classList.add('flash');setTimeout(function(){n.classList.remove('flash')},1600)}
+      });
+    }};
 
   /* ---------- opening: db + user + assets, with a local fallback ---------- */
   function use(n){return (window.claude&&window.claude.use)?window.claude.use(n).catch(function(){return null}):Promise.resolve(null)}
@@ -1592,7 +2472,7 @@ button{font:inherit;cursor:pointer}
     var raw=lsGet(KEY);if(!raw)return null;
     try{var d=JSON.parse(raw);return hasContent(d)?d:null}catch(e){return null}
   }
-  function showLegacy(){$('#legacy').hidden=!(mode==='cloud'&&legacyRaw()&&!lsGet(SKIP))}
+  function showLegacy(){$('#legacy').hidden=!(mode==='store'&&legacyRaw()&&!lsGet(SKIP))}
   $('#legacy-skip').addEventListener('click',function(){lsSet(SKIP,'1');showLegacy()});
   $('#legacy-go').addEventListener('click',function(){
     var raw=legacyRaw();if(!raw)return;
@@ -1633,7 +2513,10 @@ button{font:inherit;cursor:pointer}
     if((+r.data.rev||0)<=(state.rev||0))return;
     if(dirty||writing||inField()){remoteWaiting=true;return}
     remoteWaiting=false;
-    state=norm(r.data,state.id);renderAll();setStatus('อัปเดตฉบับนี้จากอีกเครื่องแล้ว');
+    var ui={};state.items.forEach(function(it){ui[it.id]={_open:it._open,_exp:it._exp,_rr:it._rr}});   /* keep what is open on screen */
+    state=norm(r.data,state.id);
+    state.items.forEach(function(it){var u=ui[it.id];if(u){if(u._open!==undefined)it._open=u._open;if(u._exp!==undefined)it._exp=u._exp;if(u._rr!==undefined)it._rr=u._rr}});
+    renderAll();setStatus('อัปเดตฉบับนี้จากอีกเครื่องแล้ว');
   }
   /* a newer copy arrived while a field had focus: apply it once the cursor leaves */
   var remoteWaiting=false;
@@ -1683,30 +2566,30 @@ button{font:inherit;cursor:pointer}
     document.body.classList.toggle('ro',!!on);
     var q='.wrap .card:not(.rb) input,.wrap .card:not(.rb) textarea,.wrap .card:not(.rb) select,.wrap .card:not(.rb) button';
     [].forEach.call(document.querySelectorAll(q),function(n){
-      if(on){if(!n.disabled&&n.id!=='flt'){n.disabled=true;n.setAttribute('data-ro','1')}}
+      if(on){if(!n.disabled&&n.id!=='flt'&&!n.closest('.act')){n.disabled=true;n.setAttribute('data-ro','1')}}
       else if(n.getAttribute('data-ro')){n.disabled=false;n.removeAttribute('data-ro')}
     });
   }
   function renderSubUi(){
-    var cloud=mode==='cloud',sb=$('#subbadge'),vb=$('#viewbar');
+    var inStore=mode==='store',sb=$('#subbadge'),vb=$('#viewbar');
     var off=!!window.__PWA;
-    btnSubmit.hidden=off||!cloud||!!viewing;btnWd.hidden=off||!(cloud&&!viewing&&state.sub);
+    btnSubmit.hidden=off||!inStore||!!viewing;btnWd.hidden=off||!(inStore&&!viewing&&state.sub);
     if(viewing){
       dupBtn.hidden=true;followBtn.hidden=true;resetBtn.hidden=true;
       sb.hidden=false;sb.className='badge sub';sb.textContent='ดูอย่างเดียว';
       vb.hidden=false;
       var at=state.sub&&state.sub.at;
-      $('#viewmsg').textContent='กำลังดูฉบับที่ '+whoName(viewing.owner)+' ส่งไว้ (อ่านอย่างเดียว'+(at?' · ส่งเมื่อ '+fmtShort(at):'')+')';
+      $('#viewmsg').textContent=window.__ONLINE?'เอกสารของ '+whoName(viewing.owner)+' · คุณบันทึกได้เฉพาะผลตรวจซ้ำและแจ้งแก้แล้ว (ในกล่อง “ติดตามงานแก้” ของแต่ละรายการ)':'กำลังดูฉบับที่ '+whoName(viewing.owner)+' ส่งไว้ (อ่านอย่างเดียว'+(at?' · ส่งเมื่อ '+fmtShort(at):'')+')';
     }else{
       vb.hidden=true;resetBtn.hidden=false;
-      if(!cloud||off)sb.hidden=true;
+      if(!inStore||off)sb.hidden=true;
       else if(!state.sub){sb.hidden=false;sb.className='badge draft';sb.textContent='ร่าง · เห็นคนเดียว';setLabel(btnSubmit,'ส่งเอกสาร')}
       else if((state.rev||0)>state.sub.rev){sb.hidden=false;sb.className='badge draft';sb.textContent='ส่งแล้ว · มีแก้ไขที่ยังไม่ส่ง';setLabel(btnSubmit,'ส่งฉบับล่าสุด')}
       else{sb.hidden=false;sb.className='badge sub';sb.textContent='ส่งแล้ว · ทีมเห็นได้';setLabel(btnSubmit,'ส่งอีกครั้ง')}
     }
   }
   function submitDoc(){
-    if(mode!=='cloud'||viewing||!UID)return;
+    if(mode!=='store'||viewing||!UID)return;
     if(!hasContent(state)){setStatus('ฉบับนี้ยังว่างอยู่ กรอกข้อมูลก่อนส่ง');return}
     btnSubmit.disabled=true;setStatus('กำลังส่งเอกสาร…');
     drain().then(function(ok){
@@ -1721,7 +2604,7 @@ button{font:inherit;cursor:pointer}
       .then(function(){btnSubmit.disabled=false;renderBar()});
   }
   function withdrawDoc(){
-    if(mode!=='cloud'||viewing||!state.sub)return;
+    if(mode!=='store'||viewing||!state.sub)return;
     drain().then(function(){return sharedCol(UID).doc(state.id).delete()})
       .then(function(){state.sub=null;dirty=true;touched=true;return flush()})
       .then(function(){setStatus('ถอนกลับเป็นร่างแล้ว ตอนนี้มีแต่คุณที่เห็นฉบับนี้')})
@@ -1732,8 +2615,8 @@ button{font:inherit;cursor:pointer}
   btnSubmit.addEventListener('click',submitDoc);
   function findSub(u,id){return (subDocs[u]||[]).filter(function(x){return x.id===id})[0]}
   function openShared(u,id){
-    var r=findSub(u,id);if(!r)return;
-    drain().then(function(ok){
+    var r=findSub(u,id);if(!r)return Promise.resolve();
+    return drain().then(function(ok){
       if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่เปลี่ยนฉบับ');return}
       if(!viewing)ownBack=state.id;
       viewing={id:id,owner:u};
@@ -1787,11 +2670,12 @@ button{font:inherit;cursor:pointer}
     var q=($('#q').value||'').trim().toLowerCase(),list=sharedList().filter(function(x){
       return !q||(x.inf.title+' '+x.inf.sub+' '+whoName(x.u)).toLowerCase().indexOf(q)>=0;
     });
-    $('#scope').textContent='ส่งแล้วทั้งทีม · '+list.length+' ฉบับ (ดูอย่างเดียว)';
+    $('#scope').textContent=(window.__ONLINE?'ของคนอื่นในโครงการ · '+list.length+' ฉบับ (ดู + ตรวจซ้ำ)':'ส่งแล้วทั้งทีม · '+list.length+' ฉบับ (ดูอย่างเดียว)');
     expN=0;updateExp();
     list.forEach(function(x){
       var d=x.r.data,inf=x.inf,cur=!!(viewing&&viewing.id===x.r.id&&viewing.owner===x.u);
       var chips=el('div',{class:'rec-chips'},el('span',null,inf.n+' รายการ'));
+      if(isSafety(d))chips.appendChild(el('span',{class:'c-safe'},'ความปลอดภัย'));
       if(inf.pend)chips.appendChild(el('span',{class:'c-fix'},'รอตรวจซ้ำ '+inf.pend));
       if(inf.date)chips.appendChild(el('span',null,'ตรวจ '+fmtDate(inf.date)));
       var open=el('button',{type:'button',class:'rec-open','aria-label':'เปิดดูฉบับ '+inf.title,onclick:function(){
@@ -1802,10 +2686,10 @@ button{font:inherit;cursor:pointer}
         el('span',{class:'rec-s'},[inf.sub,'ส่งโดย '+whoName(x.u)+(d.submittedAt?' · '+fmtShort(d.submittedAt):'')].filter(Boolean).join(' · ')),chips);
       host.appendChild(el('div',{class:'rec'},open));
     });
-    if(!list.length)host.appendChild(el('div',{class:'empty'},q?'ไม่พบฉบับที่ค้นหา':'ยังไม่มีใครส่งเอกสาร ฉบับร่างของแต่ละคนจะเห็นเฉพาะเจ้าของจนกว่าจะกด “ส่งเอกสาร”'));
+    if(!list.length)host.appendChild(el('div',{class:'empty'},q?'ไม่พบฉบับที่ค้นหา':window.__ONLINE?'ยังไม่มีเอกสารของคนอื่นในโครงการนี้':'ยังไม่มีใครส่งเอกสาร ฉบับร่างของแต่ละคนจะเห็นเฉพาะเจ้าของจนกว่าจะกด “ส่งเอกสาร”'));
   }
   function startCloud(){
-    mode='cloud';col=DB.collection('data/users/'+UID);
+    mode='store';col=DB.collection('data/users/'+UID);
     suffix=ASSETS?'':'บัญชีนี้อัปโหลดรูปขึ้นระบบไม่ได้ รูปจะอยู่ในหน้านี้เท่านั้น ไม่ถูกบันทึก';
     renderBar();setStatus('กำลังเปิดฐานข้อมูลในเครื่อง…');
     loadTimer=setTimeout(function(){
@@ -1813,7 +2697,8 @@ button{font:inherit;cursor:pointer}
       if(!booted){booted=true;chooseInitial()}
     },10000);
     col.orderBy('updatedAt','desc').limit(300).onSnapshot(onList,onListErr);
-    if(!window.__PWA)startShared();
+    if(!window.__PWA||window.__ONLINE)startShared();
+    if(window.__ONLINE){window.addEventListener('qc-sync',function(){renderBar()});window.addEventListener('qc-msg',function(e){setStatus(e.detail)})}
   }
   function startLocal(why){
     mode='local';booted=true;suffix='';
@@ -1924,7 +2809,7 @@ button{font:inherit;cursor:pointer}
       var d=s.sign[r[1]]||{};
       tr.appendChild(el('td',null,
         el('div',{class:'role0'},r[0]),
-        el('div',{class:'sigline'},'ลายมือชื่อ'),
+        el('div',{class:'sigline'},d.img?el('img',{src:d.img,alt:'ลายมือชื่อ '+r[0]}):'ลายมือชื่อ'),
         el('div',null,'('+(d.name||'..............................')+')'),
         el('div',null,'วันที่ '+(fmtDate(d.date)||'....../....../......'))));
     });
@@ -1938,7 +2823,7 @@ button{font:inherit;cursor:pointer}
     var heads=pend?['ลำดับ','ตำแหน่ง / อ้างอิง','รายการตรวจ','ผลตรวจ','สิ่งที่ต้องแก้ไข','กำหนดแก้เสร็จ','ผู้รับเหมารับทราบ']
       :['ลำดับ','รูปที่พบ','ตำแหน่ง','รายการตรวจ','ผลตรวจ','หมายเหตุ'].concat(RC?['ตรวจซ้ำหลังแก้ไข']:[]);
     var widths=pend?['7%','20%','20%','12%','20%','11%','10%']:(RC?['7%','17%','14%','16%','11%','13%','22%']:['7%','26%','17%','20%','12%','18%']);
-    var ttl=pend?'สรุปรายการที่ต้องแก้ไข':'แบบฟอร์มตรวจงานก่อสร้าง';
+    var ttl=pend?'สรุปรายการที่ต้องแก้ไข':formName(d);
     root.textContent='';
     function newSheet(first){
       var s=el('div',{class:'sheet'}),sb=el('div',{class:'sb'});
@@ -2113,14 +2998,16 @@ button{font:inherit;cursor:pointer}
     var btn=this;if(btn.disabled)return;btn.disabled=true;
     dmsg('กำลังรวบรวมข้อมูล…');
     drain().then(function(){
-      return QC.buildBackup({records:records,folders:folders,trashRecs:trashRecs,trashFolders:trashFolders,source:IS_PWA?'pwa':'claude-artifact',
+      return window.__qcForms?window.__qcForms.exportAll():null;
+    }).then(function(forms){
+      return QC.buildBackup({records:records,folders:folders,trashRecs:trashRecs,trashFolders:trashFolders,source:IS_PWA?'pwa':'claude-artifact',forms:forms,zones:QC.zonesAll(),
         getPhoto:getPhotoBlob,onProgress:function(n,t){if(n%5===0||n===t)dmsg('กำลังรวมรูป '+n+' / '+t)}});
     }).then(function(r){
       return dlP.then(function(dl){
         if(!dl)throw {code:'unavailable'};
         return dl.save({filename:stampName(),data:r.blob});
       }).then(function(){
-        dmsg('ส่งไฟล์สำรองให้บันทึกแล้ว · '+r.counts.inspections+' ฉบับ '+r.counts.photos+' รูป'+(r.missing?' · ดึงรูปไม่ได้ '+r.missing+' รูป':''));
+        dmsg('ส่งไฟล์สำรองให้บันทึกแล้ว · '+r.counts.inspections+' ฉบับ '+r.counts.photos+' รูป'+(r.counts.formDocs?' · รายงานแบบอื่น '+r.counts.formDocs+' ฉบับ':'')+(r.missing?' · ดึงรูปไม่ได้ '+r.missing+' รูป':''));
       });
     }).catch(function(e){
       var c=e&&e.code;dmsg(c==='declined'?'ยกเลิกการบันทึกไฟล์สำรอง':'สำรองข้อมูลไม่สำเร็จ ลองอีกครั้ง',c!=='declined');
@@ -2136,13 +3023,25 @@ button{font:inherit;cursor:pointer}
       QC.readZip(f).then(function(z){
         return z.read('data.json').then(function(b){return b?b.text():null}).then(function(t){
           if(!t)throw new Error('no data');
-          return window.__qc.importData(JSON.parse(t),function(ph){return z.read(ph.file,ph.mime)},function(n,t2){if(n%5===0||n===t2)dmsg('กำลังนำเข้ารูป '+n+' / '+t2)});
+          var dj=JSON.parse(t);
+          return window.__qc.importData(dj,function(ph){return z.read(ph.file,ph.mime)},function(n,t2){if(n%5===0||n===t2)dmsg('กำลังนำเข้ารูป '+n+' / '+t2)}).then(function(n){
+            return QC.restoreForms(z,dj).then(function(fr){n.forms=fr;n.zones=QC.restoreZones(dj);return n});
+          });
         });
       }).then(function(n){
-        dmsg('นำเข้าแล้ว '+n.inspections+' ฉบับ'+(n.skipped?' (ข้าม '+n.skipped+' ฉบับที่ในเครื่องใหม่กว่า)':'')+' · รูปใหม่ '+n.photos+(n.badPhotos?' · รูปที่ไฟล์เสียในไฟล์สำรอง '+n.badPhotos+' รูป':''));
+        dmsg('นำเข้าแล้ว '+n.inspections+' ฉบับ'+(n.skipped?' (ข้าม '+n.skipped+' ฉบับที่ในเครื่องใหม่กว่า)':'')+' · รูปใหม่ '+n.photos+(n.badPhotos?' · รูปที่ไฟล์เสียในไฟล์สำรอง '+n.badPhotos+' รูป':'')+(n.forms&&(n.forms.docs||n.forms.forms)?' · รายงานแบบอื่น '+n.forms.docs+' ฉบับ แบบฟอร์ม '+n.forms.forms+' แบบ':''));
       }).catch(function(){dmsg('นำเข้าไม่สำเร็จ ไฟล์อาจไม่ใช่ไฟล์สำรองของแอปนี้',true)});
     });
   }
+  window.addEventListener('qc-sync',function(){
+    if(!window.__qcPendingUpload)return;
+    document.querySelectorAll('.thumb[data-aid]').forEach(function(t){t.classList.toggle('upq',!!window.__qcPendingUpload(t.getAttribute('data-aid')))});
+  });
+  $('#qf-fast').addEventListener('click',function(){FAST=!FAST;lsSet('qc-fast',FAST?'1':'0');setQuick();if(FAST)setStatus('กรอกเร็ว: กด “ผ่าน” แล้วจะเลื่อนไปรายการที่ยังไม่ตรวจถัดไปให้')});
+  $('#qf-compact').addEventListener('click',function(){COMPACT=!COMPACT;lsSet('qc-compact',COMPACT?'1':'0');setQuick();renderItems()});
+  $('#qc-next').addEventListener('click',function(){var cur=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('.item');var it=cur&&state.items.filter(function(x){return x.id===cur.getAttribute('data-id')})[0];if(!goNext(it||null))goNext(null)});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('#phsheet').hidden)$('#phsheet').hidden=true});
+  setQuick();
   bindStatic();
   renderAll();
 })();
@@ -2150,5 +3049,6 @@ button{font:inherit;cursor:pointer}
 <script src="./pwa-extras.js"></script>
 <script src="./pwa-send.js"></script>
 <script src="./pwa-home.js"></script>
+<script src="./pwa-forms.js"></script>
 <script>if('serviceWorker' in navigator&&location.protocol!=='file:')addEventListener('load',function(){navigator.serviceWorker.register('./sw.js').catch(function(){})})</script>
 </body></html>
