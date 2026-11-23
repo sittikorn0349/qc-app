@@ -338,6 +338,17 @@ button{font:inherit;cursor:pointer}
 
 /* Photo viewer */
 #lb{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
+/* soft delete: bin sheet + conflict note */
+.bin-back{position:fixed;inset:0;z-index:85;background:rgba(15,20,25,.5);display:flex;align-items:flex-end;justify-content:center}
+.bin-b{background:var(--card,#fff);width:100%;max-width:620px;max-height:85vh;overflow:auto;border-radius:14px 14px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom))}
+@media (min-width:700px){.bin-back{align-items:center}.bin-b{border-radius:12px}}
+.bin-b h2{margin:0 0 4px;font-size:1.1rem}.bin-list{display:grid;gap:8px;margin:10px 0}
+.bin-row{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px}
+.bin-row img{width:52px;height:52px;object-fit:cover;border-radius:6px}.bin-ic{width:52px;height:52px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted)}
+.bin-tx{display:flex;flex-direction:column;min-width:0}.bin-tx b{overflow-wrap:anywhere}.bin-tx span{font-size:.85rem;color:var(--muted)}
+.bin-row .btn{min-height:44px}.bin-acts{display:flex;justify-content:flex-end}
+.cf-note{margin:0 0 8px;padding:10px 12px;border:1px solid var(--bad);border-radius:8px;background:var(--bad-bg);display:flex;flex-direction:column;gap:4px}
+.cf-note .cf-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}.cf-note .btn{min-height:44px}
 #lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;touch-action:pan-y;user-select:none;-webkit-user-drag:none}
 #lb .lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:64px;border:0;border-radius:10px;background:rgba(0,0,0,.55);color:#fff;font-size:34px;line-height:1;cursor:pointer}#lb .lb-prev{left:8px}#lb .lb-next{right:8px}#lb .lb-nav:disabled{opacity:.3;cursor:default}
 #lb .lb-count{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);padding:4px 12px;border-radius:12px;background:rgba(0,0,0,.6);color:#fff;font-size:14px}
@@ -583,6 +594,8 @@ button{font:inherit;cursor:pointer}
       folderId:d.folder||null,docno:m.docno||'',date:m.date||'',site:m.site||'',work:m.work||'',weather:m.weather||'',
       summary:d.summary||'',remarks:d.remarks||'',sign:d.sign||{},meta:m,plan:d.plan||null,
       createdAt:d.createdAt||'',updatedAt:upd,deletedAt:d.deletedAt||null,rev:+d.rev||0,by:d.by||''};
+    if(d.bin&&d.bin.length)insp.bin=d.bin;          /* deleted items/photos travel in the backup (restorable after restore) */
+    if(d.cf&&Object.keys(d.cf).length)insp.cf=d.cf;
     var items=(d.items||[]).map(function(it,i){
       return {id:it.id,inspectionId:id,order:i,loc:it.loc||'',chk:it.chk||'',res:it.res||'',note:it.note||'',cat:it.cat||'',ref:it.ref||'',
         rres:it.rres||'',rdate:it.rdate||'',rnote:it.rnote||'',before:(it.before||[]).slice(),after:(it.after||[]).slice(),
@@ -594,7 +607,8 @@ button{font:inherit;cursor:pointer}
   function implode(r,items){
     return {v:2,meta:r.meta||{},sign:r.sign||{},summary:r.summary||'',remarks:r.remarks||'',plan:r.plan||null,
       items:items.map(function(i){return {id:i.id,loc:i.loc,chk:i.chk,res:i.res,note:i.note,cat:i.cat,ref:i.ref,rres:i.rres,rdate:i.rdate,rnote:i.rnote,before:i.before||[],after:i.after||[]}}),
-      createdAt:r.createdAt||'',updatedAt:r.updatedAt||'',rev:+r.rev||0,folder:r.folderId||'',deletedAt:r.deletedAt||'',by:r.by||''};
+      createdAt:r.createdAt||'',updatedAt:r.updatedAt||'',rev:+r.rev||0,folder:r.folderId||'',deletedAt:r.deletedAt||'',by:r.by||'',
+      bin:Array.isArray(r.bin)?r.bin:undefined,cf:r.cf||undefined};
   }
 
   /* ---------- ZIP: write (stored) / read (stored or deflate) ---------- */
@@ -676,6 +690,7 @@ button{font:inherit;cursor:pointer}
     });
     items.forEach(function(it){it.before.concat(it.after).forEach(function(x){ids[x]=1})});
     inspections.forEach(function(r){(r.plan&&r.plan.sheets||[]).forEach(function(x){if(x&&x.a&&x.a.indexOf('data:')!==0)ids[x.a]=1})});   /* plan images */
+    inspections.forEach(function(r){(r.bin||[]).forEach(function(e){(e.t==='item'?(e.item.before||[]).concat(e.item.after||[]):[e.p]).forEach(function(x){if(typeof x==='string'&&x&&x.indexOf('data:')!==0)ids[x]=1})})});   /* photos of deleted-but-restorable items */
     var folders=(o.folders||[]).concat(o.trashFolders||[]).map(function(f){return {id:f.id,name:f.name,createdAt:f.createdAt||'',updatedAt:f.createdAt||'',deletedAt:f.deletedAt||null}});
     var entries=[],list=[],missing=0,keys=Object.keys(ids),n=0;
     for(var i=0;i<keys.length;i++){
@@ -801,8 +816,21 @@ button{font:inherit;cursor:pointer}
       createdAt:raw.createdAt||'',updatedAt:raw.updatedAt||'',rev:+raw.rev||0,folder:raw.folder||'',deletedAt:raw.deletedAt||'',
       sub:(raw.sub&&raw.sub.at)?{rev:+raw.sub.rev||0,at:raw.sub.at}:null,
       rx:(raw.rx&&raw.rx.hash)?raw.rx:null,
-      plan:normPlan(raw.plan)
+      plan:normPlan(raw.plan),
+      bin:normBin(raw.bin),cf:(raw.cf&&typeof raw.cf==='object'&&!Array.isArray(raw.cf))?Object.assign({},raw.cf):{}
     };
+  }
+  /* deleted items and photos of this document (soft delete): kept here, out of the live lists, for BIN_DAYS.
+     bin=[{t:'item',at,i,item} | {t:'ph',at,item:itemId,k:'before'|'after',j,p}] · cf={itemId:at} = "you deleted it,
+     someone changed it on another device" (online), waiting for the user's decision */
+  var BIN_DAYS=30;
+  function normBin(b){
+    return (Array.isArray(b)?b:[]).map(function(e){
+      if(!e||typeof e!=='object')return null;
+      if(e.t==='item'&&e.item&&typeof e.item==='object')return {t:'item',at:String(e.at||''),i:Math.max(0,+e.i||0),item:normItem(e.item)};
+      if(e.t==='ph'&&typeof e.p==='string'&&e.p){var q=normPh([e.p])[0];return q?{t:'ph',at:String(e.at||''),item:String(e.item||''),k:e.k==='after'?'after':'before',j:Math.max(0,+e.j||0),p:q}:null}
+      return null;
+    }).filter(Boolean);
   }
   /* plan pins (8.1, optional): plan={sheets:[{a,name,w,h}], pins:{itemId:[{s,x,y}]}} · x,y = 0..1 of the sheet */
   function normPlan(p){
@@ -898,26 +926,37 @@ button{font:inherit;cursor:pointer}
     function ph(list){
       return list.filter(function(p){return inStore?!!p.a:!!p.d}).map(function(p){return inStore?p.a:p.d});
     }
-    return {
+    function serItem(it){
+      var o={id:it.id,loc:(it.loc||'').replace(/ · $/,''),chk:it.chk,res:it.res,note:it.note,cat:it.cat,ref:it.ref,rres:it.rres,rdate:it.rdate,rnote:it.rnote,before:ph(it.before),after:ph(it.after)};
+      if(window.__ONLINE){o.asg=it.asg||'';o.due=it.due||'';o.st=it.st||'';o.rat=it.rat||'';o.fnote=it.fnote||''}
+      return o;
+    }
+    var o={
       v:2,meta:Object.assign({},state.meta),sign:JSON.parse(JSON.stringify(state.sign)),
       summary:state.summary,remarks:state.remarks,
-      items:state.items.map(function(it){
-        var o={id:it.id,loc:(it.loc||'').replace(/ · $/,''),chk:it.chk,res:it.res,note:it.note,cat:it.cat,ref:it.ref,rres:it.rres,rdate:it.rdate,rnote:it.rnote,before:ph(it.before),after:ph(it.after)};
-        if(window.__ONLINE){o.asg=it.asg||'';o.due=it.due||'';o.st=it.st||'';o.rat=it.rat||'';o.fnote=it.fnote||''}
-        return o;
-      }),
+      items:state.items.map(serItem),
       createdAt:state.createdAt,updatedAt:state.updatedAt,rev:state.rev,folder:state.folder||'',deletedAt:state.deletedAt||'',sub:state.sub||null,rx:state.rx||null,by:CLIENT,
       plan:inStore?planOut():null
     };
+    /* only written when used, so documents without deletions stay byte-for-byte as before */
+    var bin=(state.bin||[]).map(function(e){
+      if(e.t==='item')return {t:'item',at:e.at,i:e.i,item:serItem(e.item)};
+      var q=ph([e.p])[0];return q?{t:'ph',at:e.at,item:e.item,k:e.k,j:e.j,p:q}:null;
+    }).filter(Boolean);
+    if(bin.length)o.bin=bin;
+    if(state.cf&&Object.keys(state.cf).length)o.cf=Object.assign({},state.cf);
+    return o;
   }
   function planOut(){
     var p=state.plan;if(!p||!p.sheets.length)return null;
-    var ids={},pins={};state.items.forEach(function(it){ids[it.id]=1});
+    var ids={},pins={};state.items.forEach(function(it){ids[it.id]=1});(state.bin||[]).forEach(function(e){if(e.t==='item')ids[e.item.id]=1});   /* a restored item gets its pins back */
     Object.keys(p.pins).forEach(function(k){if(ids[k]&&p.pins[k].length)pins[k]=p.pins[k].map(function(q){return {s:q.s,x:Math.round(q.x*10000)/10000,y:Math.round(q.y*10000)/10000}})});
     return {sheets:p.sheets.map(function(x){return {a:x.a,name:x.name,w:x.w,h:x.h}}),pins:pins};
   }
   function photosOf(d){
-    var out=[];(d&&d.items||[]).forEach(function(it){(it.before||[]).concat(it.after||[]).forEach(function(a){if(typeof a==='string'&&a.indexOf('data:')!==0)out.push(a)})});
+    var out=[];function add(a){if(typeof a==='string'&&a.indexOf('data:')!==0)out.push(a)}
+    (d&&d.items||[]).forEach(function(it){(it.before||[]).concat(it.after||[]).forEach(add)});
+    (d&&d.bin||[]).forEach(function(e){if(e.t==='item'&&e.item)(e.item.before||[]).concat(e.item.after||[]).forEach(add);else if(e.t==='ph')add(e.p)});   /* deleted but restorable: still in use */
     (d&&d.plan&&d.plan.sheets||[]).forEach(function(x){if(x&&x.a)out.push(x.a)});   /* plan images are in use too (never collected as orphans) */
     return out;
   }
@@ -981,6 +1020,7 @@ button{font:inherit;cursor:pointer}
     trashRecs.forEach(function(r){if(photosOf(r.data).indexOf(id)>=0)hit=true});
     Object.keys(subDocs).forEach(function(u){subDocs[u].forEach(function(r){if(photosOf(r.data).indexOf(id)>=0)hit=true})});
     if(!hit)state.items.forEach(function(it){it.before.concat(it.after).forEach(function(p){if(p.a===id)hit=true})});
+    if(!hit)(state.bin||[]).forEach(function(e){(e.t==='item'?e.item.before.concat(e.item.after):[e.p]).forEach(function(p){if(p&&p.a===id)hit=true})});
     return hit;
   }
   function processDeletes(){
@@ -1233,8 +1273,10 @@ button{font:inherit;cursor:pointer}
     });
   }
   function removePhoto(it,key,j){
-    var p=it[key][j];if(p.a)queueDel(p.a);
-    it[key].splice(j,1);refreshRow(it);save();
+    var p=it[key].splice(j,1)[0];if(!p)return;
+    var e={t:'ph',at:nowIso(),item:it.id,k:key,j:j,p:p};
+    state.bin.unshift(e);refreshRow(it);save();
+    undoToast((key==='after'?'ลบรูปหลังแก้แล้ว':'ลบรูปแล้ว'),e);
   }
   /* lightbox: swipe left/right (or ‹ › / arrow keys) through the photos of the same set (P3-6) */
   var lb=$('#lb'),lbList=[],lbI=0,lbX=null,lbMoved=false;
@@ -1695,17 +1737,7 @@ button{font:inherit;cursor:pointer}
     });
 
     var del=el('button',{type:'button',class:'del','aria-label':'ลบรายการที่ '+(i+1)},'ลบ');
-    var armedTimer;
-    del.addEventListener('click',function(){
-      if(del.classList.contains('armed')){
-        clearTimeout(armedTimer);
-        it.before.concat(it.after).forEach(function(p){if(p.a)queueDel(p.a)});
-        state.items=state.items.filter(function(x){return x!==it});
-        renderItems();save();return;
-      }
-      del.classList.add('armed');del.textContent='ยืนยัน?';
-      armedTimer=setTimeout(function(){del.classList.remove('armed');del.textContent='ลบ'},3000);
-    });
+    QCU.arm(del,{armed:'ยืนยัน?',timeoutMs:3000,onConfirm:function(){binItem(it)}});
 
     main.appendChild(el('div',{class:'no'},String(i+1)));
     main.appendChild(photoStrip(it,'before','ที่พบ รายการที่ '+(i+1),'+ เพิ่มรูป'));
@@ -1731,10 +1763,90 @@ button{font:inherit;cursor:pointer}
     var chkc=main.querySelector('.chkcell');if(chkc)chkc.appendChild(el('div',{class:'csum'},sumTxt||'ยังไม่มีตำแหน่ง / รูป'));
     main.appendChild(el('button',{type:'button',class:'xpand','aria-expanded':it._exp?'true':'false',onclick:function(){it._exp=!it._exp;var n=refreshRow(it);if(n&&it._exp){var ta=n.querySelector('.loc textarea');if(ta)ta.focus({preventScroll:true})}}},it._exp?'ย่อรายละเอียด ▴':'รูป ตำแหน่ง หมายเหตุ ▾'));
     if(COMPACT&&!it._exp)art.classList.add('compact');
+    if(state.cf&&state.cf[it.id]){
+      var keep=el('button',{type:'button',class:'btn sm primary'},'เก็บรายการไว้');
+      var again=el('button',{type:'button',class:'btn sm'},'ลบต่อ');
+      keep.addEventListener('click',function(){delete state.cf[it.id];refreshRow(it);save();setStatus('เก็บรายการที่ '+(i+1)+' ไว้แล้ว')});
+      again.addEventListener('click',function(){delete state.cf[it.id];binItem(it)});
+      art.appendChild(el('div',{class:'cf-note',role:'alert'},
+        el('b',null,'คุณลบรายการนี้ไว้ แต่มีการแก้ไขจากอีกเครื่องหลังจากนั้น'),
+        el('span',null,'ระบบจึงยังไม่ลบ เพื่อไม่ให้งานที่แก้ไว้หายเงียบ ๆ · ตรวจดูแล้วเลือก'),el('div',{class:'cf-acts'},keep,again)));
+    }
     art.appendChild(main);
     art.appendChild(recheck(it,i));
     return art;
   }
+  /* ---------- soft delete: bin, undo, restore ---------- */
+  function binItem(it){
+    var i=state.items.indexOf(it);if(i<0)return;
+    state.items.splice(i,1);
+    var e={t:'item',at:nowIso(),i:i,item:it};
+    state.bin.unshift(e);if(state.cf)delete state.cf[it.id];
+    renderItems();save();
+    undoToast('ลบรายการที่ '+(i+1)+' แล้ว',e);
+  }
+  function undoToast(msg,e){
+    var docId=state.id;
+    QC.showUndoToast(msg,function(){
+      if(state.id!==docId||!restoreBin(e))setStatus('กู้คืนจาก “รายการที่ถูกลบ” ในเมนู ⋯ ของฉบับนั้นได้');
+    });
+  }
+  function restoreBin(e){
+    if(viewing)return false;
+    var k=state.bin.indexOf(e);if(k<0)return false;
+    if(e.t==='item'){
+      state.bin.splice(k,1);
+      state.items.splice(Math.min(e.i,state.items.length),0,e.item);
+      renderItems();save();setStatus('กู้คืนรายการแล้ว');
+      var n=$('#items .item[data-id="'+e.item.id+'"]');if(n)n.scrollIntoView({block:'center',behavior:'smooth'});
+      return true;
+    }
+    var it=state.items.filter(function(x){return x.id===e.item})[0];
+    if(!it){   /* its item was deleted too: bring the item back first */
+      var ie=state.bin.filter(function(x){return x.t==='item'&&x.item.id===e.item})[0];
+      if(!ie||!restoreBin(ie))return false;
+      it=ie.item;k=state.bin.indexOf(e);
+    }
+    state.bin.splice(k,1);
+    it[e.k].splice(Math.min(e.j,it[e.k].length),0,e.p);
+    if(e.k==='after')it._exp=true;
+    refreshRow(it);save();setStatus('กู้คืนรูปแล้ว');
+    return true;
+  }
+  function binLabel(e){
+    if(e.t==='item'){var x=e.item;return 'รายการ: '+((x.chk||x.loc||x.note||'').trim().split('\n')[0]||'(ยังไม่มีข้อความ)')}
+    var it=state.items.filter(function(x){return x.id===e.item})[0]||((state.bin.filter(function(x){return x.t==='item'&&x.item.id===e.item})[0]||{}).item)||{};
+    return (e.k==='after'?'รูปหลังแก้':'รูปที่พบ')+' · '+(((it.chk||it.loc||'').trim().split('\n')[0])||'รายการที่ถูกลบ');
+  }
+  function binDays(at){var d=new Date(at);return isNaN(d)?BIN_DAYS:Math.max(0,BIN_DAYS-Math.floor((Date.now()-d.getTime())/864e5))}
+  function openBin(){
+    var back=el('div',{class:'bin-back',role:'dialog','aria-modal':'true','aria-labelledby':'bin-t'});
+    var box=el('div',{class:'bin-b'});
+    function close(){document.removeEventListener('keydown',key,true);back.remove()}
+    function key(e){if(e.key==='Escape'){e.stopPropagation();close()}}
+    function draw(){
+      box.textContent='';
+      box.appendChild(el('h2',{id:'bin-t'},'รายการที่ถูกลบ ('+state.bin.length+')'));
+      box.appendChild(el('p',{class:'hint'},'ของฉบับนี้ · เก็บไว้ '+BIN_DAYS+' วันนับจากวันที่ลบ แล้วลบถาวรเอง'));
+      if(!state.bin.length)box.appendChild(el('div',{class:'empty'},'ไม่มีรายการหรือรูปที่ถูกลบในฉบับนี้'));
+      var list=el('div',{class:'bin-list'});
+      state.bin.slice().sort(function(a,b){return a.at<b.at?1:a.at>b.at?-1:0}).forEach(function(e){
+        var th=e.t==='ph'?el('img',{src:photoSrc(e.p),alt:''}):el('span',{class:'bin-ic','aria-hidden':'true'},'#');
+        var nph=e.t==='item'?e.item.before.length+e.item.after.length:0;
+        var rs=el('button',{type:'button',class:'btn sm',disabled:viewing?true:null},'กู้คืน');
+        rs.addEventListener('click',function(){if(restoreBin(e))draw()});
+        list.appendChild(el('div',{class:'bin-row'},th,el('div',{class:'bin-tx'},el('b',null,binLabel(e)),
+          el('span',null,'ลบเมื่อ '+fmtShort(e.at)+' · เหลือ '+binDays(e.at)+' วัน'+(nph?' · มีรูป '+nph+' รูป':''))),rs));
+      });
+      box.appendChild(list);
+      var c=el('button',{type:'button',class:'btn'},'ปิด');c.addEventListener('click',close);
+      box.appendChild(el('div',{class:'bin-acts'},c));
+    }
+    back.appendChild(box);back.addEventListener('mousedown',function(e){if(e.target===back)close()});
+    document.addEventListener('keydown',key,true);draw();document.body.appendChild(back);
+    var f=box.querySelector('button');if(f)f.focus();
+  }
+  window.__qcBin={count:function(){return viewing?0:(state.bin||[]).length},open:openBin,restore:restoreBin,state:function(){return state.bin}};
   function refreshRow(it){
     var i=state.items.indexOf(it);if(i<0)return null;
     var list=$('#items'),old=list.querySelector('.item[data-id="'+it.id+'"]'),n=row(it,i);
@@ -1982,6 +2094,17 @@ button{font:inherit;cursor:pointer}
   function purgeExpired(){
     var lim=Date.now()-30*864e5;
     function old(t){var d=new Date(t);return !isNaN(d)&&d.getTime()<lim}
+    /* deleted items/photos inside documents: permanently removed after the same 30 days */
+    var binOld=function(e){return old(e.at)};
+    var pend=[];
+    records.forEach(function(r){
+      var cur=r.id===state.id,b=cur?state.bin:(r.data.bin||[]);if(!b||!b.some(binOld))return;
+      var gone=b.filter(binOld),keep=b.filter(function(e){return !binOld(e)});
+      gone.forEach(function(e){(e.t==='item'?(e.item.before||[]).concat(e.item.after||[]):[e.p]).forEach(function(p){var a=typeof p==='string'?p:(p&&p.a);if(a&&a.indexOf('data:')!==0)queueDel(a)})});
+      if(cur){state.bin=keep;save()}
+      else{r.data.bin=keep;pend.push(col.doc(r.id).update({bin:keep}).catch(function(){}))}
+    });
+    if(pend.length)Promise.all(pend).then(function(){processDeletes()});else processDeletes();
     trashRecs.filter(function(r){return old(r.data.deletedAt)}).forEach(function(r){permDeleteRecord(r.id,true)});
     trashFolders.filter(function(f){return old(f.deletedAt)}).forEach(function(f){permDeleteFolder(f.id,true)});
   }
@@ -2260,7 +2383,7 @@ button{font:inherit;cursor:pointer}
     return drain().then(function(ok){
       if(ok===false){setStatus('บันทึกฉบับที่เปิดอยู่ไม่สำเร็จ ยังไม่ทำสำเนา');return false}
       var copy=norm(ser(true),newId());
-      copy.rev=0;copy.createdAt='';copy.updatedAt='';copy.sub=null;copy.rx=null;
+      copy.rev=0;copy.createdAt='';copy.updatedAt='';copy.sub=null;copy.rx=null;copy.bin=[];copy.cf={};
       var m=copy.meta;
       if(m.docno)m.docno+=' (สำเนา)';else if(m.work)m.work+=' (สำเนา)';else m.project+=' (สำเนา)';
       state=copy;touched=true;

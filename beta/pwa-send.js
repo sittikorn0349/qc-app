@@ -83,6 +83,7 @@
       var ph=photosOf(d),inline=[];
       (d.items||[]).forEach(function(it){ids(it.before).concat(ids(it.after)).forEach(function(x){if(x.indexOf('data:')===0)inline.push(x)})});
       if(inline.length)throw fail('เอกสาร “'+titleOf(d)+'” มีรูปที่ยังไม่ถูกเก็บในเครื่อง ส่งไม่ได้');
+      d=Object.assign({},d);delete d.bin;delete d.cf;   /* the receiver gets the document, not its deleted items */
       docs.push({id:idList[i],data:d,title:titleOf(d),photos:ph});
       ph.forEach(function(x){if(!photoSet[x]){photoSet[x]=1;photoOrder.push(x)}});
     }

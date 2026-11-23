@@ -106,6 +106,22 @@
      QC.confirmSheet(message,{okLabel,cancelLabel,title}) -> Promise<boolean>; same code as arm()/ask() above */
   window.QC=window.QC||{};
   QC.armConfirm=function(btn,onConfirm,o){o=o||{};return arm(btn,{armed:o.armedLabel,timeoutMs:o.timeoutMs,need:o.need,onConfirm:onConfirm})};
+  /* undo right after a delete: one toast at a time; undo runs only once; the deleted thing is never gone
+     because of the toast (the bin keeps it), the toast is only the quick way back */
+  var toastEl=null,toastT=null,toastCss=false;
+  QC.showUndoToast=function(message,onUndo,timeoutMs){
+    if(!toastCss){toastCss=true;document.head.appendChild(el('style',null,
+      '.qc-toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:95;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 24px);padding:8px 8px 8px 16px;border-radius:10px;background:#1f2328;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:.95rem}'+
+      '.qc-toast button{min-height:44px;min-width:88px;border:0;border-radius:8px;background:transparent;color:#8cc8ff;font:inherit;font-weight:700;cursor:pointer}.qc-toast button:focus-visible{outline:2px solid #8cc8ff}'));}
+    if(toastEl){toastEl.remove();clearTimeout(toastT)}
+    var used=false,b=el('button',{type:'button',class:'qc-toast-undo'},'ย้อนกลับ');
+    var t=el('div',{class:'qc-toast',role:'status','aria-live':'polite'},el('span',null,message),b);
+    function gone(){if(toastEl===t)toastEl=null;t.remove()}
+    b.addEventListener('click',function(){if(used)return;used=true;clearTimeout(toastT);gone();onUndo()});
+    document.body.appendChild(t);toastEl=t;
+    toastT=setTimeout(gone,timeoutMs||6000);
+    return {close:gone};
+  };
   QC.confirmSheet=function(message,o){o=o||{};return ask({title:o.title||'ยืนยัน',text:message,ok:o.okLabel,cancel:o.cancelLabel,danger:o.danger})};
 
   window.QCU={today:today,thDate:thDate,randHex:randHex,pad2:pad2,$:$,$$:$$,ls:ls,lsSet:lsSet,lsDel:lsDel,jget:jget,clone:clone,uid:uid,S:S,el:el,sha256js:sha256js,sha256:sha256,sha256Blob:sha256Blob,sha256Text:sha256Text,hex:hex,arm:arm,ask:ask};
