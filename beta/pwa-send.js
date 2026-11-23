@@ -314,7 +314,8 @@
         mkR();
         dmsg('นำเข้าส่งงานแล้ว '+todo.length+' ฉบับ · รหัสยืนยัน '+pl.code);
       }catch(e){
-        msg.textContent='นำเข้าไม่สำเร็จ ('+e.message+') ข้อมูลเดิมในเครื่องไม่ถูกแก้ ลองใหม่อีกครั้ง';cancel.disabled=false;
+        msg.textContent='นำเข้าไม่สำเร็จ ('+e.message+') ข้อมูลเดิมในเครื่องไม่ถูกแก้ กด “ลองใหม่” ได้เลย ไม่ต้องเลือกไฟล์ใหม่';cancel.disabled=false;
+        go.disabled=false;go.textContent='ลองใหม่';   /* P3-10: the checked file is still held in memory */
       }
     });
   }
@@ -337,7 +338,7 @@
       var fr=null;try{fr=await QC.restoreForms(z,data)}catch(e){dmsg('นำเข้าฉบับตรวจงานแล้ว แต่รายงานแบบอื่นในไฟล์สำรองนำเข้าไม่ได้ ('+e.message+')',true);return}
       var listed={};(data.photos||[]).forEach(function(p){listed[p.id]=1});
       var miss=0,seen={};(data.items||[]).forEach(function(it){(it.before||[]).concat(it.after||[]).forEach(function(x){if(x&&!listed[x]&&!seen[x]){seen[x]=1;miss++}})});
-      dmsg('นำเข้าแล้ว '+n.inspections+' ฉบับ'+(n.skipped?' (ข้าม '+n.skipped+' ฉบับที่ในเครื่องใหม่กว่า)':'')+' · รูปใหม่ '+n.photos+(n.badPhotos?' · รูปที่ไฟล์เสีย '+n.badPhotos+' รูป':'')+(miss?' · ⚠ ไฟล์สำรองนี้ไม่มีรูปอยู่แล้ว '+miss+' รูป (ขาดมาตั้งแต่ตอนสำรอง)':''),!!(miss||n.badPhotos)+(fr&&(fr.docs||fr.forms)?' · รายงานแบบอื่น '+fr.docs+' ฉบับ แบบฟอร์ม '+fr.forms+' แบบ':''));
+      dmsg('นำเข้าแล้ว '+n.inspections+' ฉบับ'+(n.skipped?' (ข้าม '+n.skipped+' ฉบับที่ในเครื่องใหม่กว่า)':'')+' · รูปใหม่ '+n.photos+(n.badPhotos?' · รูปที่ไฟล์เสีย '+n.badPhotos+' รูป':'')+(miss?' · ⚠ ไฟล์สำรองนี้ไม่มีรูปอยู่แล้ว '+miss+' รูป (ขาดมาตั้งแต่ตอนสำรอง)':'')+(fr&&(fr.docs||fr.forms)?' · รายงานแบบอื่น '+fr.docs+' ฉบับ แบบฟอร์ม '+fr.forms+' แบบ':''),!!(miss||n.badPhotos));
     }catch(e){dmsg('นำเข้าไม่สำเร็จ ข้อมูลเดิมไม่ถูกแก้ ลองอีกครั้ง',true)}
   }
   window.__qcImport=async function(file,dmsg){
@@ -436,10 +437,12 @@
           gapsConfirmed=true;
           info.textContent='';
           info.appendChild(errBox('ฉบับที่เลือกยังมีรายการที่ยังไม่ตรวจ/รอตรวจซ้ำรวม '+totalGaps+' รายการ — กด “สร้างไฟล์ส่ง” อีกครั้งถ้าต้องการส่งต่อเลย'));
-          go.textContent='ยืนยันส่งทั้งที่ยังไม่ครบ';
+          go.textContent='ยืนยันส่งทั้งที่ยังไม่ครบ';go.classList.remove('primary');go.classList.add('armed');   /* same red "armed" look as delete */
+          clearTimeout(go._armT);go._armT=setTimeout(function(){gapsConfirmed=false;go.classList.remove('armed');go.classList.add('primary');go.textContent='สร้างไฟล์ส่ง'},15000);
           return;
         }
       }
+      clearTimeout(go._armT);go.classList.remove('armed');go.classList.add('primary');
       lsSet(NAME_K,nm);lsSet(CODE_K,codeIn.value.trim().replace(/[^A-Za-z0-9ก-๙]/g,'').slice(0,6));lsSet(EXT_K,extSel.value);
       go.disabled=true;info.textContent='กำลังสร้างและตรวจไฟล์…';info.className='';
       var pkg;

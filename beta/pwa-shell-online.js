@@ -24,7 +24,7 @@
     return '{'+Object.keys(o).sort().filter(function(k){return o[k]!==undefined}).map(function(k){return JSON.stringify(k)+':'+stable(o[k])}).join(',')+'}';
   }
   function eq(a,b){return stable(a)===stable(b)}
-  function today(){return new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Bangkok'})}
+  var today=QCU.today;
 
   /* ---------- server API (one place for every Supabase call; tests can swap it) ---------- */
   function makeApi(){
@@ -98,7 +98,7 @@
 
   /* ---------- identity, ids, photo paths ---------- */
   var UID=null,UIDH='',ME=null,CUR=null,ROLE=null,PROJECTS=[],PFX='';
-  function hex(n){return Array.prototype.map.call(crypto.getRandomValues(new Uint8Array(n)),function(b){return ('0'+b.toString(16)).slice(-2)}).join('')}
+  var hex=QCU.randHex;   /* random id bytes (shared, pwa-util.js) */
   function newAssetId(){return 'u'+UIDH+'_'+hex(12)}
   function idToPath(id){var m=/^u([0-9a-f]{32})_([0-9a-f]+)$/.exec(id||'');if(!m)return null;var u=m[1];return u.slice(0,8)+'-'+u.slice(8,12)+'-'+u.slice(12,16)+'-'+u.slice(16,20)+'-'+u.slice(20)+'/'+m[2]}
   function pathToId(p){var m=/^([0-9a-f-]{36})\/([0-9a-f]+)$/.exec(p||'');return m?'u'+m[1].replace(/-/g,'')+'_'+m[2]:p}
@@ -755,7 +755,7 @@
           var d=new Date(dt.value);if(isNaN(d)){dt.focus();return}requestAnswer(r.id,'reschedule','',d.toISOString());
         }},'เลื่อนนัด')));
       }
-      if(open&&(meReq||ROLE==='pm'))acts.appendChild(el('button',{class:'btn',type:'button',onclick:function(){if(window.confirm('ยกเลิกใบขอตรวจ “'+r.title+'”?'))requestAnswer(r.id,'cancel')}},'ยกเลิก'));
+      if(open&&(meReq||ROLE==='pm'))acts.appendChild(el('button',{class:'btn',type:'button',onclick:function(){QCU.ask({title:'ยกเลิกใบขอตรวจ',text:'“'+r.title+'” จะถูกยกเลิก และแจ้งผู้เกี่ยวข้อง',ok:'ยกเลิกใบขอตรวจ',cancel:'ไม่ยกเลิก'}).then(function(y){if(y)requestAnswer(r.id,'cancel')})}},'ยกเลิก'));
       if(!open&&r.status==='failed'&&meReq)acts.appendChild(el('button',{class:'btn primary',type:'button',onclick:function(){v.close();requestForm({title:r.title,loc:r.loc,cat:r.cat,hold:r.hold,next:r.next_step,inspector:r.inspector_id,doc:r.inspection_id,note:'แก้แล้ว ขอตรวจใหม่'})}},'ขอตรวจใหม่'));
       if(acts.childNodes.length)box.appendChild(acts);
       return box;
@@ -1138,13 +1138,15 @@
     if(PROJECTS.length>1||(ME&&ME.org_role==='admin'))v.c.append(el('button',{class:'btn',type:'button',onclick:function(){lsSet(PK,'');location.reload()}},'เปลี่ยนโครงการ'));
     v.c.append(
       el('button',{class:'btn',type:'button',onclick:function(){
-        if((outbox.size||uploads.size)&&!confirmLeave())return;
-        api.signOut().then(function(){location.reload()});
+        confirmLeave().then(function(y){if(y)api.signOut().then(function(){location.reload()})});
       }},'ออกจากระบบ'),
-      el('button',{class:'btn',type:'button',onclick:function(){if((outbox.size||uploads.size)&&!confirmLeave())return;toOffline()}},'สลับไปโหมดออฟไลน์'),
+      el('button',{class:'btn',type:'button',onclick:function(){confirmLeave().then(function(y){if(y)toOffline()})}},'สลับไปโหมดออฟไลน์'),
       el('button',{class:'btn primary',type:'button',onclick:v.close},'ปิด'));
   }
-  function confirmLeave(){return window.confirm('ยังมีข้อมูลที่ยังไม่ได้ส่งขึ้นระบบ '+(outbox.size+uploads.size)+' รายการ ถ้าออกตอนนี้ ข้อมูลจะรอส่งในเครื่องนี้จนกว่าจะกลับเข้ามาในบัญชีเดิม ดำเนินการต่อ?')}
+  function confirmLeave(){
+    if(!(outbox.size||uploads.size))return Promise.resolve(true);
+    return QCU.ask({title:'ยังมีข้อมูลที่ยังไม่ได้ส่งขึ้นระบบ',text:(outbox.size+uploads.size)+' รายการ จะรอส่งในเครื่องนี้จนกว่าจะกลับเข้ามาในบัญชีเดิม ถ้าล้างข้อมูลเครื่องหรือเปลี่ยนเครื่อง ข้อมูลนี้จะหาย',ok:'ออกต่อ',cancel:'อยู่ต่อเพื่อส่งก่อน'});
+  }
   function showPill(){
     css();
     pill=el('button',{class:'qo-pill',type:'button','aria-label':'สถานะออนไลน์และเมนูบัญชี'},el('span',{class:'qo-d'}),el('span',{class:'qo-t'},''));
