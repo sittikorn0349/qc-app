@@ -42,11 +42,13 @@ const BASE = 'http://localhost:8911/' + (process.argv[2] || '');
   ok(px > 200, 'red markup baked into the saved photo (' + px + ' red px)');
 
   console.log('\n[mark up a saved photo]');
-  await page.click('.item .thumb .tb.ann'); await page.waitForTimeout(400);
+  /* touch screen: the photo actions live behind one 44 px ⋯ button (7.2) */
+  await page.click('.item .thumb .tb.more'); await page.click('#phsheet-b button:has-text("ขีดเขียน")'); await page.waitForTimeout(400);
   ok(await page.isVisible('.an-back canvas'), 'thumb ✎ opens markup');
   await page.click('.an-head button:has-text("ยกเลิก")'); await page.waitForTimeout(200);
   ok(!(await page.isVisible('.an-back')) && await page.evaluate((s) => document.querySelector('.item .thumb img').src === s, d1), 'cancel leaves the photo untouched');
-  await page.click('.item .thumb .tb.ann'); await page.waitForTimeout(400);
+  /* touch screen: the photo actions live behind one 44 px ⋯ button (7.2) */
+  await page.click('.item .thumb .tb.more'); await page.click('#phsheet-b button:has-text("ขีดเขียน")'); await page.waitForTimeout(400);
   const b2 = await page.locator('.an-back canvas').boundingBox();
   await page.mouse.move(b2.x + 20, b2.y + 20); await page.mouse.down(); await page.mouse.move(b2.x + 120, b2.y + 90, { steps: 6 }); await page.mouse.up();
   await page.click('.an-head .done');

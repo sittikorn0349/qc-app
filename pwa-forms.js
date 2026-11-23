@@ -69,7 +69,40 @@
       W('photos',{label:'รูปวัสดุ / ป้ายสินค้า / ใบส่งของ',caption:true}),
       W('choice',{label:'ผลการตรวจรับ',options:['รับ','รับบางส่วน','ไม่รับ / ส่งคืน']}),
       W('text',{label:'หมายเหตุ',multiline:true}),
-      W('signatures',{label:'ลงนาม',roles:['ผู้ตรวจรับ','ผู้ส่งของ']})]}
+      W('signatures',{label:'ลงนาม',roles:['ผู้ตรวจรับ','ผู้ส่งของ']})]},
+    /* 8.3 template library: more ready-made field forms (copy any of them into the builder to adapt) */
+    {id:'waterproof',name:'ตรวจงานกันซึม (ทดสอบขังน้ำ)',sub:'ก่อนปิดผิว: ขังน้ำ 24–48 ชม. ตรวจรอยรั่ว',short:'WP',builtin:true,group:'สถาปัตย์',widgets:[
+      HEAD([{label:'ตำแหน่ง / ห้อง',type:'text'},{label:'ระบบกันซึม',type:'text'},{label:'เริ่มขังน้ำ',type:'text'},{label:'สิ้นสุด',type:'text'},{label:'ระดับน้ำ (ซม.)',type:'number'}]),
+      W('checklist',{label:'ตรวจก่อนและระหว่างทดสอบ',options:['ผ่าน','ไม่ผ่าน','ไม่เกี่ยว'],note:true,items:['ผิวพื้นสะอาด แห้ง ไม่มีรอยแตก','ทาซ้อนทับตามจำนวนชั้นที่กำหนด','ยกขอบผนังตามระยะที่กำหนด','รอบท่อ / ช่องเปิด ปิดครบ','ระดับน้ำคงที่ตลอดการทดสอบ','ไม่พบน้ำซึมใต้พื้น / ห้องข้างล่าง']}),
+      W('photos',{label:'รูปก่อน / ระหว่าง / หลังทดสอบ',caption:true}),
+      W('choice',{label:'ผลการทดสอบ',options:['ผ่าน ปิดผิวได้','ไม่ผ่าน ต้องแก้แล้วทดสอบใหม่']}),
+      W('text',{label:'หมายเหตุ',multiline:true}),
+      W('signatures',{label:'ลงนาม',roles:['ผู้รับเหมา','ผู้ควบคุมงาน']})]},
+    {id:'scaffold',name:'ตรวจนั่งร้านประจำวัน',sub:'ก่อนเริ่มงาน: ฐาน ค้ำยัน ราวกันตก ป้ายสถานะ',short:'SC',builtin:true,group:'ความปลอดภัย',widgets:[
+      HEAD([{label:'ตำแหน่งนั่งร้าน',type:'text'},{label:'ความสูง (ม.)',type:'number'},{label:'ผู้ติดตั้ง',type:'text'}]),
+      W('checklist',{label:'รายการตรวจ',options:['ผ่าน','ไม่ผ่าน','ไม่เกี่ยว'],note:true,items:['ฐานรองแข็งแรง ไม่ทรุด มีแผ่นรองฐาน','ค้ำยันทแยงครบ ยึดแน่น','ยึดโยงกับโครงสร้างตามระยะ','พื้นทางเดินเต็ม ไม่มีช่องว่าง','ราวกันตกบน-กลาง และขอบกันของตก','บันไดขึ้นลงมั่นคง','ป้ายสถานะ (เขียว / แดง) ติดถูกต้อง']}),
+      W('photos',{label:'รูปนั่งร้าน',caption:true}),
+      W('choice',{label:'สถานะ',options:['ใช้งานได้ (ป้ายเขียว)','ห้ามใช้ (ป้ายแดง)']}),
+      W('signatures',{label:'ลงนาม',roles:['ผู้ตรวจ (จป.)','หัวหน้างาน']})]},
+    {id:'pressure',name:'ทดสอบแรงดันท่อ',sub:'ท่อน้ำดี / ดับเพลิง ก่อนปิดผนัง-ฝ้า',short:'PT',builtin:true,group:'งานระบบ',widgets:[
+      HEAD([{label:'ระบบ / ช่วงท่อ',type:'text'},{label:'ชนิดและขนาดท่อ',type:'text'},{label:'แรงดันทดสอบ (บาร์)',type:'number'},{label:'ระยะเวลา (ชม.)',type:'number'}]),
+      W('table',{label:'บันทึกแรงดัน',columns:[{label:'เวลา',type:'text'},{label:'แรงดัน (บาร์)',type:'number'},{label:'หมายเหตุ',type:'text'}],rows:[['เริ่ม','',''],['ระหว่างทาง','',''],['สิ้นสุด','','']]}),
+      W('checklist',{label:'ตรวจ',options:['ผ่าน','ไม่ผ่าน','ไม่เกี่ยว'],note:true,items:['เกจวัดสอบเทียบแล้ว','ไม่พบรอยรั่วที่ข้อต่อ','แรงดันลดลงไม่เกินเกณฑ์']}),
+      W('photos',{label:'รูปเกจและจุดทดสอบ',caption:true}),
+      W('choice',{label:'ผลการทดสอบ',options:['ผ่าน','ไม่ผ่าน']}),
+      W('signatures',{label:'ลงนาม',roles:['ผู้รับเหมางานระบบ','ผู้ควบคุมงาน']})]},
+    {id:'elec',name:'ตรวจงานไฟฟ้าก่อนปิดฝ้า / ผนัง',sub:'ท่อร้อยสาย กล่อง ต่อลงดิน ค่าฉนวน',short:'EL',builtin:true,group:'งานระบบ',widgets:[
+      HEAD([{label:'พื้นที่ / ชั้น',type:'text'},{label:'แบบอ้างอิง',type:'text'}]),
+      W('checklist',{label:'รายการตรวจ',options:['ผ่าน','ไม่ผ่าน','ไม่เกี่ยว'],note:true,items:['ชนิด ขนาดท่อและสายตรงตามแบบ','ยึดท่อตามระยะ ไม่หย่อน','กล่องต่อสายมีฝาปิด เข้าถึงได้','สายดินต่อครบทุกจุด','วัดค่าความเป็นฉนวนผ่านเกณฑ์','ป้ายวงจรในตู้ตรงกับแบบ']}),
+      W('table',{label:'ผลวัดค่า',columns:[{label:'วงจร',type:'text'},{label:'ค่าฉนวน (MΩ)',type:'number'},{label:'ค่าดิน (Ω)',type:'number'}],rows:[['','',''],['','','']]}),
+      W('photos',{label:'รูปประกอบ',caption:true}),
+      W('signatures',{label:'ลงนาม',roles:['ผู้รับเหมางานไฟฟ้า','วิศวกรไฟฟ้า']})]},
+    {id:'handover',name:'ตรวจรับห้องก่อนส่งมอบ',sub:'ข้อบกพร่องรายห้อง พร้อมรูป',short:'HO',builtin:true,group:'ส่งมอบ',widgets:[
+      HEAD([{label:'ห้อง / ยูนิต',type:'text'},{label:'ผู้รับมอบ',type:'text'}]),
+      W('checklist',{label:'รายการตรวจ',options:['ผ่าน','มีข้อบกพร่อง','ไม่เกี่ยว'],note:true,items:['ประตู หน้าต่าง เปิดปิดสนิท','ผนัง ฝ้า สีเรียบ ไม่มีรอยร้าว','พื้น กระเบื้อง ไม่โก่ง ไม่กลวง','สุขภัณฑ์ ก๊อกน้ำ ไม่รั่ว','ปลั๊ก สวิตช์ ดวงโคม ใช้งานได้','ระบายน้ำพื้นห้องน้ำ / ระเบียง']}),
+      W('photos',{label:'รูปข้อบกพร่อง',caption:true}),
+      W('text',{label:'ข้อบกพร่องอื่น',multiline:true}),
+      W('signatures',{label:'ลงนาม',roles:['ผู้ส่งมอบ','ผู้รับมอบ']})]}
   ];
   var CUSTOM=[];
   function loadCustom(){return all('forms').then(function(a){CUSTOM=a.sort(function(x,y){return (y.updatedAt||'').localeCompare(x.updatedAt||'')});return CUSTOM}).catch(function(){return CUSTOM})}
@@ -334,6 +367,31 @@
         list.appendChild(row);
       });
     });
+    /* share form templates between teams / devices as a small file (no account needed) */
+    var tl=el('div',{class:'qlist',id:'qf-tpl-list'});
+    var imp=el('input',{type:'file',accept:'.json,application/json',class:'sr','aria-label':'นำเข้าแบบฟอร์มจากไฟล์'});
+    imp.addEventListener('change',function(){
+      var f=imp.files&&imp.files[0];imp.value='';if(!f)return;
+      f.text().then(function(t){var o=JSON.parse(t);if(!o||o.format!=='qc-form'||!o.form||!Array.isArray(o.form.widgets))throw new Error('bad');
+        var fm=clone(o.form);fm.id=uid('c');fm.custom=true;fm.builtin=false;fm.updatedAt=new Date().toISOString();
+        return put('forms',fm).then(loadCustom).then(function(){status('นำเข้าแบบฟอร์ม “'+fm.name+'” แล้ว');drawT()});
+      }).catch(function(){status('ไฟล์นี้ไม่ใช่แบบฟอร์มของแอปนี้')});
+    });
+    function drawT(){
+      tl.textContent='';
+      (CUSTOM||[]).forEach(function(f){
+        tl.appendChild(el('div',{class:'qrow'},el('div',{class:'grow'},el('b',null,f.name),el('small',null,(f.widgets||[]).length+' ส่วน')),
+          btn('ส่งออกเป็นไฟล์',function(){
+            var blob=new Blob([JSON.stringify({format:'qc-form',version:1,exportedAt:new Date().toISOString(),form:f},null,1)],{type:'application/json'});
+            var a2=el('a',{href:URL.createObjectURL(blob),download:'แบบฟอร์ม_'+String(f.name).replace(/[\\\/:*?"<>|\s]+/g,'_')+'.json'});document.body.appendChild(a2);a2.click();setTimeout(function(){URL.revokeObjectURL(a2.href);a2.remove()},2000);
+          },'sm')));
+      });
+      if(!(CUSTOM||[]).length)tl.appendChild(el('div',{class:'qhelp'},'ยังไม่มีแบบฟอร์มที่สร้างเอง'));
+    }
+    r.firstChild.appendChild(el('div',null,el('h2',{style:'margin:16px 0 4px'},'คลังแบบฟอร์มของทีม'),
+      el('p',{class:'qhelp',style:'margin:0 0 6px'},'ส่งออกแบบฟอร์มที่สร้างเองเป็นไฟล์ แล้วส่งให้เพื่อนร่วมทีมนำเข้า ใช้แบบเดียวกันทั้งโครงการ'),
+      tl,el('label',{class:'btn',style:'margin-top:6px;display:inline-flex'},'นำเข้าแบบฟอร์มจากไฟล์',imp)));
+    loadCustom().then(drawT);
   }
 
   /* ---------- PDF (A4 sheets drawn as HTML, then html2canvas + jsPDF like the original form) ---------- */

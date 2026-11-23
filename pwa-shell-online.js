@@ -506,6 +506,27 @@
     L.mine.sort(function(a,b){return (a.it.due||'9')<(b.it.due||'9')?-1:1});
     return L;
   }
+  /* ---------- 8.5 due-date reminders: a device notification once a day for my fixes due today / tomorrow / late.
+     Works while the app has been opened that day; a reminder with the app closed needs the server (LINE OA). ---------- */
+  var DUEK='qc-due-notified';
+  function dueSoon(){
+    var t=today(),tm=new Date(Date.now()+86400000).toLocaleDateString('sv-SE',{timeZone:'Asia/Bangkok'});
+    return lists().mine.filter(function(x){return x.it.due&&x.it.due<=tm}).map(function(x){return {x:x,late:x.it.due<t,today:x.it.due===t}});
+  }
+  function dueCheck(force){
+    if(!('Notification' in window)||Notification.permission!=='granted')return Promise.resolve(false);
+    var t=today();if(!force&&lsGet(DUEK)===t)return Promise.resolve(false);
+    var L=dueSoon();if(!L.length)return Promise.resolve(false);
+    var late=L.filter(function(y){return y.late}).length,td=L.filter(function(y){return y.today}).length;
+    var body=(late?'เลยกำหนด '+late+' รายการ · ':'')+(td?'ครบวันนี้ '+td+' รายการ · ':'')+'รวมที่ต้องแก้ภายในพรุ่งนี้ '+L.length+' รายการ';
+    lsSet(DUEK,t);
+    var show=function(reg){var o={body:body,tag:'qc-due',icon:'./icons/icon-192.png',data:{url:location.href}};return reg&&reg.showNotification?reg.showNotification('งานแก้ที่ใกล้ครบกำหนด',o):new Notification('งานแก้ที่ใกล้ครบกำหนด',o)};
+    return (navigator.serviceWorker?navigator.serviceWorker.getRegistration():Promise.resolve(null)).then(show,function(){return show(null)}).then(function(){return true},function(){return false});
+  }
+  function askDue(){
+    if(!('Notification' in window))return Promise.resolve('unsupported');
+    return Promise.resolve(Notification.permission==='default'?Notification.requestPermission():Notification.permission).then(function(p){if(p==='granted')dueCheck(true);return p});
+  }
   var taskBtn=null;
   function taskCount(){var L=lists();return L.mine.length+L.recheck.length+reqLists().todo.length}
   function updateTaskBtn(){if(!taskBtn)return;var n=taskCount();taskBtn.querySelector('b').textContent=n?String(n):'';taskBtn.classList.toggle('qo-has',!!n)}
@@ -1025,6 +1046,7 @@
     v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();tasksPanel()}},'งาน · ใบขอตรวจ'));
     v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();searchPanel()}},'ค้นหาทุกเอกสาร'));
     v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();linePanel()}},'เชื่อม LINE รับแจ้งเตือน'));
+    if('Notification' in window)v.c.append(el('button',{class:'btn',type:'button',id:'qo-due',onclick:function(){askDue().then(function(p){toast(p==='granted'?'เปิดแจ้งเตือนกำหนดแก้ในเครื่องนี้แล้ว (วันละครั้ง)':p==='denied'?'เครื่องนี้ปิดการแจ้งเตือนไว้ เปิดได้ที่การตั้งค่าเบราว์เซอร์':'ยังไม่ได้เปิดแจ้งเตือน')})}},Notification.permission==='granted'?'แจ้งเตือนกำหนดแก้: เปิดอยู่':'เปิดแจ้งเตือนกำหนดแก้ (ในเครื่อง)'));
     v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();runSync()}},'ซิงก์ตอนนี้'));
     if(ROLE==='pm'||(ME&&ME.org_role==='admin'))v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();membersPanel()}},'จัดการสมาชิก'));
     if(PROJECTS.length>1||(ME&&ME.org_role==='admin'))v.c.append(el('button',{class:'btn',type:'button',onclick:function(){lsSet(PK,'');location.reload()}},'เปลี่ยนโครงการ'));
@@ -1098,7 +1120,8 @@
     showPill();
     window.addEventListener('online',function(){schedule(0)});window.addEventListener('offline',status);
     setInterval(function(){if(!document.hidden)schedule(0)},60000);
-    document.addEventListener('visibilitychange',function(){if(!document.hidden)schedule(0)});
+    document.addEventListener('visibilitychange',function(){if(!document.hidden){schedule(0);setTimeout(dueCheck,3000)}});
+    setTimeout(dueCheck,4000);
     try{stopRealtime=api.subscribe(CUR,function(){schedule(1500)})}catch(e){}
     schedule(0);
   }
@@ -1223,7 +1246,7 @@
     uid:function(){return UID},members:function(){return MEMBERS.slice()},name:nameOf,canCreate:canCreate,
     recheck:function(doc,iid,res,note,after){return act('rx',doc,iid,{res:res,note:note,after:after})},
     reportFixed:function(doc,iid,note,after){return act('fx',doc,iid,{note:note,after:after})},
-    tasks:function(t){tasksPanel(t)},lists:lists,search:function(q){searchPanel(q)},requestForm:function(o){requestForm(o)},requests:function(){return REQS.slice()},parseQuery:parseQuery,onMessage:function(f){actListeners.push(f)}};
+    tasks:function(t){tasksPanel(t)},dueSoon:dueSoon,dueCheck:dueCheck,lists:lists,search:function(q){searchPanel(q)},requestForm:function(o){requestForm(o)},requests:function(){return REQS.slice()},parseQuery:parseQuery,onMessage:function(f){actListeners.push(f)}};
 
   var caps={db:db,user:user,assets:assets,downloads:downloads};
   window.claude={use:function(n){return ready.then(function(){return caps[n]||null},function(){return null})}};

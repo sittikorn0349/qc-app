@@ -68,6 +68,9 @@
     '#qh-sheet{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;padding:0}',
     '#qh-sheet .qh-card{width:100%;max-width:520px;max-height:90vh;overflow:auto;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:16px 16px 0 0;padding:16px max(16px,env(safe-area-inset-left,0px)) max(18px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}',
     '@media (min-width:700px){#qh-sheet{align-items:center}#qh-sheet .qh-card{border-radius:16px}}',
+    '.qd-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}.qd-kpi div{border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}.qd-kpi b{display:block;font-size:1.4rem}.qd-kpi small{color:var(--muted)}',
+    '.qd-sec{margin-top:12px}.qd-sec h3{margin:0 0 6px;font-size:.95rem}.qd-row{display:grid;grid-template-columns:minmax(0,9rem) 1fr 2.4rem;gap:8px;align-items:center;margin:4px 0;font-size:.9rem}.qd-k{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.qd-bar{height:12px;border-radius:6px;background:var(--bg)}.qd-bar i{display:block;height:100%;border-radius:6px;background:var(--warn,#d98a00)}.qd-row b{text-align:right}',
+    '.qd-late{display:block;width:100%;text-align:left;margin:4px 0;min-height:48px}',
     '#qh-sheet h2{margin:0;font-size:1.15rem}',
     '.qh-big{display:flex;align-items:center;gap:12px;min-height:56px;padding:0 14px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:12px;font:inherit;text-align:left;cursor:pointer}',
     '.qh-big small{display:block;color:var(--muted);font-size:.78rem}',
@@ -180,6 +183,7 @@
       tile('dup','ทำสำเนา','เป็นฉบับใหม่','copy',{need:true,run:function(){run('dupRecord')}}),
       tile('imp','รับไฟล์ ZIP','งานที่เพื่อนส่งมา','inbox',{run:openFile}),
       tile('bk','สำรอง / กู้คืน','ข้อมูลทั้งหมด','db',{run:openBackup}),
+      tile('dash','สรุปงานค้าง','ใครค้างแก้ หมวดไหน เลยกำหนด','recheck',{run:openDash}),
       tile('trash','ถังขยะ','กู้คืนได้ 30 วัน','trash',{run:openTrash}),
       tile('set','ตั้งค่า','รหัสผู้ตรวจ ฯลฯ','gear',{run:openSettings}));
 
@@ -303,6 +307,47 @@
   function big(ic,t,sub,fn){
     var b=el('button',{type:'button',class:'qh-big'},icon(ic),el('span',null,t,el('small',null,sub||'')));
     b.addEventListener('click',fn);return b;
+  }
+  /* ---------- 8.4 dashboard: inspection -> corrective action, from the documents on this device ---------- */
+  function dashData(){
+    var docs=(window.__qcDocs?window.__qcDocs():[]),O=window.__qcOnline,today=new Date().toISOString().slice(0,10);
+    var tot={docs:docs.length,items:0,pend:0,fixed:0,late:0},by={contractor:{},cat:{},asg:{},project:{}},late=[];
+    docs.forEach(function(x){
+      var d=x.data||{},m=d.meta||{};
+      (d.items||[]).forEach(function(it){
+        if(!it.res)return;tot.items++;
+        if(it.res!=='fix'&&it.res!=='bad')return;
+        if(it.rres==='ok'){tot.fixed++;return}
+        tot.pend++;
+        var inc=function(g,k){k=(k||'').trim()||'ไม่ระบุ';by[g][k]=(by[g][k]||0)+1};
+        inc('contractor',m.contractor);inc('cat',it.cat);inc('project',m.project);
+        if(O)inc('asg',it.asg?O.name(it.asg):'ยังไม่มอบหมาย');
+        if(it.due&&it.due<today){tot.late++;late.push({t:(m.docno||m.work||'ฉบับไม่มีเลขที่')+' · '+(it.loc||it.chk||''),due:it.due,id:x.id,iid:it.id})}
+      });
+    });
+    late.sort(function(a,b){return a.due<b.due?-1:1});
+    return {tot:tot,by:by,late:late,online:!!O};
+  }
+  function bars(title,obj){
+    var ks=Object.keys(obj).sort(function(a,b){return obj[b]-obj[a]}).slice(0,8),mx=ks.length?obj[ks[0]]:1;
+    if(!ks.length)return null;
+    return el('section',{class:'qd-sec'},el('h3',null,title),el('div',{class:'qd-bars'},ks.map(function(k){
+      return el('div',{class:'qd-row'},el('span',{class:'qd-k'},k),el('span',{class:'qd-bar'},el('i',{style:'width:'+Math.max(6,Math.round(obj[k]/mx*100))+'%'})),el('b',null,String(obj[k])));
+    })));
+  }
+  function openDash(){
+    var D=dashData(),t=D.tot;
+    var kpi=el('div',{class:'qd-kpi'},[['ฉบับ',t.docs],['ค้างแก้',t.pend],['แก้แล้วผ่าน',t.fixed],['เลยกำหนด',t.late]].map(function(k){return el('div',null,el('b',null,String(k[1])),el('small',null,k[0]))}));
+    var nodes=[kpi];
+    if(!t.pend)nodes.push(el('div',{class:'qh-kv'},'ไม่มีรายการค้างแก้ในเครื่องนี้'));
+    [bars('ผู้รับเหมาที่ค้างแก้มากสุด',D.by.contractor),D.online?bars('ผู้รับผิดชอบ (มอบหมาย)',D.by.asg):null,bars('หมวดงาน',D.by.cat),bars('โครงการ',D.by.project)].forEach(function(n){if(n)nodes.push(n)});
+    if(D.late.length)nodes.push(el('section',{class:'qd-sec'},el('h3',null,'เลยกำหนดแก้'),D.late.slice(0,10).map(function(l){
+      var b=el('button',{type:'button',class:'btn qd-late'},l.t,el('small',null,' ครบ '+l.due));
+      b.addEventListener('click',function(){closeSheet();if(window.__qcForm&&window.__qcForm.openDoc)window.__qcForm.openDoc(l.id,l.iid).then(function(){goForm()})});
+      return b;
+    })));
+    nodes.push(el('small',{class:'qh-kv'},D.online?'นับจากเอกสารของคุณในโครงการนี้ที่อยู่ในเครื่อง':'นับจากเอกสารที่อยู่ในเครื่องนี้'));
+    openSheet('สรุปงานค้างแก้',nodes);
   }
   function openBackup(){
     openSheet('สำรอง / กู้คืนข้อมูล',[

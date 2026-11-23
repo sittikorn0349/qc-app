@@ -15,7 +15,7 @@
     var m=d.meta||{},g=d.sign||{};
     return JSON.stringify({
       meta:['project','docno','site','date','work','inspector','contractor','weather'].map(function(k){return S(m[k])}),
-      sign:['inspector','supervisor','contractor'].map(function(k){return [S((g[k]||{}).name),S((g[k]||{}).date)]}),
+      sign:['inspector','supervisor','contractor'].map(function(k){var o=g[k]||{},a=[S(o.name),S(o.date)];if(o.img)a.push(S(o.img));return a}),   /* a drawn signature is content (no img = same hash as before) */
       summary:S(d.summary),remarks:S(d.remarks),
       items:(d.items||[]).map(function(it){return [S(it.id),S(it.loc),S(it.chk),S(it.res),S(it.note),S(it.cat),S(it.ref),S(it.rres),S(it.rdate),S(it.rnote),ids(it.before),ids(it.after)]})
     });

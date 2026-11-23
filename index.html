@@ -67,7 +67,7 @@ button{font:inherit;cursor:pointer}
 .rb-actions{display:flex;gap:8px;flex-wrap:wrap}
 .badge.sub{background:var(--ok-bg);color:var(--ok);border-color:transparent}
 .badge.draft{background:var(--warn-bg);color:var(--fg);border-color:var(--line)}
-.ro .wrap .card:not(.rb) :is(.tb,.addphoto,.addbar,.del,.re-toggle,.rb-actions):not(.act *){display:none!important}
+.ro .wrap .card:not(.rb) :is(.sp-btn,.mic,.zsel,.tb,.addphoto,.addbar,.del,.re-toggle,.rb-actions):not(.act *){display:none!important}
 .ro .wrap .card:not(.rb) :is(input,textarea,select,button):not(.act *){pointer-events:none}
 /* online: status, assignment and actions on items */
 .wf{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -184,6 +184,34 @@ button{font:inherit;cursor:pointer}
 .thumb .rot{bottom:4px;left:4px}
 .thumb .rep{bottom:4px;right:4px}
 .thumb .ann{top:4px;left:4px}
+.thumb .tb{width:32px;height:32px}
+.thumb .tb.more{display:none;top:4px;right:4px;width:44px;height:44px;font-size:22px}
+@media (pointer:coarse){.thumb .tb{display:none}.thumb .tb.more{display:flex}}
+.ph-sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;background:var(--surface,#fff);color:var(--fg);border-radius:16px 16px 0 0;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 -6px 24px rgba(0,0,0,.3)}
+.ph-sheet h2{margin:0;font-size:1.1rem}
+.ph-sheet-b{display:grid;gap:8px}
+.ph-sheet-b .btn{min-height:56px;font-size:1.05rem;justify-content:flex-start}
+.ph-sheet-b .btn.armed{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+/* quick entry */
+.qfast{display:flex;gap:6px}
+.f.note{position:relative}
+.zsel{width:100%;min-height:40px;margin-bottom:6px}
+.zadd{border:1px dashed var(--line);border-radius:8px;background:none;color:var(--accent);font:inherit;font-size:.85rem;text-align:left;padding:0 10px;cursor:pointer}
+.mic{position:absolute;right:6px;bottom:6px;min-width:44px;min-height:44px;padding:0 8px;border-radius:22px;border:1px solid var(--line);background:var(--surface,#fff);color:var(--accent);font:inherit;font-size:.85rem;cursor:pointer}
+.mic[aria-pressed="true"]{background:var(--bad);color:#fff;border-color:var(--bad)}
+.mic.armed{outline:2px solid var(--accent)}
+.mic-note{display:block;margin-top:4px;font-size:.8rem;color:var(--warn);line-height:1.4}
+.f.note textarea{padding-right:60px}
+.qfast .btn[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.qc-next{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));z-index:40;min-height:52px;padding:0 18px;border-radius:26px;border:0;background:var(--accent);color:#fff;font:inherit;font-size:1rem;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.28)}
+.qc-next b{display:inline-block;min-width:1.6em;margin-left:6px;padding:0 6px;border-radius:99px;background:rgba(255,255,255,.25)}
+.qc-home-on .qc-next{display:none}
+.xpand{display:none;justify-self:start;min-height:40px;padding:0 4px;border:0;background:none;color:var(--accent);font:inherit;font-size:.9rem;cursor:pointer}
+.compact-on .xpand{display:block}
+.item.compact .photos,.item.compact .loc,.item.compact .tagrow,.item.compact .note,.item.compact .del{display:none}
+.csum{display:none;font-size:.85rem;color:var(--muted);margin-top:2px}
+.item.compact .csum{display:block}
+.item.flash{outline:3px solid var(--accent);outline-offset:-3px}
 /* photo markup */
 .an-back{position:fixed;inset:0;z-index:70;background:#0d1113;display:flex;flex-direction:column;color:#fff;touch-action:none}
 .an-stage{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px;overflow:hidden}
@@ -237,6 +265,15 @@ button{font:inherit;cursor:pointer}
 .sign{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
 .sign .box{border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
 .sign .role{font-weight:600;font-size:.9rem}
+.sign .line img{max-height:64px;max-width:100%;display:block}
+.sign .line.has{height:auto;min-height:44px;flex-wrap:wrap;gap:6px}
+.sp-btn{min-height:44px;padding:0 12px;border-radius:8px;border:1px dashed var(--line);background:none;color:var(--accent);font:inherit;font-size:.9rem;cursor:pointer}
+.sp-back{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
+.sp-card{width:100%;max-width:640px;background:var(--surface,#fff);color:var(--fg);border-radius:16px 16px 0 0;padding:14px;display:flex;flex-direction:column;gap:10px}
+.sp-card canvas{width:100%;height:240px;background:#fff;border:1px solid var(--line);border-radius:8px;touch-action:none}
+.sp-card .row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.sp-card .row .btn{min-height:48px}
+.sheet .sigline img{max-height:46px;display:block;margin:0 auto}
 .sign .line{height:44px;border-bottom:1px solid var(--muted);font-size:.75rem;color:var(--muted);display:flex;align-items:flex-end;padding-bottom:2px}
 .foot{display:flex;justify-content:flex-end}
 
@@ -291,10 +328,10 @@ button{font:inherit;cursor:pointer}
   .cols-head{display:none}
   .irow{
     grid-template-columns:2.4rem 1fr auto;
-    grid-template-areas:"no . del" "photos photos photos" "loc loc loc" "chk chk chk" "res res res" "note note note";
+    grid-template-areas:"no . del" "photos photos photos" "loc loc loc" "chk chk chk" "res res res" "note note note" "xp xp xp";
     gap:10px 8px; padding:14px 14px 10px;
   }
-  .no{grid-area:no}.photos{grid-area:photos}.loc{grid-area:loc}.chkcell{grid-area:chk}.chk{grid-area:chk}.chkcell .chk{grid-area:auto}.res{grid-area:res}.note{grid-area:note}.del{grid-area:del}
+  .xpand{grid-area:xp}.no{grid-area:no}.photos{grid-area:photos}.loc{grid-area:loc}.chkcell{grid-area:chk}.chk{grid-area:chk}.chkcell .chk{grid-area:auto}.res{grid-area:res}.note{grid-area:note}.del{grid-area:del}
   .table .lbl{display:block}
   .photos{flex-direction:row;flex-wrap:wrap}
   .thumb{width:calc(33.333% - 4px)}
@@ -384,6 +421,10 @@ button{font:inherit;cursor:pointer}
       <h2>รายการตรวจงาน</h2>
       <div class="counts" id="counts" aria-live="polite"></div>
       <select id="flt" aria-label="กรองรายการ" class="flt"></select>
+      <div class="qfast noprint" role="group" aria-label="โหมดกรอก">
+        <button type="button" class="btn sm" id="qf-fast" aria-pressed="false" title="กดผล “ผ่าน” แล้วเลื่อนไปรายการที่ยังไม่ตรวจถัดไปให้เอง">กรอกเร็ว</button>
+        <button type="button" class="btn sm" id="qf-compact" aria-pressed="false" title="แสดงเฉพาะ ลำดับ รายการตรวจ และปุ่มผลตรวจ กดแถวเพื่อดูรูป ตำแหน่ง หมายเหตุ">ย่อแถว</button>
+      </div>
     </div>
     <div class="cols-head" aria-hidden="true">
       <div>ลำดับ</div><div>รูปที่พบ</div><div>ตำแหน่ง</div><div>รายการตรวจ</div><div>ผลตรวจ</div><div>หมายเหตุ</div><div></div>
@@ -478,6 +519,8 @@ button{font:inherit;cursor:pointer}
     </div>
   </div>
 </div>
+<button type="button" id="qc-next" class="qc-next noprint" hidden aria-label="ไปรายการที่ยังไม่ตรวจถัดไป">ไปรายการถัดไปที่ยังไม่ตรวจ <b id="qc-next-n"></b></button>
+<div class="dlg-back noprint" id="phsheet" hidden><div class="ph-sheet" role="dialog" aria-modal="true" aria-labelledby="phsheet-t"><h2 id="phsheet-t">ตัวเลือกรูป</h2><div id="phsheet-b" class="ph-sheet-b"></div><button type="button" class="btn" id="phsheet-x">ปิด</button></div></div>
 <div id="lb" hidden><img alt="รูปขยาย"></div>
 <div id="pdfroot" aria-hidden="true"></div>
 
@@ -749,6 +792,7 @@ button{font:inherit;cursor:pointer}
     return (d.items||[]).some(function(it){return (it.loc||it.chk||it.note||it.res||it.rres||it.rnote||'').toString().trim()||(it.before||it.photos||[]).length||(it.after||[]).length});
   }
   var flt='all';
+  var FAST=lsGet('qc-fast')==='1',COMPACT=lsGet('qc-compact')==='1';   /* quick entry (7.1) */
   function isPend(it){return (it.res==='fix'||it.res==='bad')&&it.rres!=='ok'}
   function matches(it){
     if(flt==='all')return true;
@@ -812,7 +856,7 @@ button{font:inherit;cursor:pointer}
       v:2,meta:Object.assign({},state.meta),sign:JSON.parse(JSON.stringify(state.sign)),
       summary:state.summary,remarks:state.remarks,
       items:state.items.map(function(it){
-        var o={id:it.id,loc:it.loc,chk:it.chk,res:it.res,note:it.note,cat:it.cat,ref:it.ref,rres:it.rres,rdate:it.rdate,rnote:it.rnote,before:ph(it.before),after:ph(it.after)};
+        var o={id:it.id,loc:(it.loc||'').replace(/ · $/,''),chk:it.chk,res:it.res,note:it.note,cat:it.cat,ref:it.ref,rres:it.rres,rdate:it.rdate,rnote:it.rnote,before:ph(it.before),after:ph(it.after)};
         if(window.__ONLINE){o.asg=it.asg||'';o.due=it.due||'';o.st=it.st||'';o.rat=it.rat||'';o.fnote=it.fnote||''}
         return o;
       }),
@@ -1154,7 +1198,89 @@ button{font:inherit;cursor:pointer}
       editPhoto(it,key,p,function(){return shrink(f)});
     });
     th.appendChild(el('label',{class:'tb rep',title:'เปลี่ยนรูป','aria-label':'เปลี่ยนรูปที่ '+(j+1)},'⇄',inp));
+    /* touch screens: one 44 px button opens large choices (the four small buttons are hidden by CSS on coarse pointers) */
+    th.appendChild(el('button',{type:'button',class:'tb more','aria-label':'ตัวเลือกรูปที่ '+(j+1)+' (ขีดเขียน หมุน เปลี่ยน ลบ)',title:'ตัวเลือกรูป',onclick:function(){photoSheet(th,tag+' รูปที่ '+(j+1))}},'⋯'));
     return th;
+  }
+  /* ---------- standard zones per project (7.4): pick a zone, then type the detail after it ---------- */
+  function zoneKey(){return 'qc-zones:'+((state.meta&&state.meta.project)||'').trim()}
+  function zonesFor(){try{return JSON.parse(lsGet(zoneKey())||'[]')}catch(e){return []}}
+  function zoneOf(loc,zs){loc=loc||'';var hit='';zs.forEach(function(z){if(loc===z||loc.indexOf(z+' · ')===0)if(z.length>hit.length)hit=z});return hit}
+  function zonePick(it,i){
+    var zs=zonesFor(),cur=zoneOf(it.loc,zs);
+    if(!zs.length)return i===0?el('button',{type:'button',class:'zsel zadd',onclick:zoneEditor},'+ ตั้งรายชื่อโซน / ชั้นของโครงการ'):document.createTextNode('');
+    var sel=el('select',{class:'zsel','aria-label':'โซน/ชั้นมาตรฐาน รายการที่ '+(i+1)},el('option',{value:''},zs.length?'เลือกโซน / ชั้น…':'+ ตั้งรายชื่อโซน / ชั้นของโครงการ'));
+    zs.forEach(function(z){sel.appendChild(el('option',{value:z},z))});
+    if(zs.length)sel.appendChild(el('option',{value:'__edit'},'แก้รายชื่อโซน…'));
+    sel.value=cur;
+    sel.addEventListener('change',function(){
+      if(sel.value==='__edit'){sel.value=cur;zoneEditor();return}
+      var detail=cur?it.loc.slice(cur.length).replace(/^ · /,''):it.loc;
+      it.loc=sel.value?(sel.value+' · '+detail):detail;   /* the separator stays so the detail can be typed straight after */save();var n=refreshRow(it);var ta=n&&n.querySelector('.loc textarea');if(ta){ta.focus({preventScroll:true});ta.setSelectionRange(ta.value.length,ta.value.length)}
+    });
+    return sel;
+  }
+  function zoneEditor(){
+    var bk=$('#phsheet'),b=$('#phsheet-b');b.textContent='';
+    var pj=((state.meta&&state.meta.project)||'').trim();
+    $('#phsheet-t').textContent='โซน / ชั้นมาตรฐาน'+(pj?' · '+pj:'');
+    if(!pj){b.appendChild(el('p',null,'กรอกชื่อโครงการในส่วน “ข้อมูลโครงการ” ก่อน รายชื่อโซนผูกกับชื่อโครงการ'));bk.hidden=false;$('#phsheet-x').onclick=function(){bk.hidden=true};return}
+    var ta=el('textarea',{rows:8,'aria-label':'รายชื่อโซน หนึ่งบรรทัดต่อหนึ่งโซน',placeholder:'ฐานราก\nชั้น 1\nชั้น 2\nชั้น 3\nหลังคา'});ta.value=zonesFor().join('\n');
+    var ok=el('button',{type:'button',class:'btn primary'},'บันทึกรายชื่อโซน');
+    ok.addEventListener('click',function(){var z=ta.value.split('\n').map(function(x){return x.trim()}).filter(Boolean);lsSet(zoneKey(),JSON.stringify(z));bk.hidden=true;renderItems();setStatus('บันทึกรายชื่อโซน '+z.length+' โซน · ใช้กับทุกฉบับของโครงการ “'+pj+'” ในเครื่องนี้')});
+    b.append(el('p',{style:'margin:0;color:var(--muted)'},'หนึ่งบรรทัดต่อหนึ่งโซน ช่องตำแหน่งจะให้เลือกโซนก่อนแล้วพิมพ์รายละเอียดต่อท้าย เช่น “ชั้น 3 · เสา C-3” ทุกคนเขียนตำแหน่งตรงกัน'),ta,ok);
+    bk.hidden=false;ta.focus();$('#phsheet-x').onclick=function(){bk.hidden=true};bk.onclick=function(e){if(e.target===bk)bk.hidden=true};
+  }
+  /* ---------- finger signatures (8.6): drawn on screen, stored with the document (sign.<role>.img, PNG) ---------- */
+  var SIGNK=['inspector','supervisor','contractor'],SIGNL={inspector:'ผู้ตรวจ',supervisor:'ผู้ควบคุมงาน',contractor:'ผู้รับเหมา'};
+  function renderSignPads(){
+    document.querySelectorAll('.sign .box').forEach(function(box,i){
+      var k=SIGNK[i],line=box.querySelector('.line');if(!k||!line)return;
+      var g=(state.sign&&state.sign[k])||{};line.textContent='';line.classList.toggle('has',!!g.img);
+      if(g.img){
+        line.appendChild(el('img',{src:g.img,alt:'ลายมือชื่อ '+SIGNL[k]}));
+        line.appendChild(el('button',{type:'button',class:'sp-btn',onclick:function(){signPad(k)}},'เซ็นใหม่'));
+        line.appendChild(el('button',{type:'button',class:'sp-btn',onclick:function(){delete state.sign[k].img;save();renderSignPads()}},'ลบลายเซ็น'));
+      }else line.appendChild(el('button',{type:'button',class:'sp-btn','aria-label':'เซ็นชื่อด้วยนิ้ว '+SIGNL[k],onclick:function(){signPad(k)}},'เซ็นชื่อด้วยนิ้ว'));
+    });
+  }
+  function signPad(k){
+    var cv=el('canvas',{width:'600',height:'240','aria-label':'ช่องเซ็นชื่อ ลากนิ้วเพื่อเซ็น'}),cx=cv.getContext('2d'),drawn=false,down=false,last=null;
+    cx.lineWidth=3;cx.lineCap='round';cx.lineJoin='round';cx.strokeStyle='#111';
+    function pt(e){var r=cv.getBoundingClientRect();return [(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]}
+    cv.addEventListener('pointerdown',function(e){down=true;last=pt(e);try{cv.setPointerCapture(e.pointerId)}catch(x){}cx.beginPath();cx.arc(last[0],last[1],1.4,0,7);cx.fill();drawn=true});
+    cv.addEventListener('pointermove',function(e){if(!down)return;var p=pt(e);cx.beginPath();cx.moveTo(last[0],last[1]);cx.lineTo(p[0],p[1]);cx.stroke();last=p;drawn=true});
+    ['pointerup','pointercancel','pointerleave'].forEach(function(t){cv.addEventListener(t,function(){down=false})});
+    var nm=((state.sign||{})[k]||{}).name||'';
+    var msg=el('div',{role:'status',style:'min-height:1.2em;color:var(--muted)'});
+    var back=el('div',{class:'sp-back noprint',role:'dialog','aria-modal':'true','aria-label':'เซ็นชื่อ '+SIGNL[k]});
+    var close=function(){back.remove()};
+    var ok=el('button',{type:'button',class:'btn primary'},'บันทึกลายเซ็น');
+    ok.addEventListener('click',function(){
+      if(!drawn){msg.textContent='ยังไม่ได้เซ็น';return}
+      state.sign[k]=Object.assign({},state.sign[k]||{name:'',date:''},{img:cv.toDataURL('image/png')});
+      if(!state.sign[k].date){var t=new Date();state.sign[k].date=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');bindValues()}
+      save();close();renderSignPads();setStatus('บันทึกลายเซ็น'+SIGNL[k]+'แล้ว');
+    });
+    back.appendChild(el('div',{class:'sp-card'},el('h2',{style:'margin:0;font-size:1.1rem'},'เซ็นชื่อ '+SIGNL[k]+(nm?' · '+nm:'')),cv,msg,
+      el('div',{class:'row'},el('button',{type:'button',class:'btn',onclick:function(){cx.clearRect(0,0,cv.width,cv.height);drawn=false}},'ล้าง'),el('button',{type:'button',class:'btn',onclick:close},'ยกเลิก'),ok)));
+    back.addEventListener('mousedown',function(e){if(e.target===back)close()});
+    document.body.appendChild(back);
+  }
+  function photoSheet(th,title){
+    var bk=$('#phsheet'),b=$('#phsheet-b');b.textContent='';$('#phsheet-t').textContent=title;
+    var close=function(){bk.hidden=true;try{th.querySelector('.tb.more').focus()}catch(e){}};
+    var go=function(sel){return function(){close();var t=th.querySelector(sel);if(t)t.click()}};
+    var del=el('button',{type:'button',class:'btn'},'ลบรูปนี้'),armT;
+    del.addEventListener('click',function(){
+      if(del.classList.contains('armed')){clearTimeout(armT);close();var x=th.querySelector('.tb.x');if(x)x.click();return}
+      del.classList.add('armed');del.textContent='กดอีกครั้งเพื่อลบ';armT=setTimeout(function(){del.classList.remove('armed');del.textContent='ลบรูปนี้'},3500);
+    });
+    b.append(el('button',{type:'button',class:'btn',onclick:go('.tb.ann')},'ขีดเขียนบนรูป (วงกลม ลูกศร ข้อความ)'),
+      el('button',{type:'button',class:'btn',onclick:go('.tb.rot')},'หมุน 90°'),
+      el('button',{type:'button',class:'btn',onclick:function(){close();var i=th.querySelector('.tb.rep input');if(i)i.click()}},'เปลี่ยนรูป'),del);
+    bk.hidden=false;b.firstChild.focus();
+    $('#phsheet-x').onclick=close;bk.onclick=function(e){if(e.target===bk)close()};
   }
   function photoStrip(it,key,tag,addLabel){
     var box=el('div',{class:'photos'});
@@ -1174,7 +1300,40 @@ button{font:inherit;cursor:pointer}
     var ta=el('textarea',{rows:2,placeholder:ph,'aria-label':label});
     ta.value=it[key];
     ta.addEventListener('input',function(){it[key]=ta.value;autosize(ta);save()});
-    return el('label',{class:'f '+cls},el('span',{class:'lbl'},label),ta);
+    var lab=el('label',{class:'f '+cls},el('span',{class:'lbl'},label),ta);
+    if(key==='note'&&SR)lab.appendChild(micBtn(ta,label));
+    return lab;
+  }
+  /* ---------- dictation (7.3): only where the browser supports it; it needs internet while speaking, said up front ---------- */
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition||null,recNow=null;
+  function micBtn(ta,label){
+    var b=el('button',{type:'button',class:'mic noprint','aria-label':'พูดเพื่อพิมพ์ '+label,title:'พูดเพื่อพิมพ์ (ต้องใช้อินเทอร์เน็ตขณะพูด)','aria-pressed':'false'},'ไมค์');
+    b.addEventListener('click',function(e){
+      e.preventDefault();
+      if(recNow){try{recNow.stop()}catch(x){}return}
+      if(!navigator.onLine){setStatus('พูดเพื่อพิมพ์ต้องใช้อินเทอร์เน็ตขณะพูด ตอนนี้ไม่มีสัญญาณ ให้พิมพ์ไปก่อน');return}
+      if(lsGet('qc-voice-ok')!=='1'){
+        if(!b.classList.contains('armed')){
+          var tx='พูดเพื่อพิมพ์: เสียงจะถูกส่งไปแปลงเป็นข้อความผ่านอินเทอร์เน็ตโดยเบราว์เซอร์ (ไม่ได้ทำในเครื่อง) กดไมค์อีกครั้งเพื่อเริ่ม';
+          b.classList.add('armed');setStatus(tx);
+          if(!b.parentNode.querySelector('.mic-note'))b.parentNode.appendChild(el('small',{class:'mic-note',role:'note'},tx));   /* stays visible even when the status line moves on */
+          return;
+        }
+        var mn=b.parentNode.querySelector('.mic-note');if(mn)mn.remove();
+        lsSet('qc-voice-ok','1');
+      }
+      b.classList.remove('armed');
+      var r=new SR();r.lang='th-TH';r.interimResults=false;r.continuous=false;recNow=r;
+      b.setAttribute('aria-pressed','true');b.textContent='หยุด';setStatus('กำลังฟัง… พูดได้เลย');
+      r.onresult=function(ev){
+        var t='';for(var i=ev.resultIndex;i<ev.results.length;i++)if(ev.results[i].isFinal)t+=ev.results[i][0].transcript;
+        if(t){ta.value=(ta.value?ta.value.replace(/\s*$/,' '):'')+t.trim();ta.dispatchEvent(new Event('input',{bubbles:true}))}
+      };
+      r.onerror=function(ev){setStatus(ev&&ev.error==='network'?'แปลงเสียงไม่ได้: สัญญาณอินเทอร์เน็ตไม่พอ':ev&&ev.error==='not-allowed'?'ไม่ได้รับอนุญาตให้ใช้ไมโครโฟน':'แปลงเสียงไม่สำเร็จ ลองอีกครั้ง')};
+      r.onend=function(){recNow=null;b.setAttribute('aria-pressed','false');b.textContent='ไมค์'};
+      try{r.start()}catch(x){recNow=null;b.textContent='ไมค์';setStatus('เริ่มฟังไม่ได้ ลองอีกครั้ง')}
+    });
+    return b;
   }
   function isOpen(it){
     if(typeof it._open==='boolean')return it._open;
@@ -1303,8 +1462,12 @@ button{font:inherit;cursor:pointer}
     RES.forEach(function(r){
       var b=el('button',{type:'button','data-k':r[0],class:it.res===r[0]?'on':'','aria-pressed':it.res===r[0]?'true':'false'},r[1]);
       b.addEventListener('click',function(){
+        var was=it.res;
         it.res=it.res===r[0]?'':r[0];
+        if(it.res==='fix'||it.res==='bad')it._exp=true;          /* needs a photo / note: open the details */
         save();var n=refreshRow(it);var nb=n&&n.querySelector('.irow .seg button[data-k="'+r[0]+'"]');if(nb)nb.focus();
+        if(FAST&&!was&&it.res==='ok')goNext(it);
+        else if(FAST&&!was&&it.res&&n){var ta=n.querySelector('.note textarea');if(ta){ta.focus({preventScroll:true});n.scrollIntoView({block:'center',behavior:'smooth'})}}
       });
       seg.appendChild(b);
     });
@@ -1325,6 +1488,7 @@ button{font:inherit;cursor:pointer}
     main.appendChild(el('div',{class:'no'},String(i+1)));
     main.appendChild(photoStrip(it,'before','ที่พบ รายการที่ '+(i+1),'+ เพิ่มรูป'));
     var locCell=el('div',{class:'loc'});
+    locCell.appendChild(zonePick(it,i));
     locCell.appendChild(textField('ตำแหน่ง','','loc',it,'เช่น เสา C-3 ชั้น 1'));
     var cs=el('select',{'aria-label':'หมวดงาน (แนะนำให้เลือก ช่วยค้นหาภายหลัง)'},el('option',{value:''},'+ เลือกหมวดงาน (แนะนำ)'));
     var cats=catsFor(state).slice();if(it.cat&&cats.indexOf(it.cat)<0)cats.push(it.cat);
@@ -1339,6 +1503,11 @@ button{font:inherit;cursor:pointer}
     main.appendChild(el('div',{class:'f res'},el('span',{class:'lbl'},'ผลตรวจ'),seg));
     main.appendChild(textField('หมายเหตุ','note','note',it,'สิ่งที่พบ และข้อแก้ไข'));
     main.appendChild(del);
+    /* compact rows: number + check + result; tap to show photos, location, note */
+    var sumTxt=[it.loc,(it.before.length?it.before.length+' รูป':''),it.note?'มีหมายเหตุ':''].filter(Boolean).join(' · ');
+    var chkc=main.querySelector('.chkcell');if(chkc)chkc.appendChild(el('div',{class:'csum'},sumTxt||'ยังไม่มีตำแหน่ง / รูป'));
+    main.appendChild(el('button',{type:'button',class:'xpand','aria-expanded':it._exp?'true':'false',onclick:function(){it._exp=!it._exp;var n=refreshRow(it);if(n&&it._exp){var ta=n.querySelector('.loc textarea');if(ta)ta.focus({preventScroll:true})}}},it._exp?'ย่อรายละเอียด ▴':'รูป ตำแหน่ง หมายเหตุ ▾'));
+    if(COMPACT&&!it._exp)art.classList.add('compact');
     art.appendChild(main);
     art.appendChild(recheck(it,i));
     return art;
@@ -1375,6 +1544,24 @@ button{font:inherit;cursor:pointer}
     if(pend)c.appendChild(el('span',{class:'c-fix'},'รอตรวจซ้ำ '+pend));
     if(done)c.appendChild(el('span',{class:'c-ok'},'ตรวจซ้ำผ่าน '+done));
     if(flt!=='all')c.appendChild(el('span',null,'แสดง '+state.items.filter(matches).length+' รายการ'));
+    var nx=$('#qc-next'),left=state.items.filter(function(x){return !x.res&&matches(x)}).length;
+    if(nx){nx.hidden=!left||!!viewing||state.items.length<2;$('#qc-next-n').textContent=left}
+  }
+  /* ---------- quick entry (field use): next unchecked item, auto-advance, compact rows ---------- */
+  function goNext(from){
+    var list=state.items.filter(matches),start=from?list.indexOf(from)+1:0,nxt=null;
+    for(var k=0;k<list.length;k++){var c2=list[(start+k)%list.length];if(!c2.res&&c2!==from){nxt=c2;break}}
+    if(!nxt)return false;
+    var node=document.querySelector('.item[data-id="'+nxt.id+'"]');if(!node)return false;
+    node.scrollIntoView({block:'center',behavior:'smooth'});
+    node.classList.add('flash');setTimeout(function(){node.classList.remove('flash')},900);
+    var b=node.querySelector('.irow .seg button');if(b)b.focus({preventScroll:true});
+    return true;
+  }
+  function setQuick(){
+    var f=$('#qf-fast'),c=$('#qf-compact');if(!f)return;
+    f.setAttribute('aria-pressed',FAST?'true':'false');c.setAttribute('aria-pressed',COMPACT?'true':'false');
+    document.body.classList.toggle('compact-on',COMPACT);
   }
   $('#add').addEventListener('click',function(){
     if(flt!=='all'){flt='all';$('#flt').value='all'}
@@ -1766,7 +1953,7 @@ button{font:inherit;cursor:pointer}
       });
     }
   }
-  function renderAll(){var h1=document.querySelector('.top h1');if(h1)h1.textContent=formName(state);document.body.classList.toggle('form-safety',isSafety(state));bindValues();renderItems();renderBar();renderList();if(viewing)lockForm(true)}
+  function renderAll(){var h1=document.querySelector('.top h1');if(h1)h1.textContent=formName(state);document.body.classList.toggle('form-safety',isSafety(state));bindValues();renderItems();renderSignPads();renderBar();renderList();if(viewing)lockForm(true)}
 
   listBtn.addEventListener('click',function(){if(dlg.hidden)openList();else closeList()});
   $('#q').addEventListener('input',renderList);
@@ -1959,7 +2146,10 @@ button{font:inherit;cursor:pointer}
     if((+r.data.rev||0)<=(state.rev||0))return;
     if(dirty||writing||inField()){remoteWaiting=true;return}
     remoteWaiting=false;
-    state=norm(r.data,state.id);renderAll();setStatus('อัปเดตฉบับนี้จากอีกเครื่องแล้ว');
+    var ui={};state.items.forEach(function(it){ui[it.id]={_open:it._open,_exp:it._exp,_rr:it._rr}});   /* keep what is open on screen */
+    state=norm(r.data,state.id);
+    state.items.forEach(function(it){var u=ui[it.id];if(u){if(u._open!==undefined)it._open=u._open;if(u._exp!==undefined)it._exp=u._exp;if(u._rr!==undefined)it._rr=u._rr}});
+    renderAll();setStatus('อัปเดตฉบับนี้จากอีกเครื่องแล้ว');
   }
   /* a newer copy arrived while a field had focus: apply it once the cursor leaves */
   var remoteWaiting=false;
@@ -2252,7 +2442,7 @@ button{font:inherit;cursor:pointer}
       var d=s.sign[r[1]]||{};
       tr.appendChild(el('td',null,
         el('div',{class:'role0'},r[0]),
-        el('div',{class:'sigline'},'ลายมือชื่อ'),
+        el('div',{class:'sigline'},d.img?el('img',{src:d.img,alt:'ลายมือชื่อ '+r[0]}):'ลายมือชื่อ'),
         el('div',null,'('+(d.name||'..............................')+')'),
         el('div',null,'วันที่ '+(fmtDate(d.date)||'....../....../......'))));
     });
@@ -2480,6 +2670,11 @@ button{font:inherit;cursor:pointer}
     if(!window.__qcPendingUpload)return;
     document.querySelectorAll('.thumb[data-aid]').forEach(function(t){t.classList.toggle('upq',!!window.__qcPendingUpload(t.getAttribute('data-aid')))});
   });
+  $('#qf-fast').addEventListener('click',function(){FAST=!FAST;lsSet('qc-fast',FAST?'1':'0');setQuick();if(FAST)setStatus('กรอกเร็ว: กด “ผ่าน” แล้วจะเลื่อนไปรายการที่ยังไม่ตรวจถัดไปให้')});
+  $('#qf-compact').addEventListener('click',function(){COMPACT=!COMPACT;lsSet('qc-compact',COMPACT?'1':'0');setQuick();renderItems()});
+  $('#qc-next').addEventListener('click',function(){var cur=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('.item');var it=cur&&state.items.filter(function(x){return x.id===cur.getAttribute('data-id')})[0];if(!goNext(it||null))goNext(null)});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('#phsheet').hidden)$('#phsheet').hidden=true});
+  setQuick();
   bindStatic();
   renderAll();
 })();
