@@ -360,7 +360,7 @@
       docs.forEach(function(d){
         var t=titleOf(d),dl=btn('ลบ',function(){
           if(!dl.classList.contains('armed')){dl.classList.add('armed');dl.textContent='ยืนยันลบ?';setTimeout(function(){dl.classList.remove('armed');dl.textContent='ลบ'},3000);return}
-          del('docs',d.id).then(function(){row.remove();status('ลบแล้ว')});
+          del('docs',d.id).then(function(){row.remove();status('ลบแล้ว');try{window.dispatchEvent(new CustomEvent('qc-form-deleted',{detail:{id:d.id}}));window.dispatchEvent(new Event('qc-change'))}catch(e){}});
         },'sm');
         var row=el('div',{class:'qrow'},el('div',{class:'grow'},el('b',null,t.name+(t.no?' · '+t.no:'')),el('small',null,(t.project||'ไม่ระบุโครงการ')+' · แก้ล่าสุด '+new Date(d.updatedAt).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'}))),
           btn('เปิด',function(){fill(d)},'primary sm'),btn('PDF',function(){exportPdf(d)},'sm'),dl);
@@ -628,6 +628,7 @@
         return chain;
       }).then(function(){return loadCustom()}).then(function(){try{window.dispatchEvent(new Event('qc-change'))}catch(e){}return n});
     },
+    removeDocs:function(ids){var chain=Promise.resolve();(ids||[]).forEach(function(id){chain=chain.then(function(){return del('docs',id)})});return chain.then(function(){try{window.dispatchEvent(new Event('qc-change'))}catch(e){}})},
     putDocs:function(list){var chain=Promise.resolve();(list||[]).forEach(function(d){chain=chain.then(function(){return put('docs',d)})});return chain.then(function(){try{window.dispatchEvent(new Event('qc-change'))}catch(e){}})}
   };
 })();

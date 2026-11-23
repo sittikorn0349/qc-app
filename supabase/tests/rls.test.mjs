@@ -305,5 +305,21 @@ ok((await notes()).slice(nb).some(n => n.kind === 'request_cancelled' && n.user_
 await as(U.foreman, () => q(`insert into inspection_requests(project_id, title, inspector_id, scheduled_at) values ('p1','ตรวจแบบหล่อ',$1, now())`, [U.pm]));
 ok((await q(`select queue_inspection_reminders() n`)).rows[0].n === 1 && (await notes()).some(n => n.kind === 'request_today' && n.user_id === U.pm && /ตรวจแบบหล่อ/.test(n.body)), 'morning reminder lists today\'s appointments');
 
+console.log('\n[005 form documents, team templates, project zones]');
+await as(U.foreman, () => q(`insert into form_docs(id, project_id, form_id, title, data) values ('fd1','p1','daily','รายงานประจำวัน','{"v":1}')`));
+ok((await rows(U.viewer, `select id from form_docs where id='fd1'`)).length === 1, 'project member sees the document');
+ok((await rows(U.outsider, `select id from form_docs where id='fd1'`)).length === 0, 'outsider does not');
+ok((await rows(U.foreman2, `update form_docs set title='x' where id='fd1' returning id`)).length === 0, 'another member cannot change it');
+await fails(U.outsider, `insert into form_docs(id, project_id, data) values ('fd2','p1','{}')`, [], 'outsider cannot add to the project');
+await fails(U.foreman, `insert into form_docs(id, project_id, owner_id, data) values ('fd3','p1',$1,'{}')`, [U.foreman2], 'cannot write as someone else');
+ok((await one(U.foreman, `update form_docs set deleted_at=now() where id='fd1' returning id`)).id === 'fd1', 'owner soft-deletes');
+await as(U.foreman, () => q(`insert into form_templates(id, project_id, name, data) values ('ft1','p1','ตรวจกันซึมของทีม','{"widgets":[]}')`));
+ok((await rows(U.headman, `select id from form_templates where id='ft1'`)).length === 1, 'team sees the template');
+ok((await rows(U.pm, `update form_templates set name='ตรวจกันซึม v2' where id='ft1' returning id`)).length === 1, 'PM can edit a team template');
+ok((await rows(U.headman, `update form_templates set name='x' where id='ft1' returning id`)).length === 0, 'headman cannot');
+ok((await one(U.pm, `select set_project_zones('p1', array['ชั้น 1',' ชั้น 2 ','','ชั้น 1']) z`)).z.length === 2, 'PM sets zones (trimmed, unique)');
+await fails(U.headman, `select set_project_zones('p1', array['x'])`, [], 'headman cannot set zones');
+ok((await rows(U.viewer, `select zones from my_projects() where id='p1'`))[0].zones.length === 2, 'my_projects returns the zones');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

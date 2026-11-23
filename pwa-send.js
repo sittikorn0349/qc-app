@@ -324,6 +324,7 @@
     if(bad.length){dmsg('ไม่นำเข้า: ไฟล์รูปเสียหายหรือหายในไฟล์สำรอง '+bad.length+' รูป (ไม่ได้นำเข้าอะไรเลย) เช่น '+bad[0],true);return}
     try{
       var n=await window.__qc.importData(data,function(p){return Promise.resolve(cache[p.id]||null)},function(a,t){if(a%5===0||a===t)dmsg('กำลังนำเข้ารูป '+a+' / '+t)});
+      try{QC.restoreZones(data)}catch(e){}
       var fr=null;try{fr=await QC.restoreForms(z,data)}catch(e){dmsg('นำเข้าฉบับตรวจงานแล้ว แต่รายงานแบบอื่นในไฟล์สำรองนำเข้าไม่ได้ ('+e.message+')',true);return}
       var listed={};(data.photos||[]).forEach(function(p){listed[p.id]=1});
       var miss=0,seen={};(data.items||[]).forEach(function(it){(it.before||[]).concat(it.after||[]).forEach(function(x){if(x&&!listed[x]&&!seen[x]){seen[x]=1;miss++}})});

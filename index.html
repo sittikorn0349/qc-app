@@ -677,12 +677,12 @@ button{font:inherit;cursor:pointer}
     var data={format:'qc-inspection-backup',version:1,exportedAt:new Date().toISOString(),source:o.source||'',
       projects:Object.keys(projects).map(function(k){return projects[k]}),parties:Object.keys(parties).map(function(k){return parties[k]}),
       folders:folders,inspections:inspections,items:items,photos:list,
-      formDocs:fdocs,customForms:fforms,formPhotos:flist};
+      formDocs:fdocs,customForms:fforms,formPhotos:flist,zones:o.zones||{}};
     var txt='QC inspection backup\nformat: qc-inspection-backup v1\nนำเข้าได้ที่แอปตรวจงานก่อสร้าง > คลังเอกสาร > นำเข้า\ndata.json = ข้อมูลแยกตาราง (projects, parties, folders, inspections, items, photos, formDocs, customForms, formPhotos)\nphotos/ = รูปถ่าย\nform-photos/ = รูปในรายงานแบบอื่น (รายงานประจำวัน ใบขอเท ตรวจรับวัสดุ แบบฟอร์มที่สร้างเอง)\n';
     entries.unshift({name:'data.json',blob:new Blob([JSON.stringify(data)],{type:'application/json'})});
     entries.push({name:'README.txt',blob:new Blob([txt],{type:'text/plain'})});
     return {blob:await makeZip(entries),missing:missing,
-      counts:{inspections:inspections.length,items:items.length,photos:list.length,folders:folders.length,formDocs:fdocs.length,formPhotos:flist.length}};
+      counts:{inspections:inspections.length,items:items.length,photos:list.length,folders:folders.length,formDocs:fdocs.length,formPhotos:flist.length,zones:Object.keys(o.zones||{}).length}};
   }
 
   /* restore form-engine documents from a backup zip (no-op for backups without them) */
@@ -703,7 +703,15 @@ button{font:inherit;cursor:pointer}
     return window.__qcForms.importAll({docs:(data.formDocs||[]).map(back),forms:data.customForms||[]});
   }
 
-  window.QC={restoreForms:restoreForms,h32:h32,explode:explode,implode:implode,makeZip:makeZip,readZip:readZip,buildBackup:buildBackup,dataURLBlob:dataURLBlob,projectId:projectId,partyId:partyId};
+  /* standard zone lists per project (localStorage 'qc-zones:<project>') travel in the backup; restore = union, nothing removed */
+  function zonesAll(){var o={};try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('qc-zones:')===0){var v=JSON.parse(localStorage.getItem(k)||'[]');if(Array.isArray(v)&&v.length)o[k.slice(9)]=v}}}catch(e){}return o}
+  function restoreZones(data){
+    var z=data&&data.zones,n=0;if(!z||typeof z!=='object')return 0;
+    Object.keys(z).forEach(function(p){if(!Array.isArray(z[p]))return;var k='qc-zones:'+p,cur=[];try{cur=JSON.parse(localStorage.getItem(k)||'[]')}catch(e){}
+      var add=z[p].filter(function(x){return typeof x==='string'&&x.trim()&&cur.indexOf(x)<0});if(add.length){try{localStorage.setItem(k,JSON.stringify(cur.concat(add)));n++}catch(e){}}});
+    return n;
+  }
+  window.QC={zonesAll:zonesAll,restoreZones:restoreZones,restoreForms:restoreForms,h32:h32,explode:explode,implode:implode,makeZip:makeZip,readZip:readZip,buildBackup:buildBackup,dataURLBlob:dataURLBlob,projectId:projectId,partyId:partyId};
 })();
 </script>
 <script src="./libs/jspdf.umd.min.js"></script>
@@ -1227,7 +1235,14 @@ button{font:inherit;cursor:pointer}
     if(!pj){b.appendChild(el('p',null,'กรอกชื่อโครงการในส่วน “ข้อมูลโครงการ” ก่อน รายชื่อโซนผูกกับชื่อโครงการ'));bk.hidden=false;$('#phsheet-x').onclick=function(){bk.hidden=true};return}
     var ta=el('textarea',{rows:8,'aria-label':'รายชื่อโซน หนึ่งบรรทัดต่อหนึ่งโซน',placeholder:'ฐานราก\nชั้น 1\nชั้น 2\nชั้น 3\nหลังคา'});ta.value=zonesFor().join('\n');
     var ok=el('button',{type:'button',class:'btn primary'},'บันทึกรายชื่อโซน');
-    ok.addEventListener('click',function(){var z=ta.value.split('\n').map(function(x){return x.trim()}).filter(Boolean);lsSet(zoneKey(),JSON.stringify(z));bk.hidden=true;renderItems();setStatus('บันทึกรายชื่อโซน '+z.length+' โซน · ใช้กับทุกฉบับของโครงการ “'+pj+'” ในเครื่องนี้')});
+    ok.addEventListener('click',function(){
+      var z=ta.value.split('\n').map(function(x){return x.trim()}).filter(Boolean);lsSet(zoneKey(),JSON.stringify(z));bk.hidden=true;renderItems();
+      var O=window.__qcOnline;
+      if(!O||!O.saveZones){setStatus('บันทึกรายชื่อโซน '+z.length+' โซน · ใช้กับทุกฉบับของโครงการ “'+pj+'” ในเครื่องนี้ และอยู่ในไฟล์สำรอง');return}
+      O.saveZones(pj,z).then(function(r){
+        setStatus(r.ok?'บันทึกรายชื่อโซน '+z.length+' โซน ให้ทุกคนในโครงการแล้ว':r.denied?'บันทึกในเครื่องนี้แล้ว · รายชื่อโซนของโครงการ PM หรือโฟร์แมนเป็นคนตั้ง':'บันทึกในเครื่องนี้แล้ว'+(r.why?' · ยังไม่ขึ้นเซิร์ฟเวอร์ ('+r.why+')':''));
+      });
+    });
     b.append(el('p',{style:'margin:0;color:var(--muted)'},'หนึ่งบรรทัดต่อหนึ่งโซน ช่องตำแหน่งจะให้เลือกโซนก่อนแล้วพิมพ์รายละเอียดต่อท้าย เช่น “ชั้น 3 · เสา C-3” ทุกคนเขียนตำแหน่งตรงกัน'),ta,ok);
     bk.hidden=false;ta.focus();$('#phsheet-x').onclick=function(){bk.hidden=true};bk.onclick=function(e){if(e.target===bk)bk.hidden=true};
   }
@@ -2633,7 +2648,7 @@ button{font:inherit;cursor:pointer}
     drain().then(function(){
       return window.__qcForms?window.__qcForms.exportAll():null;
     }).then(function(forms){
-      return QC.buildBackup({records:records,folders:folders,trashRecs:trashRecs,trashFolders:trashFolders,source:IS_PWA?'pwa':'claude-artifact',forms:forms,
+      return QC.buildBackup({records:records,folders:folders,trashRecs:trashRecs,trashFolders:trashFolders,source:IS_PWA?'pwa':'claude-artifact',forms:forms,zones:QC.zonesAll(),
         getPhoto:getPhotoBlob,onProgress:function(n,t){if(n%5===0||n===t)dmsg('กำลังรวมรูป '+n+' / '+t)}});
     }).then(function(r){
       return dlP.then(function(dl){
@@ -2658,7 +2673,7 @@ button{font:inherit;cursor:pointer}
           if(!t)throw new Error('no data');
           var dj=JSON.parse(t);
           return window.__qc.importData(dj,function(ph){return z.read(ph.file,ph.mime)},function(n,t2){if(n%5===0||n===t2)dmsg('กำลังนำเข้ารูป '+n+' / '+t2)}).then(function(n){
-            return QC.restoreForms(z,dj).then(function(fr){n.forms=fr;return n});
+            return QC.restoreForms(z,dj).then(function(fr){n.forms=fr;n.zones=QC.restoreZones(dj);return n});
           });
         });
       }).then(function(n){

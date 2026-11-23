@@ -32,7 +32,7 @@ const FAKE = `
   window.__qcOnlineApi={
     session:function(){return Promise.resolve({user:{id:ME,email:'foreman@example.com',user_metadata:{full_name:'Foreman Test'}}})},
     signIn:function(){return Promise.resolve()},signOut:function(){return Promise.resolve()},
-    myProjects:function(){return Promise.resolve([{id:'p1',name:'Tower A',site:'Bangna',categories:[],role:'foreman'}])},
+    myProjects:function(){return Promise.resolve([{id:'p1',name:'Tower A',site:'Bangna',categories:[],role:'foreman',zones:S.zones||[]}])},
     myProfile:function(){return Promise.resolve({org_role:'staff'})},
     inspections:function(f){log('inspections');return Promise.resolve(Object.values(S.insp).filter(function(h){
       return (!f.id||h.id===f.id)&&(!f.project||h.project_id===f.project)&&(!f.owner||h.owner_id===f.owner)&&(!f.notOwner||h.owner_id!==f.notOwner)}).map(c))},
@@ -61,6 +61,12 @@ const FAKE = `
     profileByEmail:function(){return Promise.resolve(null)},members:function(){return Promise.resolve([{user_id:ME,role:'foreman'},{user_id:OTHER,role:'pm'},{user_id:HM,role:'headman'}])},
     addMember:function(){return Promise.resolve(null)},removeMember:function(){return Promise.resolve(null)},
     createProject:function(){return Promise.reject(new Error('no'))},
+    /* 005: form documents / templates / zones; sessionStorage fk-no005=1 simulates a server without the migration */
+    formDocs:function(p){if(sessionStorage.getItem('fk-no005')==='1')return Promise.reject({code:'PGRST205',message:"Could not find the table 'public.form_docs' in the schema cache"});log('formDocs');return Promise.resolve(Object.values(S.fdocs||{}).filter(function(r){return r.project_id===p}).map(c))},
+    putFormDoc:function(r){if(sessionStorage.getItem('fk-no005')==='1')return Promise.reject({code:'PGRST205',message:'form_docs'});log('putFormDoc');S.fdocs=S.fdocs||{};var ex=S.fdocs[r.id];if(ex&&ex.owner_id!==ME)return Promise.resolve([]);var x=c(r);x.owner_id=ME;S.fdocs[r.id]=x;return Promise.resolve([{id:r.id}])},
+    formTemplates:function(p){if(sessionStorage.getItem('fk-no005')==='1')return Promise.reject({code:'PGRST205',message:'form_templates'});return Promise.resolve(Object.values(S.ftpl||{}).filter(function(r){return r.project_id===p}).map(c))},
+    putFormTemplate:function(r){log('putFormTemplate');S.ftpl=S.ftpl||{};var x=c(r);x.owner_id=x.owner_id||ME;S.ftpl[r.id]=x;return Promise.resolve([{id:r.id}])},
+    setZones:function(p,z){if(sessionStorage.getItem('fk-no005')==='1')return Promise.reject({code:'PGRST202',message:'set_project_zones'});S.zones=z;return Promise.resolve(z)},
     requests:function(){return Promise.resolve(Object.values(S.reqs||{}).map(c))},
     insertRequest:function(row){log('insertRequest');S.reqs=S.reqs||{};if(S.reqs[row.id])return Promise.reject(Object.assign(new Error('duplicate key'),{code:'23505'}));
       if(row.inspector_id===ME)return Promise.reject(Object.assign(new Error('choose someone else to inspect'),{code:'P0001'}));

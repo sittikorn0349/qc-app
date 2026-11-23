@@ -58,6 +58,12 @@
       insertItems:function(rows){return rows.length?sb.from('inspection_items').insert(rows).then(chk):Promise.resolve()},
       updateItem:function(id,patch){return sb.from('inspection_items').update(patch).eq('id',id).select('id').then(chk)},
       deleteItems:function(ids){return ids.length?sb.from('inspection_items').delete().in('id',ids).then(chk):Promise.resolve()},
+      /* 005: form-engine documents, team templates, project zones */
+      formDocs:function(p){return sb.from('form_docs').select('id,owner_id,form_id,title,data,updated_at,deleted_at').eq('project_id',p).then(chk)},
+      putFormDoc:function(row){return sb.from('form_docs').upsert(row,{onConflict:'id'}).select('id').then(chk)},
+      formTemplates:function(p){return sb.from('form_templates').select('id,owner_id,name,data,updated_at,deleted_at').eq('project_id',p).then(chk)},
+      putFormTemplate:function(row){return sb.from('form_templates').upsert(row,{onConflict:'id'}).select('id').then(chk)},
+      setZones:function(p,z){return sb.rpc('set_project_zones',{p:p,z:z}).then(chk)},
       requests:function(p){return sb.from('inspection_requests').select('*').eq('project_id',p).order('scheduled_at',{ascending:true}).then(chk)},
       insertRequest:function(row){return sb.from('inspection_requests').insert(row).then(chk)},
       answerRequest:function(id,action,note,photos,at){return sb.rpc('answer_inspection_request',{p_id:id,p_action:action,p_note:note||'',p_photos:photos||[],p_scheduled:at||null}).then(chk)},
@@ -301,7 +307,7 @@
     if(!navigator.onLine){status();return}
     if(authErr){status();return}            /* waiting for a new sign-in; local writes still go to the outbox */
     syncing=true;status();
-    uploadAll().then(pushAll).then(pull).then(function(){lastErr=''},function(e){
+    uploadAll().then(pushAll).then(pull).then(formSync).then(function(){lastErr=''},function(e){
       if(isAuth(e)){authErr=true;lastErr='';}
       else lastErr=isNet(e)?'':(e&&(e.message||e.code))||'error';
       try{console.warn('[qc-online] sync',e)}catch(x){}
@@ -311,6 +317,83 @@
       else if(outbox.size||uploads.size)schedule(lastErr?30000:5000);
     });
   }
+  /* ---------- form-engine documents + team templates (migration 005) ----------
+     newest-wins per document (the documents are filled by one person); deletions travel as deleted_at.
+     If the server has no tables yet, everything keeps working locally and the status says so. */
+  var FS={ready:null,why:'',pending:0},FSK=function(){return 'qc-fsync:'+UID+':'+CUR},TOMB=function(){return 'qc-ftomb:'+UID};
+  function fsGet(k,d){try{return JSON.parse(lsGet(k)||'')||d}catch(e){return d}}
+  function noTable(e){return !!e&&(e.code==='42P01'||e.code==='PGRST205'||e.code==='PGRST202'||e.status===404||/form_docs|form_templates|schema cache/i.test(e.message||''))}
+  function formPending(){
+    var F=window.__qcForms;if(!F||!UID||!CUR)return Promise.resolve(0);
+    var done=fsGet(FSK(),{}),tomb=fsGet(TOMB(),{});
+    return F.listDocs().then(function(ds){return ds.filter(function(d){return (!d._project||d._project===CUR)&&(!d._owner||d._owner===UID)&&done[d.id]!==(d.updatedAt||'')}).length+Object.keys(tomb).length});
+  }
+  function formSync(){
+    var F=window.__qcForms;if(!F||!CUR)return;
+    var done=fsGet(FSK(),{}),tomb=fsGet(TOMB(),{}),proj=CUR;
+    return api.formDocs(proj).then(function(rows){
+      FS.ready=true;FS.why='';
+      var srv={};(rows||[]).forEach(function(r){srv[r.id]=r});
+      /* 1. deletions made here */
+      var chain=Promise.resolve();
+      Object.keys(tomb).forEach(function(id){
+        chain=chain.then(function(){var r=srv[id];if(!r||r.owner_id!==UID){delete tomb[id];return}
+          return api.putFormDoc({id:id,project_id:r.project_id||proj,form_id:r.form_id,title:r.title,data:r.data,updated_at:new Date().toISOString(),deleted_at:new Date().toISOString()}).then(function(){delete tomb[id];r.deleted_at=new Date().toISOString()})});   /* the snapshot below must not pull it back */
+      });
+      return chain.then(function(){lsSet(TOMB(),JSON.stringify(tomb));return F.listDocs()}).then(function(local){
+        var lm={},push=[],tag=[];local.forEach(function(d){lm[d.id]=d});
+        local.forEach(function(d){
+          if(d._project&&d._project!==proj)return;
+          if(d._owner&&d._owner!==UID)return;
+          if(!d._project){d=Object.assign({},d,{_project:proj,_owner:UID});tag.push(d)}
+          var r=srv[d.id];
+          if(r&&r.deleted_at)return;
+          if(done[d.id]===(d.updatedAt||'')&&r)return;
+          if(r&&((r.data&&r.data.updatedAt)||'')>(d.updatedAt||''))return;      /* server is newer: pulled below */
+          push.push(d);
+        });
+        var c2=tag.length?F.putDocs(tag):Promise.resolve();
+        push.forEach(function(d){
+          c2=c2.then(function(){return api.putFormDoc({id:d.id,project_id:proj,form_id:(d.form&&d.form.id)||d.formId||'',title:F.titleOf(d),data:d,updated_at:d.updatedAt||new Date().toISOString(),deleted_at:null})})
+            .then(function(){done[d.id]=d.updatedAt||''});
+        });
+        return c2.then(function(){
+          /* 2. pull what is newer on the server (other devices, other members) */
+          var inc=[],gone=[];
+          (rows||[]).forEach(function(r){
+            if(r.deleted_at||tomb[r.id]){if(lm[r.id]&&r.deleted_at&&r.owner_id!==UID)gone.push(r.id);return}   /* the owner deleted it */
+            var d=Object.assign({},r.data||{},{id:r.id,_project:proj,_owner:r.owner_id});
+            if(!lm[r.id]||(d.updatedAt||'')>(lm[r.id].updatedAt||''))inc.push(d);
+            done[r.id]=d.updatedAt||'';
+          });
+          return (gone.length?F.removeDocs(gone):Promise.resolve()).then(function(){return inc.length?F.importAll({docs:inc}):null});
+        });
+      }).then(function(){lsSet(FSK(),JSON.stringify(done))});
+    }).then(function(){
+      /* 3. team templates: share mine, take the team's */
+      return api.formTemplates(proj).then(function(rows){
+        var have={};(rows||[]).forEach(function(r){have[r.id]=r});
+        var mine=(F.customs()||[]).filter(function(f){return !f._owner||f._owner===UID}),c3=Promise.resolve();
+        mine.forEach(function(f){var r=have[f.id];if(r&&((r.data&&r.data.updatedAt)||'')>=(f.updatedAt||''))return;
+          c3=c3.then(function(){return api.putFormTemplate({id:f.id,project_id:proj,name:f.name||'',data:Object.assign({},f,{_owner:UID}),updated_at:f.updatedAt||new Date().toISOString(),deleted_at:null})})});
+        return c3.then(function(){
+          var inc=(rows||[]).filter(function(r){return !r.deleted_at&&r.owner_id!==UID}).map(function(r){return Object.assign({},r.data,{id:r.id,_owner:r.owner_id,custom:true})});
+          return inc.length?F.importAll({forms:inc}):null;
+        });
+      });
+    }).then(formPending).then(function(n){FS.pending=n;status()},function(e){
+      if(isAuth(e)||isNet(e))throw e;
+      FS.why=noTable(e)?'เซิร์ฟเวอร์ยังไม่เปิดส่วนนี้ (ยังไม่ได้ติดตั้ง migration 005)':'ซิงก์รายงานแบบอื่นไม่สำเร็จชั่วคราว จะลองใหม่';
+      if(noTable(e))FS.ready=false;
+      try{console.warn('[qc-online] form sync',e)}catch(x){}
+      return formPending().then(function(n){FS.pending=n;status()});
+    });
+  }
+  window.addEventListener('qc-form-deleted',function(e){
+    var id=e&&e.detail&&e.detail.id;if(!id||!UID)return;
+    var t=fsGet(TOMB(),{});t[id]=new Date().toISOString();lsSet(TOMB(),JSON.stringify(t));schedule(500);
+  });
+  window.addEventListener('qc-change',function(){if(UID&&CUR)formPending().then(function(n){if(n!==FS.pending){FS.pending=n;status();schedule(2000)}})});
   function uploadAll(){
     var ids=Array.from(uploads),chain=Promise.resolve();
     ids.forEach(function(id){
@@ -867,9 +950,9 @@
   /* ---------- status (badge + floating pill) ---------- */
   var pill=null;
   function syncState(){
-    var n=outbox.size+uploads.size;
+    var n=outbox.size+uploads.size+(FS.ready===true?FS.pending:0);
     return {online:navigator.onLine,pending:n,syncing:syncing,error:lastErr,conflicts:conflicts,project:CUR,role:ROLE,
-      setup:!!setupInfo(),auth:authErr,
+      setup:!!setupInfo(),auth:authErr,forms:{ready:FS.ready===true,pending:FS.pending,why:FS.why||(FS.ready===null?'ยังไม่ได้ตรวจกับเซิร์ฟเวอร์':'')},
       state:!navigator.onLine?'offline':authErr?'auth':lastErr?'error':(n||syncing)?'pending':'ok'};
   }
   window.__qcSync=syncState;
@@ -1093,6 +1176,14 @@
     ME={id:UID,email:u.email||'',name:(u.user_metadata&&(u.user_metadata.full_name||u.user_metadata.name))||''};
     if(cached){try{var m=JSON.parse(lsGet(meKey(UID))||'null');if(m)ME=Object.assign(ME,m)}catch(e){}}
   }
+  /* project zones (005): the PM's list is the project's; cached under the project name used by the location field */
+  function zonesFromProjects(){(PROJECTS||[]).forEach(function(p){if(p&&p.name&&Array.isArray(p.zones)&&p.zones.length)lsSet('qc-zones:'+p.name,JSON.stringify(p.zones))})}
+  function saveZones(name,list){
+    var p=(PROJECTS||[]).filter(function(x){return x.id===CUR})[0];
+    if(!p||p.name!==name)return Promise.resolve({local:true});
+    return api.setZones(CUR,list).then(function(z){p.zones=z||list;lsSet(PL+':'+UID,JSON.stringify(PROJECTS));zonesFromProjects();return {ok:true}},
+      function(e){if(noTable(e)||e&&e.code==='PGRST202')return {local:true,why:'เซิร์ฟเวอร์ยังไม่เปิดส่วนนี้'};if(e&&(e.code==='42501'||/not allowed/.test(e.message||'')))return {denied:true};return {local:true,why:isNet(e)?'ไม่มีสัญญาณ':'บันทึกขึ้นเซิร์ฟเวอร์ไม่สำเร็จ'}});
+  }
   function choose(){
     var isAdmin=ME.org_role==='admin',saved=lsGet(PK);
     var pick=PROJECTS.filter(function(p){return p.id===saved})[0]||(PROJECTS.length===1&&!isAdmin?PROJECTS[0]:null);
@@ -1104,6 +1195,7 @@
     return Promise.all([api.myProjects().then(function(ps){PROJECTS=ps||[];lsSet(PL+':'+UID,JSON.stringify(PROJECTS))}),
       api.myProfile(UID).then(function(p){if(p)ME.org_role=p.org_role})]).catch(fail).then(function(){
       lsSet(meKey(UID),JSON.stringify({email:ME.email,name:ME.name,org_role:ME.org_role||null}));
+      zonesFromProjects();
       return choose();
     }).then(function(id){
       CUR=id;lsSet(PK,id);
@@ -1151,7 +1243,7 @@
         CUR=id;lsSet(PK,id);loadMembers();start();
         /* background refresh of what setup cached */
         if(sess&&navigator.onLine){
-          loadProjects().then(function(){ROLE=(PROJECTS.filter(function(p){return p.id===CUR})[0]||{}).role||ROLE;status()}).catch(function(){});
+          loadProjects().then(function(){ROLE=(PROJECTS.filter(function(p){return p.id===CUR})[0]||{}).role||ROLE;zonesFromProjects();status()}).catch(function(){});
           api.myProfile(UID).then(function(p){if(p){ME.org_role=p.org_role;lsSet(meKey(UID),JSON.stringify({email:ME.email,name:ME.name,org_role:ME.org_role||null}))}},function(){});
         }
       });
@@ -1246,7 +1338,7 @@
     uid:function(){return UID},members:function(){return MEMBERS.slice()},name:nameOf,canCreate:canCreate,
     recheck:function(doc,iid,res,note,after){return act('rx',doc,iid,{res:res,note:note,after:after})},
     reportFixed:function(doc,iid,note,after){return act('fx',doc,iid,{note:note,after:after})},
-    tasks:function(t){tasksPanel(t)},dueSoon:dueSoon,dueCheck:dueCheck,lists:lists,search:function(q){searchPanel(q)},requestForm:function(o){requestForm(o)},requests:function(){return REQS.slice()},parseQuery:parseQuery,onMessage:function(f){actListeners.push(f)}};
+    tasks:function(t){tasksPanel(t)},dueSoon:dueSoon,dueCheck:dueCheck,saveZones:saveZones,formSync:function(){return formSync()},lists:lists,search:function(q){searchPanel(q)},requestForm:function(o){requestForm(o)},requests:function(){return REQS.slice()},parseQuery:parseQuery,onMessage:function(f){actListeners.push(f)}};
 
   var caps={db:db,user:user,assets:assets,downloads:downloads};
   window.claude={use:function(n){return ready.then(function(){return caps[n]||null},function(){return null})}};
