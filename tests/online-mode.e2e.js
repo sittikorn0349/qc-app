@@ -113,6 +113,7 @@ const FAKE = `
           if(w.msgs.some(function(m){return m.client_id===row.client_id}))return Promise.resolve([]);
           var m=c(row);m.id=w.msgs.length+1;m.author=ME;m.created_at=now();w.msgs.push(m);return Promise.resolve([m])},
         editMessage:function(){return Promise.resolve(null)},
+        replies:function(ch){return Promise.resolve(W().msgs.filter(function(m){return m.channel_id===ch&&m.item_id}).map(function(m){return {item_id:m.item_id}}))},
         itemEvents:function(ids){return Promise.resolve(S.events.filter(function(e){return ids.indexOf(e.item)>=0}).map(function(e){return {item_id:e.item,kind:e.kind,actor:ME,detail:{res:e.res},created_at:now()}}))},
         plan:function(p){return Promise.resolve(Object.values(W().plan).filter(function(t){return t.project_id===p}).map(c))},
         savePlanTask:function(r){var w=W();r=c(r);r.id=r.id||('pt_'+Math.random().toString(36).slice(2,8));w.plan[r.id]=Object.assign(w.plan[r.id]||{pct:0,preds:[],weight:0,position:0},r);return Promise.resolve([c(w.plan[r.id])])},

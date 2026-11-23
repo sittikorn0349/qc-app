@@ -28,6 +28,7 @@
     lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',check:'<path d="M5 12l5 5 9-10"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',
     warn:'<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/>',flag:'<path d="M5 21V4h11l-2 4 2 4H5"/>',drawing:'<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M9 9v11"/>',
     trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14"/>',zip:'<path d="M7 3h10v18H7z"/><path d="M12 3v2M12 7v2M12 11v2"/><rect x="10.5" y="14" width="3" height="4"/>',
+    chat:'<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
     refresh:'<path d="M20 11a8 8 0 0 0-14.5-4.5L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.5 4.5L20 16"/><path d="M20 21v-5h-5"/>',
     key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/>',card:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/>',hist:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>'
   };
@@ -102,6 +103,7 @@
         var a=lsJ(P+'msgs',[]);a.push(row);lsSJ(P+'msgs',a.slice(-2000));ls_.forEach(function(f){f()});return row},
       retry:function(){},drop:function(){},pendingMessages:function(){return 0},onMessages:function(f){ls_.push(f)},
       search:function(t){return Promise.resolve(lsJ(P+'msgs',[]).filter(function(m){return (m.body||'').indexOf(t)>=0}).slice(0,50))},
+      replies:function(ch){var n={};lsJ(P+'msgs',[]).forEach(function(m){if(m.item_id&&m.channel_id===ch)n[m.item_id]=(n[m.item_id]||0)+1});return Promise.resolve(n)},
       itemEvents:function(){return Promise.resolve([])},
       plan:function(p){return Promise.resolve(lsJ(P+'plan:'+(p||api.project()),[]))},
       savePlanTask:function(r){var k=P+'plan:'+api.project(),a=lsJ(k,[]);r=Object.assign({id:uid('pt_'),pct:0,dur:1,weight:0,preds:[],position:a.length},r);
@@ -211,30 +213,29 @@
       var add=el('button',{type:'button',class:'qa-add','aria-label':'สร้างโครงการใหม่'},ic('plus'));
       add.addEventListener('click',function(){go('#/newproject')});railEl.appendChild(add);
     }
-    railEl.appendChild(el('span',{class:'qa-note'},ONLINE?'เห็นเฉพาะโครงการที่ถูกเพิ่ม':'โหมดออฟไลน์ · เครื่องนี้'));
   }
   function syncLine(){
-    if(!ONLINE)return 'เก็บในเครื่องนี้ · ออฟไลน์';
+    if(!ONLINE)return 'เก็บในเครื่องนี้ · ใช้ได้แม้ไม่มีเน็ต';
     var s=window.__qcSync?window.__qcSync():null;if(!s)return '';
     var q=W.pendingMessages?W.pendingMessages():0,n=(s.pending||0)+q;
-    return s.state==='offline'?'ไม่มีสัญญาณ · รอส่ง '+n:s.state==='auth'?'ต้องเข้าสู่ระบบใหม่ · งานไม่หาย':s.state==='error'?'ซิงก์ไม่สำเร็จ · จะลองใหม่':n?'กำลังส่ง '+n+' รายการ':'ซิงก์แล้ว';
+    return s.state==='offline'?'ไม่มีสัญญาณ · รอส่ง '+n:s.state==='auth'?'ต้องเข้าสู่ระบบใหม่ · งานไม่หาย':s.state==='error'?'ส่งไม่สำเร็จ · จะลองใหม่เอง':n?'กำลังส่ง '+n+' รายการ':'ส่งให้ทีมแล้ว';
   }
   function renderSide(){
     sideEl.textContent='';
     var p=M.projects.filter(function(x){return x.id===M.project})[0];
     var hd=el('header',{class:'qa-hd'});
-    var tt=el('div',{class:'qa-tt'},el('h1',null,p?p.name:'ยังไม่มีโครงการ'),el('div',{class:'qa-sub',id:'qa-sync'},((M.company&&M.company.name)||'')+' · '+syncLine()));
-    var sr=el('a',{class:'qa-ib',href:'#/search','aria-label':'ค้นหาทุกช่อง'},ic('search'));
+    var tt=el('div',{class:'qa-tt'},el('h1',null,p?p.name:'ยังไม่มีโครงการ'),el('div',{class:'qa-sub',id:'qa-sync'},(ONLINE&&M.company&&M.company.name?M.company.name+' · ':'')+syncLine()));
+    var sr=el('a',{class:'qa-ib',href:'#/search','aria-label':'ค้นหาในโครงการนี้'},ic('search'));
     hd.append(tt,sr);sideEl.appendChild(hd);
     var sc=el('div',{class:'qa-scroll'}),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);sideEl.appendChild(sc);
     if(!p){
-      pad.appendChild(el('p',{class:'qa-empty'},ONLINE?'ยังไม่มีโครงการที่คุณถูกเพิ่ม · รอ PM หรือแอดมินเพิ่มคุณเข้าโครงการ':'ยังไม่มีโครงการ · สร้างรายงานแรก หรือกด + ที่แถบซ้ายเพื่อสร้างโครงการ'));
+      pad.appendChild(el('p',{class:'qa-empty'},ONLINE?'ยังไม่มีโครงการให้ตรวจ · ขอให้ PM หรือผู้ดูแลเพิ่มคุณเข้าโครงการ แล้วโครงการจะขึ้นที่นี่เอง':'ยังไม่มีโครงการ · กด “สร้างโครงการ” เพื่อเริ่ม'));
       if(!ONLINE)pad.appendChild(el('a',{class:'qa-btn pri',href:'#/newproject'},'สร้างโครงการ'));
       return;
     }
     var t=tasks(),mine=t.fix.length+t.re.length+t.req.length;
     var kp=el('div',{class:'qa-kpis'});
-    [['งานของฉัน',mine,'#0B1F3A','#/tasks'],['รอตรวจซ้ำ',t.re.length,'#1F5FA8','#/tasks/re'],['เลยกำหนด',t.late.length,'#C2372E','#/tasks/late']].forEach(function(k){
+    [['งานของฉัน',mine,'var(--qa-tx)','#/tasks'],['รอตรวจซ้ำ',t.re.length,'var(--qa-blu)','#/tasks/re'],['เลยกำหนด',t.late.length,'var(--qa-red)','#/tasks/late']].forEach(function(k){
       kp.appendChild(el('a',{class:'qa-kpi',href:k[3]},el('b',{style:'color:'+k[2]},String(k[1])),el('span',null,k[0])));
     });
     pad.appendChild(kp);
@@ -246,27 +247,29 @@
     M.channels.forEach(function(c){var g=c.kind==='announce'?'ทั่วไป':(c.category||'โซนงาน');if(!groups[g]){groups[g]=[];order.push(g)}groups[g].push(c)});
     if((M.byChannel['__nozone']||[]).length){if(!groups['ทั่วไป']){groups['ทั่วไป']=[];order.push('ทั่วไป')}groups['ทั่วไป'].push(chById('__nozone'))}
     order.sort(function(a,b){return (b==='ทั่วไป')-(a==='ทั่วไป')});
+    if(!order.filter(function(g){return g!=='ทั่วไป'}).length&&can('ch_manage')){groups['โซนงาน']=[];order.push('โซนงาน')}
+    var addG=order.filter(function(g){return g!=='ทั่วไป'})[0]||order[0];
     order.forEach(function(g,gi){
       var box=el('div',null);
       var sec=el('div',{class:'qa-sec'},el('span',null,g));
-      if(gi===0&&can('ch_manage')){
-        var ab=el('button',{type:'button',class:'qa-ib','aria-label':'สร้างช่องใหม่','aria-expanded':addingCh?'true':'false'},ic('plus'));
+      if(g===addG&&can('ch_manage')){
+        var ab=el('button',{type:'button',class:'qa-ib','aria-label':'เพิ่มชั้นหรือโซน','aria-expanded':addingCh?'true':'false'},ic('plus'));
         ab.addEventListener('click',function(){addingCh=!addingCh;renderSide()});sec.appendChild(ab);
       }
       box.appendChild(sec);
-      if(gi===0&&addingCh)box.appendChild(addChannelForm(g));
+      if(g===addG&&addingCh)box.appendChild(addChannelForm(g));
       groups[g].forEach(function(c){box.appendChild(chRow(c))});
       pad.appendChild(box);
     });
-    if(!M.channels.length&&!(M.byChannel['__nozone']||[]).length)pad.appendChild(el('p',{class:'qa-empty'},'ยังไม่มีช่อง · PM สร้างช่องตามชั้นหรือโซนได้ที่ปุ่ม +'));
+    if(!M.channels.length&&!(M.byChannel['__nozone']||[]).length)pad.appendChild(el('p',{class:'qa-empty'},'ยังไม่ได้แบ่งชั้นหรือโซน · กด + เพื่อเพิ่ม เช่น ชั้น 1, ชั้น 2'));
     var me=M.me||{};
-    var foot=el('a',{class:'qa-row',href:'#/me',style:'border-top:1px solid var(--qa-bd);background:#F0F3F7'},el('span',{class:'qa-av',style:'background:'+colorOf(me.id)},ini(me.name)),
+    var foot=el('a',{class:'qa-row',href:'#/me',style:'border-top:1px solid var(--qa-bd);background:var(--qa-side)'},el('span',{class:'qa-av',style:'background:'+colorOf(me.id)},ini(me.name)),
       el('span',{class:'qa-rt'},el('b',null,me.name||'ฉัน'),el('span',null,roleLine())),ic('gear',20));
     sideEl.appendChild(foot);
   }
   function roleLine(){var r=(M.myRoles||[]).map(function(id){var x=M.roles.filter(function(y){return y.id===id})[0];return x&&x.name}).filter(Boolean);return r.length?r.join(' · '):(ONLINE?'สมาชิก':'ใช้คนเดียวในเครื่องนี้')}
   function chRow(c){
-    var n=unreadOf(c.id),on=(route.name==='c'&&route.args[0]===c.id),cnt=itemsIn(c.id).filter(function(x){return x.st.open}).length;
+    var n=unreadOf(c.id),on=(route.name==='c'&&route.args[0]===c.id)||(route.name==='cs'&&route.args[0]===c.id)||(route.name==='t'&&(function(){var x=findItem(route.args[0],route.args[1]);return x&&x.ch===c.id})()),cnt=itemsIn(c.id).filter(function(x){return x.st.open}).length;
     var a=el('a',{class:'qa-ch'+(n?' unread':'')+(on?' on':''),href:'#/c/'+encodeURIComponent(c.id),'aria-current':on?'page':null},
       el('span',{class:'h','aria-hidden':'true'},c.kind==='announce'?'!':'#'),el('span',{style:'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'},c.name));
     if(c.hold)a.appendChild(el('span',{class:'qa-tag '+c.hold,title:c.hold==='H'?'จุดหยุดตรวจ':'จุดเชิญตรวจ'},c.hold));
@@ -276,14 +279,14 @@
   }
   function addChannelForm(cat){
     var f=el('form',{class:'qa-card',style:'margin:0 4px 8px;padding:10px;display:flex;flex-direction:column;gap:8px'});
-    var name=el('input',{placeholder:'ชื่อช่อง เช่น ชั้น 4','aria-label':'ชื่อช่องใหม่',style:'min-height:48px;padding:0 12px;border-radius:6px;border:1px solid #C9D2DC;font-size:16px'});
-    var ok=el('button',{type:'submit',class:'qa-btn pri',style:'flex:1'},'สร้างช่อง'),cn=el('button',{type:'button',class:'qa-btn'},'ยกเลิก');
+    var name=el('input',{placeholder:'เช่น ชั้น 4 หรือ ลานจอดรถ','aria-label':'ชื่อชั้นหรือโซน',style:'min-height:48px;padding:0 12px;border-radius:6px;border:1px solid #C9D2DC;font-size:16px'});
+    var ok=el('button',{type:'submit',class:'qa-btn pri',style:'flex:1'},'เพิ่ม'),cn=el('button',{type:'button',class:'qa-btn'},'ยกเลิก');
     cn.addEventListener('click',function(){addingCh=false;renderSide()});
     f.addEventListener('submit',function(e){e.preventDefault();var v=name.value.trim();if(!v)return;
       ok.disabled=true;saveCh({name:v,category:cat==='ทั่วไป'?'โซนงาน':cat,kind:'zone',position:M.channels.length}).then(function(r){
         addingCh=false;syncZones(v);return reloadChannels().then(function(){var c=(r&&r[0])||M.channels.filter(function(x){return x.name===v})[0];if(c)go('#/c/'+encodeURIComponent(c.id));else render()})
-      }).catch(function(e){ok.disabled=false;flash('สร้างช่องไม่สำเร็จ: '+((e&&e.message)||''))})});
-    f.append(name,el('div',{style:'display:flex;gap:8px'},ok,cn),el('span',{style:'font-size:12px;color:var(--qa-mu)'},'ช่อง = ชั้นหรือโซนงาน · ใช้เป็นตัวเลือกในช่องตำแหน่งของรายงานด้วย'));
+      }).catch(function(e){ok.disabled=false;flash('เพิ่มไม่สำเร็จ: '+((e&&e.message)||''))})});
+    f.append(name,el('div',{style:'display:flex;gap:8px'},ok,cn),el('span',{style:'font-size:12px;color:var(--qa-mu)'},'จะขึ้นเป็นตัวเลือกตอนกรอกตำแหน่งในรายงานด้วย'));
     setTimeout(function(){name.focus()},0);return f;
   }
   /* channel names are the project's zones: keep the location picker of the form in step */
@@ -378,7 +381,7 @@
   VIEWS.home=function(){
     var first=M.channels.filter(function(c){return c.kind==='zone'})[0];
     if(window.innerWidth>=900&&first){location.replace('#/c/'+encodeURIComponent(first.id));return}
-    mainEl.appendChild(el('p',{class:'qa-empty'},'เลือกช่องทางซ้ายเพื่อดูรายงานและพูดคุย'));
+    mainEl.appendChild(el('p',{class:'qa-empty'},'เลือกชั้นหรือโซนเพื่อดูรายงานและคุยกับทีม'));
   };
 
   /* ---------- view: channel feed (M2 / desktop Main) ---------- */
@@ -474,50 +477,100 @@
   }
   function canPost(c){if(!c||c.virtual||c.legacy)return false;if(c.kind==='announce')return can('ch_manage');return can('ch_post')||can('ins_create')}
   VIEWS.c=function(chId){
-    var c=chById(chId);if(!c){mainEl.appendChild(el('p',{class:'qa-empty'},'ไม่พบช่องนี้ หรือคุณไม่มีสิทธิ์เห็น'));return}
+    var c=chById(chId);if(!c){mainEl.appendChild(el('p',{class:'qa-empty'},'ไม่พบโซนนี้ หรือคุณไม่มีสิทธิ์เห็น'));return}
     var docs=(M.byChannel[chId]||[]).slice().sort(function(a,b){return String(b.data.updatedAt||'').localeCompare(String(a.data.updatedAt||''))});
     var its=itemsIn(chId),open=its.filter(function(x){return x.st.open}).length;
     var right=[];
-    if(can('ch_manage')&&!c.virtual)right.push(el('a',{class:'qa-ib',href:'#/cs/'+encodeURIComponent(chId),'aria-label':'ตั้งค่าช่อง'},ic('gear')));
-    var nb=el('button',{type:'button',class:'qa-btn pri sm',style:'margin-left:4px'},ic('plus',18),'รายงาน');nb.addEventListener('click',function(){newReport(chId)});
+    if(can('ch_manage')&&!c.virtual)right.push(el('a',{class:'qa-ib',href:'#/cs/'+encodeURIComponent(chId),'aria-label':'ตั้งค่าโซนนี้'},ic('gear')));
+    var nb=el('button',{type:'button',class:'qa-btn pri sm qa-mainnew',style:'margin-left:4px'},ic('plus',18),'รายงาน');nb.addEventListener('click',function(){newReport(chId)});
     if(can('ins_create')&&!c.virtual&&c.kind!=='announce')right.push(nb);
     mainEl.appendChild(header((c.kind==='announce'?'':'#')+c.name+(c.hold?' · '+c.hold:''),docs.length+' รายงาน · ค้าง '+open+(c.standard_ref?' · '+c.standard_ref:''),{right:right}));
     var sc=scroller(),feed=el('div',{class:'qa-feed',id:'qa-feed'});sc.appendChild(feed);mainEl.appendChild(sc);
-    if(c.hold==='H'&&open)feed.appendChild(el('div',{class:'qa-note bad',role:'note'},el('b',null,'จุดหยุดตรวจ: '),txt('ยังมี '+open+' รายการที่ต้องแก้ · งานขั้นถัดไปที่ผูกกับช่องนี้ในแผนงานยังเริ่มไม่ได้')));
+    if(c.hold==='H'&&open)feed.appendChild(el('div',{class:'qa-note bad',role:'note'},el('b',null,'จุดหยุดตรวจ: '),txt('ยังมี '+open+' รายการที่ต้องแก้ · งานขั้นถัดไปในแผนงานยังเริ่มไม่ได้จนกว่าจะตรวจผ่าน')));
     var entries=docs.map(function(d){return {t:d.data.updatedAt||d.data.createdAt||'',d:d}});
     var drawn=false;
     function draw(msgs){
       feed.querySelectorAll('.qa-x').forEach(function(n){n.remove()});
       var all=entries.concat((msgs||[]).map(function(m){return {t:m.created_at,m:m}})).sort(function(a,b){return String(a.t).localeCompare(String(b.t))});
       var lastDay='';
-      if(!all.length)feed.appendChild(el('p',{class:'qa-empty qa-x'},c.kind==='announce'?'ยังไม่มีประกาศ':'ยังไม่มีรายงานในช่องนี้ · กด “รายงาน” เพื่อเริ่มตรวจ หรือพิมพ์คุยกับทีมด้านล่าง'));
+      if(!all.length)feed.appendChild(el('p',{class:'qa-empty qa-x'},c.kind==='announce'?'ยังไม่มีประกาศ':'ยังไม่มีรายงานในโซนนี้ · กด “สร้างรายงาน” เพื่อเริ่มตรวจ หรือพิมพ์คุยกับทีมด้านล่าง'));
       all.forEach(function(e){var day=fmtDay(e.t);if(day!==lastDay){feed.appendChild(el('div',{class:'qa-day qa-x'},day));lastDay=day}
         var n=e.d?repCard(e.d,chId):msgView(e.m);n.classList.add('qa-x');feed.appendChild(n)});
       if(!drawn){sc.scrollTop=sc.scrollHeight;drawn=true}
     }
     draw([]);
     if(!c.virtual)W.messages({channel:chId}).then(function(ms){if(route.name==='c'&&route.args[0]===chId)draw(ms)}).catch(function(){});
-    if(c.legacy)mainEl.appendChild(el('div',{class:'qa-note info',style:'margin:8px'},'แชทในช่องจะใช้ได้เมื่อผู้ดูแลอัปเดตเซิร์ฟเวอร์ (migration 006) · รายงานและงานแก้ใช้ได้ตามปกติ'));
+    if(c.legacy)mainEl.appendChild(el('div',{class:'qa-note info',style:'margin:8px'},'ยังพิมพ์คุยในโครงการนี้ไม่ได้ (ผู้ดูแลระบบยังไม่เปิดใช้) · ตรวจงานและติดตามงานแก้ได้ตามปกติ'));
     if(canPost(c))mainEl.appendChild(composer({channel:chId,label:'ข้อความถึง #'+c.name,placeholder:'ข้อความถึง #'+c.name+'…',note:ONLINE?null:'โหมดออฟไลน์: ข้อความเก็บในเครื่องนี้เท่านั้น'}));
-    else if(!c.virtual)mainEl.appendChild(el('div',{class:'qa-comp-note'},c.kind==='announce'?'เฉพาะผู้ดูแลช่องประกาศได้':'คุณดูช่องนี้ได้ แต่ส่งข้อความไม่ได้'));
+    else if(!c.virtual)mainEl.appendChild(el('div',{class:'qa-comp-note'},c.kind==='announce'?'เฉพาะ PM หรือผู้ดูแลที่ประกาศได้':'คุณดูได้ แต่ส่งข้อความในโซนนี้ไม่ได้'));
     if(M.unread[chId]){W.markRead(chId);M.unread[chId]=0}
-    /* right panel (desktop): every check item in this channel */
-    asideEl.hidden=false;
-    var flt=sticky.flt||'open';
-    var ah=el('header',{class:'qa-hd'},el('div',{class:'qa-tt'},el('h2',null,'รายการตรวจในช่องนี้'),el('div',{class:'qa-sub'},its.length+' รายการ · ค้าง '+open)));
-    asideEl.appendChild(ah);
-    var chips=el('div',{class:'qa-chips',role:'tablist',style:'padding:8px 12px'});
-    [['open','ค้าง'],['re','รอตรวจซ้ำ'],['closed','ปิด/ผ่าน'],['all','ทั้งหมด']].forEach(function(f){var b=el('button',{type:'button',role:'tab',class:'qa-chip','aria-selected':flt===f[0]?'true':'false'},f[1]);
-      b.addEventListener('click',function(){sticky.flt=f[0];render()});chips.appendChild(b)});
-    asideEl.appendChild(chips);
-    var list=el('div',{class:'qa-scroll'}),lp=el('div',{class:'qa-pad'});list.appendChild(lp);asideEl.appendChild(list);
-    its.filter(function(x){return flt==='all'||(flt==='open'&&x.st.open)||(flt==='re'&&x.st.k==='re')||(flt==='closed'&&!x.st.open&&x.st.k!=='none')}).forEach(function(x){lp.appendChild(taskCard(x))});
-    if(!lp.children.length)lp.appendChild(el('p',{class:'qa-empty'},'ไม่มีรายการในกลุ่มนี้'));
+    zonePanel(chId,null);
   };
-  function stColor(st){return st.k==='ok'||st.k==='closed'?'#1E7A46':st.k==='re'?'#1F5FA8':(st.late||st.k==='bad'||st.k==='again')?'#C2372E':'#B26B00'}
+  /* ---------- zone panel (desktop right column, canvas Main): every check item in the zone ---------- */
+  function sigOf(x){var it=x.it;return [it.res,it.rres,it.st,it.asg,it.due,(it.after||[]).length,it.fnote||''].join('|')}
+  function seenMap(){return lsJ('qa-seen:'+(myId()||''),{})}
+  function isUnread(x){if(isMine(x.doc))return false;return seenMap()[x.doc.id+'/'+x.it.id]!==sigOf(x)}
+  function markSeen(list){var m=seenMap();[].concat(list).forEach(function(x){m[x.doc.id+'/'+x.it.id]=sigOf(x)});lsSJ('qa-seen:'+(myId()||''),m)}
+  var REP={};
+  function zonePanel(chId,selKey){
+    var c=chById(chId);if(!c)return;
+    var its=itemsIn(chId).filter(function(x){return x.st.k!=='none'||(x.it.chk||x.it.note)});
+    var rank=function(x){return x.st.open?(x.st.late?0:x.st.k==='re'?2:1):3};
+    its.sort(function(a,b){return rank(a)-rank(b)||String(b.doc.data.updatedAt||'').localeCompare(String(a.doc.data.updatedAt||''))});
+    asideEl.hidden=false;
+    var flt=sticky.zf&&sticky.zfCh===chId?sticky.zf:'all',q=sticky.zfCh===chId&&sticky.zq||'';
+    /* header: zone, what it covers, create report */
+    var hd=el('header',{class:'qa-zh'});
+    var top=el('div',{class:'qa-zh-top'},el('span',{class:'h','aria-hidden':'true'},c.kind==='announce'?'!':'#'),
+      el('div',{class:'qa-tt'},el('h2',null,c.name),el('div',{class:'qa-sub'},[c.category&&c.category!=='โซนงาน'?c.category:'',c.standard_ref||'',its.length+' จุด'].filter(Boolean).join(' · '))));
+    if(can('ins_create')&&!c.virtual&&c.kind!=='announce'){var nb=el('button',{type:'button',class:'qa-btn pri sm','aria-haspopup':'dialog'},ic('plus',18),'สร้างรายงาน');nb.addEventListener('click',function(){newReport(chId)});top.appendChild(nb)}
+    hd.appendChild(top);
+    var sl=el('label',{class:'qa-zs'},ic('search',16));var si=el('input',{type:'search','aria-label':'ค้นหาในโซนนี้',placeholder:'ค้นหาในโซนนี้ · Ctrl+K',value:q});sl.appendChild(si);hd.appendChild(sl);
+    var unread=its.filter(isUnread);
+    if(unread.length){var ur=el('div',{class:'qa-zu',role:'status'},el('span',{class:'d','aria-hidden':'true'}),el('span',{style:'flex:1'},'ยังไม่อ่าน '+unread.length+' รายการ'));
+      var ra=el('button',{type:'button'},'อ่านทั้งหมดแล้ว');ra.addEventListener('click',function(){markSeen(unread);if(M.unread[chId]){W.markRead(chId);M.unread[chId]=0}render()});ur.appendChild(ra);hd.appendChild(ur)}
+    var cats={};its.forEach(function(x){var k=(x.it.cat||'').trim();if(k)cats[k]=(cats[k]||0)+1});
+    var F=[['all','ทั้งหมด',its.length],['fix','ต้องแก้',its.filter(function(x){return x.st.open&&x.st.k!=='re'}).length],['re','รอตรวจซ้ำ',its.filter(function(x){return x.st.k==='re'}).length],['late','เลยกำหนด',its.filter(function(x){return x.st.late}).length]]
+      .concat(Object.keys(cats).sort(function(a,b){return cats[b]-cats[a]}).slice(0,6).map(function(k){return ['cat:'+k,k,null]}));
+    var fr=el('div',{class:'qa-chips qa-zf',role:'group','aria-label':'กรองรายการ'});
+    F.forEach(function(f){var b=el('button',{type:'button',class:'qa-chip'+(f[0]==='fix'?' fix':''),'aria-pressed':flt===f[0]?'true':'false'},f[1]+(f[2]!=null?' '+f[2]:''));
+      b.addEventListener('click',function(){sticky.zf=f[0];sticky.zfCh=chId;render()});fr.appendChild(b)});
+    hd.appendChild(fr);asideEl.appendChild(hd);
+    var list=el('div',{class:'qa-scroll qa-zl'});asideEl.appendChild(list);
+    var shown=its.filter(function(x){return flt==='all'||(flt==='fix'&&x.st.open&&x.st.k!=='re')||(flt==='re'&&x.st.k==='re')||(flt==='late'&&x.st.late)||(flt.indexOf('cat:')===0&&(x.it.cat||'').trim()===flt.slice(4))});
+    var cards=shown.map(function(x){var n=postCard(x,selKey===x.doc.id+'/'+x.it.id);list.appendChild(n);return {n:n,t:(itemTitle(x.it)+' '+(x.it.loc||'')+' '+(x.it.cat||'')+' '+(x.it.note||'')).toLowerCase()}});
+    var empty=el('p',{class:'qa-empty',hidden:true},'ไม่มีรายการที่ตรงกัน');list.appendChild(empty);
+    function filt(){var v=si.value.trim().toLowerCase();sticky.zq=si.value;sticky.zfCh=chId;var k=0;cards.forEach(function(c_){var on=!v||c_.t.indexOf(v)>=0;c_.n.hidden=!on;if(on)k++});empty.hidden=k>0}
+    si.addEventListener('input',filt);filt();
+    if(!shown.length){empty.hidden=false;empty.textContent=its.length?'ไม่มีรายการในกลุ่มนี้':'ยังไม่มีจุดตรวจในโซนนี้ · กด “สร้างรายงาน” เพื่อเริ่มตรวจ'}
+    var sel=list.querySelector('.qa-post.sel');if(sel)setTimeout(function(){sel.scrollIntoView({block:'nearest'})},0);
+    if(!c.virtual&&W.replies)W.replies(chId).then(function(n){REP[chId]=n||{};list.querySelectorAll('.qa-post').forEach(function(p_){var k=p_.getAttribute('data-sid'),r=(n||{})[k]||0;var e=p_.querySelector('.rp');if(e)e.lastChild.textContent=String(r);var sy=p_.querySelector('.sy');if(sy)sy.hidden=!(n||{})['~'+k]})}).catch(function(){});
+  }
+  function postCard(x,sel){
+    var it=x.it,un=isUnread(x),sid=sidOf(x.doc.id,it.id),rest=locRest(it.loc,x.zone);
+    var a=el('a',{class:'qa-post'+(sel?' sel':'')+(un?' un':''),href:'#/t/'+encodeURIComponent(x.doc.id)+'/'+encodeURIComponent(it.id),'data-sid':sid,'aria-current':sel?'true':null,
+      'aria-label':(un?'ยังไม่อ่าน · ':'')+x.st.label+' · '+itemTitle(it)+(rest?' · '+rest:'')});
+    if(un)a.appendChild(el('span',{class:'qa-ud','aria-hidden':'true',title:'ยังไม่อ่าน'}));
+    var th=el('div',{class:'qa-th'});var ph=(it.before||[])[0]||(it.after||[])[0];
+    if(ph){var im=photoImg(ph,'');im.alt='';th.appendChild(im)}else th.appendChild(ic('camera',22));
+    a.appendChild(th);
+    var who=it.asg?W.nameOf(it.asg):(x.st.open?'ยังไม่มอบหมาย':(isMine(x.doc)?'คุณ':W.nameOf(x.doc.owner||x.doc.data._owner)));
+    var due=it.due&&x.st.open?(x.st.late?'เลย '+fmtDate(it.due):'ครบ '+fmtDate(it.due)):'';
+    var body=el('div',{class:'qa-pb'},
+      el('div',{class:'l1'},el('span',{class:'qa-pill qa-p-'+stKey(x.st)},x.st.label),el('span',{class:'mu'},[it.cat||'',rest].filter(Boolean).join(' · ')||(x.doc.data.meta&&x.doc.data.meta.docno)||'')),
+      el('b',null,itemTitle(it)),
+      el('div',{class:'l3'},el('span',{class:'w'},(it.asg||!x.st.open)?el('span',{class:'qa-av xs',style:'background:'+colorOf(it.asg||x.doc.owner||myId()),'aria-hidden':'true'},ini(it.asg?who:(isMine(x.doc)?(M.me&&M.me.name):who))):null,txt(who)),
+        due?el('span',{class:x.st.late?'late':''},due):null,
+        el('span',{class:'rp','aria-label':'ข้อความ'},ic('chat',14),txt(String(((REP[x.ch]||{})[sid])||0))),
+        el('span',{class:'sy',hidden:true},'รอส่ง')));
+    a.appendChild(body);
+    return a;
+  }
+  function stKey(st){return st.k==='ok'||st.k==='closed'?'ok':st.k==='re'?'re':(st.late||st.k==='bad'||st.k==='again')?'bad':st.k==='none'?'mu':'fix'}
+  function stColor(st){return {ok:'var(--qa-grn)',re:'var(--qa-blu)',bad:'var(--qa-red)',fix:'var(--qa-ora)',mu:'var(--qa-mu)'}[stKey(st)]}
   function taskCard(x,extra){
     var c=stColor(x.st),b=el('a',{class:'qa-task',href:'#/t/'+encodeURIComponent(x.doc.id)+'/'+encodeURIComponent(x.it.id),style:'border-left-color:'+c});
-    b.append(el('span',{class:'qa-pill',style:'background:'+c+'1F;color:'+c},x.st.label),el('b',null,itemTitle(x.it)),
+    b.append(el('span',{class:'qa-pill qa-p-'+stKey(x.st)},x.st.label),el('b',null,itemTitle(x.it)),
       el('span',{class:'m'},el('span',null,(x.zone?'#'+x.zone:'ไม่ระบุโซน')+(function(){var r=locRest(x.it.loc,x.zone),t=itemTitle(x.it);return r&&r!==t?' · '+r:''})()+' · '+(x.doc.data.meta&&x.doc.data.meta.docno||'')+(x.it.asg?' · '+W.nameOf(x.it.asg):'')+(extra?' · '+extra:'')),el('span',null,x.it.due?(x.st.late?'เลย '+fmtDate(x.it.due):'ครบ '+fmtDate(x.it.due)):'')));
     return b;
   }
@@ -530,13 +583,14 @@
   function photoRow(ids,label){if(!(ids||[]).length)return null;var p=el('div',{class:'qa-photos'},el('span',{class:'lbl'},label));ids.forEach(function(id){p.appendChild(photoImg(id,label))});return p}
   VIEWS.t=function(docId,itemId){
     var x=findItem(docId,itemId);
-    if(!x){mainEl.appendChild(header('จุดตรวจ','',{back:'#/'}));mainEl.appendChild(el('p',{class:'qa-empty'},'ไม่พบรายการนี้ (อาจถูกลบ หรือยังซิงก์ไม่ถึงเครื่องนี้)'));return}
+    if(!x){mainEl.appendChild(header('จุดตรวจ','',{back:'#/'}));mainEl.appendChild(el('p',{class:'qa-empty'},'ไม่พบรายการนี้ (อาจถูกลบ หรือยังส่งมาไม่ถึงเครื่องนี้)'));return}
     var it=x.it,d=x.doc,data=d.data,st=x.st,ch=chById(x.ch),me=myId(),own=isMine(d);
+    markSeen(x);zonePanel(x.ch,d.id+'/'+it.id);
     mainEl.appendChild(header(itemTitle(it),(x.zone?'#'+x.zone+' · ':'')+docTitle(data),{back:'#/c/'+encodeURIComponent(x.ch)}));
     var sc=scroller(),feed=el('div',{class:'qa-feed'});sc.appendChild(feed);mainEl.appendChild(sc);
     /* the item card */
     var card=el('div',{class:'qa-card',style:'padding:14px;display:flex;flex-direction:column;gap:8px'});
-    card.append(el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap'},el('span',{class:'qa-pill',style:'background:'+stColor(st)+'1F;color:'+stColor(st)},st.label),
+    card.append(el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap'},el('span',{class:'qa-pill qa-p-'+stKey(st)},st.label),
       it.cat?el('span',{class:'qa-pill qa-p-mu'},it.cat):null,it.ref?el('span',{class:'qa-pill qa-p-pur'},'แบบ '+it.ref):null),
       el('b',{style:'font-size:17px'},itemTitle(it)),
       el('div',{style:'font-size:14px;color:var(--qa-mu)'},'ตำแหน่ง: '+(it.loc||'ไม่ระบุ')+(it.asg?' · ผู้แก้: '+W.nameOf(it.asg):'')+(it.due?' · ครบกำหนด '+fmtDate(it.due):'')));
@@ -558,9 +612,9 @@
     var base=[];
     base.push({t:data.createdAt||'',n:evRow('#98A2B3',owner,'บันทึกในรายงาน '+docTitle(data),data.createdAt)});
     if(it.res)base.push({t:data.createdAt||'',n:evRow(stColor(statusOf({res:it.res})),owner,'ลงผล “'+(it.res==='ok'?'ผ่าน':it.res==='bad'?'ไม่ผ่าน':'ต้องแก้ไข')+'”',null)});
-    if(it.asg)base.push({t:data.createdAt||'',n:evRow('#B26B00',owner,'มอบหมายให้ '+W.nameOf(it.asg)+(it.due?' ครบ '+fmtDate(it.due):''),null)});
+    if(it.asg)base.push({t:data.createdAt||'',n:evRow('var(--qa-ora)',owner,'มอบหมายให้ '+W.nameOf(it.asg)+(it.due?' ครบ '+fmtDate(it.due):''),null)});
     if(it.st==='fixed'||it.fnote)base.push({t:it.rat||'',n:evRow('#1F5FA8',it.asg?W.nameOf(it.asg):'ผู้แก้','แจ้งแก้แล้ว'+(it.fnote?': '+it.fnote:''),null)});
-    if(it.rres)base.push({t:it.rdate||'',n:evRow(it.rres==='ok'?'#1E7A46':'#C2372E',owner,'ตรวจซ้ำ “'+(it.rres==='ok'?'ผ่าน':'ยังไม่ผ่าน')+'”'+(it.rnote?': '+it.rnote:''),it.rdate)});
+    if(it.rres)base.push({t:it.rdate||'',n:evRow(it.rres==='ok'?'var(--qa-grn)':'var(--qa-red)',owner,'ตรวจซ้ำ “'+(it.rres==='ok'?'ผ่าน':'ยังไม่ผ่าน')+'”'+(it.rnote?': '+it.rnote:''),it.rdate)});
     function drawHist(evs,msgs){
       hist.textContent='';
       var all=base.slice();
@@ -623,7 +677,7 @@
 
   /* ---------- view: my tasks (M5 / D-MyTasks) ---------- */
   VIEWS.tasks=function(tab){
-    var t=tasks();tab=tab||(t.fix.length?'fix':t.re.length?'re':'mine');
+    var t=tasks();tab=tab||(t.fix.length?'fix':t.re.length?'re':t.mine.length||!t.none.length?'mine':'none');
     var me=M.me||{};
     var hd=el('header',{class:'qa-hd qa-navy',style:'flex-direction:column;align-items:stretch;gap:10px;padding:14px 16px'});
     hd.append(el('div',{style:'display:flex;align-items:center;gap:10px'},avatar(me.id,me.name),el('div',{class:'qa-tt'},el('h2',null,'งานของฉัน'),el('div',{class:'qa-sub'},(me.name||'')+' · '+roleLine()))));
@@ -631,7 +685,7 @@
     [[t.late.length,'เลยกำหนด','#FF9C94'],[t.re.length,'รอฉันตรวจซ้ำ','#9CCBFF'],[t.fix.length,'ฉันต้องแก้','#FFD08A']].forEach(function(k){kp.appendChild(el('div',{class:'qa-kpi',style:'background:rgba(255,255,255,.1);border:0;color:#fff'},el('b',{style:'color:'+k[2]},String(k[0])),el('span',{style:'color:#C9D6E6'},k[1])))});
     hd.appendChild(kp);mainEl.appendChild(hd);
     var TABS=[['fix','ฉันต้องแก้',t.fix],['re','รอตรวจซ้ำ',t.re],['req','ใบขอตรวจ',t.req],['mine','ติดตามที่มอบ',t.mine],['late','เลยกำหนด',t.late],['none','ยังไม่มอบหมาย',t.none],['plan','งานในแผน',null]];
-    var tl=el('div',{class:'qa-chips',role:'tablist','aria-label':'ประเภทงาน',style:'padding:10px 12px;background:#fff;border-bottom:1px solid var(--qa-bd)'});
+    var tl=el('div',{class:'qa-chips',role:'tablist','aria-label':'ประเภทงาน',style:'padding:10px 12px;background:var(--qa-card);border-bottom:1px solid var(--qa-bd)'});
     TABS.forEach(function(x){var a=el('a',{role:'tab',class:'qa-chip',href:'#/tasks/'+x[0],'aria-selected':tab===x[0]?'true':'false'},x[1]+(x[2]?' '+x[2].length:''));tl.appendChild(a)});
     mainEl.appendChild(tl);
     var sc=scroller(),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);mainEl.appendChild(sc);
@@ -639,8 +693,8 @@
     if(tab==='req'){
       if(!ONLINE){pad.appendChild(el('p',{class:'qa-empty'},'ใบขอตรวจใช้ได้ในโหมดออนไลน์ (โฟร์แมนขอ → QC รับนัด)'));return}
       var nb=el('button',{type:'button',class:'qa-btn pri'},ic('plus',18),'ขอตรวจงาน');nb.addEventListener('click',function(){window.__qcOnline.requestForm({})});pad.appendChild(nb);
-      t.req.forEach(function(r){var c=r.status==='requested'?'#B26B00':'#1F5FA8';
-        var a=el('button',{type:'button',class:'qa-task',style:'border-left-color:'+c},el('span',{class:'qa-pill',style:'background:'+c+'1F;color:'+c},r.status==='requested'?'รอรับนัด':'รับนัดแล้ว'),el('b',null,r.title),
+      t.req.forEach(function(r){var c=r.status==='requested'?'var(--qa-ora)':'var(--qa-blu)';
+        var a=el('button',{type:'button',class:'qa-task',style:'border-left-color:'+c},el('span',{class:'qa-pill '+(r.status==='requested'?'qa-p-fix':'qa-p-re')},r.status==='requested'?'รอรับนัด':'รับนัดแล้ว'),el('b',null,r.title),
           el('span',{class:'m'},el('span',null,r.inspector_id===myId()?'ขอโดย '+W.nameOf(r.requested_by):'ผู้ตรวจ '+W.nameOf(r.inspector_id)),el('span',null,fmtDay(r.scheduled_at)+' '+fmtTime(r.scheduled_at))));
         a.addEventListener('click',function(){window.__qcOnline.tasks('req')});pad.appendChild(a)});
       if(!t.req.length)pad.appendChild(el('p',{class:'qa-empty'},'ไม่มีใบขอตรวจที่ค้าง'));return;
@@ -655,9 +709,9 @@
     mainEl.appendChild(header('แจ้งเตือน','เฉพาะสิ่งที่เกี่ยวกับคุณ',{back:'#/'}));
     var sc=scroller(),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);mainEl.appendChild(sc);
     var t=tasks(),rows=[];
-    t.fix.forEach(function(x){rows.push([x,'มอบงานแก้ให้คุณ','#B26B00'])});
+    t.fix.forEach(function(x){rows.push([x,'มอบงานแก้ให้คุณ','var(--qa-ora)'])});
     t.re.forEach(function(x){rows.push([x,'แจ้งแก้แล้ว · รอคุณตรวจซ้ำ','#1F5FA8'])});
-    t.late.forEach(function(x){rows.push([x,'เลยกำหนดแล้ว','#C2372E'])});
+    t.late.forEach(function(x){rows.push([x,'เลยกำหนดแล้ว','var(--qa-red)'])});
     rows.forEach(function(r){pad.appendChild(taskCard(r[0],r[1]))});
     t.req.forEach(function(r){pad.appendChild(el('a',{class:'qa-task',href:'#/tasks/req',style:'border-left-color:#B26B00'},el('b',null,'ใบขอตรวจ: '+r.title),el('span',{class:'m'},el('span',null,W.nameOf(r.requested_by)),el('span',null,fmtDay(r.scheduled_at)))))});
     if(!pad.children.length)pad.appendChild(el('p',{class:'qa-empty'},'ไม่มีอะไรใหม่ · งานที่มอบให้คุณ ผลตรวจซ้ำ และใบขอตรวจจะขึ้นที่นี่'));
@@ -667,9 +721,9 @@
   /* ---------- view: search across channels (M30 / D-Search) ---------- */
   VIEWS.search=function(q){
     q=q||'';
-    mainEl.appendChild(header('ค้นหา','ทุกช่องในโครงการนี้',{back:'#/'}));
+    mainEl.appendChild(header('ค้นหา','ทั้งโครงการ',{back:'#/'}));
     var inp=el('input',{type:'search',value:q,'aria-label':'ค้นหา',placeholder:'คำในรายการ ตำแหน่ง เลขที่ หรือข้อความ',style:'width:100%;min-height:52px;padding:0 14px;border-radius:8px;border:1px solid #C9D2DC;font-size:17px'});
-    var box=el('div',{class:'qa-pad',style:'background:#fff;border-bottom:1px solid var(--qa-bd)'},inp);mainEl.appendChild(box);
+    var box=el('div',{class:'qa-pad',style:'background:var(--qa-card);border-bottom:1px solid var(--qa-bd)'},inp);mainEl.appendChild(box);
     var sc=scroller(),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);mainEl.appendChild(sc);
     function run(){
       var v=inp.value.trim().toLowerCase();pad.textContent='';if(!v){pad.appendChild(el('p',{class:'qa-empty'},'พิมพ์อย่างน้อย 1 คำ'));return}
@@ -706,10 +760,10 @@
       row('#/overview','chart','ภาพรวมโครงการ','ความคืบหน้า · จุดค้าง · จุดหยุดตรวจ'),row('#/plan','plan','แผนงาน','แผนหลัก · 3 สัปดาห์ · สัปดาห์นี้'),row('#/drawings','drawing','แบบล่าสุด','แบบแปลนที่ใช้ในโครงการนี้'),
       row(null,'doc','รายงานแบบอื่น','แบบฟอร์มสำเร็จรูป / สร้างเอง',function(){if(window.__qcForms)window.__qcForms.library()}),
       row(null,'zip','รับไฟล์ ZIP','งานที่เพื่อนส่งมา',function(){if(window.__qcHome&&window.__qcHome.importZip)window.__qcHome.importZip()})]));
-    var dev=[row('#/data','cloud','ข้อมูลในเครื่องและการซิงก์',ONLINE?'ข้อมูลอยู่ที่ไหน · สำรอง · ถังขยะ':'สำรองเป็นไฟล์ · ถังขยะ'),prefSwitch('qa-sun','โหมดกลางแดด','สีเข้มขึ้น อ่านง่ายกลางแจ้ง'),prefSwitch('qa-big','ตัวอักษรใหญ่','ทั้งแอป')];
+    var dev=[row('#/data','cloud','ข้อมูลในเครื่องและการส่งให้ทีม',ONLINE?'ข้อมูลอยู่ที่ไหน · สำรอง · ถังขยะ':'สำรองเป็นไฟล์ · ถังขยะ'),prefSwitch('qa-sun','โหมดกลางแดด','สีเข้มขึ้น อ่านง่ายกลางแจ้ง'),prefSwitch('qa-big','ตัวอักษรใหญ่','ทั้งแอป')];
     pad.appendChild(group('เครื่องนี้',dev));
     var acc=[row('#/profile','bell','การแจ้งเตือน · LINE · ตั้งค่า','ชื่อผู้ตรวจ ลายเซ็น และโหมดการใช้งาน'),row('#/company','building','บริษัทและรหัสเข้า',(M.company&&M.company.name)||''),
-      row('#/members','people','สมาชิกโครงการ','เพิ่มคนและให้ยศ'),(can('*')||!ONLINE)?row('#/roles','shield','ยศและสิทธิ์','แบบ Discord · ใครทำอะไรได้'):null,row('#/welcome','help','ช่วยเหลือและเริ่มใช้งาน','ติดตั้งแอป · อนุญาตกล้อง/แจ้งเตือน')];
+      row('#/members','people','สมาชิกโครงการ','เพิ่มคนและให้ยศ'),(can('*')||!ONLINE)?row('#/roles','shield','ยศและสิทธิ์','ใครทำอะไรได้บ้าง'):null,row('#/welcome','help','ช่วยเหลือและเริ่มใช้งาน','ติดตั้งแอป · อนุญาตกล้อง/แจ้งเตือน')];
     pad.appendChild(group('บัญชี',acc));
     pad.appendChild(el('p',{style:'text-align:center;font-size:12px;color:var(--qa-mu)'},'QC App · '+(ONLINE?'โหมดออนไลน์':'โหมดออฟไลน์ (เครื่องนี้)')));
   };
@@ -721,20 +775,20 @@
 
   /* ---------- view: data & sync (M37) ---------- */
   VIEWS.data=function(){
-    mainEl.appendChild(header('ข้อมูลในเครื่องและการซิงก์',ONLINE?'ออนไลน์ · ซิงก์กับทีม':'ออฟไลน์ · เก็บในเครื่องนี้',{back:'#/me'}));
+    mainEl.appendChild(header('ข้อมูลในเครื่องและการส่งให้ทีม',ONLINE?'ออนไลน์ · ทีมเห็นงานเดียวกัน':'ออฟไลน์ · เก็บในเครื่องนี้',{back:'#/me'}));
     var sc=scroller(),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);mainEl.appendChild(sc);
     var s=ONLINE&&window.__qcSync?window.__qcSync():null;
     var stat=el('div',{class:'qa-card',style:'padding:12px 14px;display:flex;flex-direction:column;gap:8px'});
-    stat.append(el('b',{style:'font-size:16px'},syncLine()),el('span',{style:'font-size:13px;color:var(--qa-mu)'},ONLINE?'ซิงก์เองทุกครั้งที่มีสัญญาณ · ถ้าหลุด ทุกปุ่มยังใช้ได้และขึ้นว่า “รอส่ง”':'ข้อมูลอยู่ในเครื่องนี้เท่านั้น · สำรองเป็นไฟล์อย่างสม่ำเสมอ หรือเปลี่ยนเป็นโหมดออนไลน์เพื่อให้ทีมเห็น'));
-    if(ONLINE){var sy=el('button',{type:'button',class:'qa-btn'},ic('refresh',18),'ซิงก์ตอนนี้');sy.addEventListener('click',function(){window.__qcOnline.sync();flash('กำลังซิงก์…');setTimeout(refresh,1500)});stat.appendChild(sy)}
+    stat.append(el('b',{style:'font-size:16px'},syncLine()),el('span',{style:'font-size:13px;color:var(--qa-mu)'},ONLINE?'ส่งให้ทีมเองทุกครั้งที่มีสัญญาณ · ไม่มีสัญญาณก็ทำงานต่อได้ งานจะขึ้นว่า “รอส่ง”':'ข้อมูลอยู่ในเครื่องนี้เท่านั้น · สำรองเป็นไฟล์อย่างสม่ำเสมอ หรือเปลี่ยนเป็นโหมดออนไลน์เพื่อให้ทีมเห็น'));
+    if(ONLINE){var sy=el('button',{type:'button',class:'qa-btn'},ic('refresh',18),'ส่งตอนนี้');sy.addEventListener('click',function(){window.__qcOnline.sync();flash('กำลังส่ง…');setTimeout(refresh,1500)});stat.appendChild(sy)}
     pad.appendChild(stat);
     /* where each kind of data lives */
     var nDocs=M.docs.filter(isMine).length,nPh=0,nBin=0;M.docs.filter(isMine).forEach(function(d){(d.data.items||[]).forEach(function(it){nPh+=(it.before||[]).length+(it.after||[]).length});nBin+=(d.data.bin||[]).length});
     var q=W.pendingMessages?W.pendingMessages():0,pend=s?s.pending:0;
     var rowsD=[['รายงานตรวจงานของคุณ',nDocs+' ฉบับ',ONLINE?(pend?'รอส่ง '+pend:'บนระบบ'):'ในเครื่องนี้',ONLINE&&!pend],
       ['รูปถ่าย',nPh+' รูป',ONLINE?'บนระบบ':'ในเครื่องนี้',ONLINE],
-      ['ข้อความในช่องและจุดตรวจ',q?'รอส่ง '+q:'—',ONLINE?(q?'รอส่ง':'บนระบบ'):'ในเครื่องนี้',ONLINE&&!q],
-      ['รายงานแบบอื่น',ONLINE&&s&&s.forms?(s.forms.ready?'ซิงก์ได้':'ยังไม่ซิงก์'):'—',ONLINE&&s&&s.forms&&s.forms.ready?'บนระบบ':'ในเครื่องนี้',ONLINE&&s&&s.forms&&s.forms.ready],
+      ['ข้อความคุยกับทีม',q?'รอส่ง '+q:'—',ONLINE?(q?'รอส่ง':'บนระบบ'):'ในเครื่องนี้',ONLINE&&!q],
+      ['รายงานแบบอื่น',ONLINE&&s&&s.forms?(s.forms.ready?'ส่งให้ทีมได้':'ยังอยู่ในเครื่องนี้'):'—',ONLINE&&s&&s.forms&&s.forms.ready?'บนระบบ':'ในเครื่องนี้',ONLINE&&s&&s.forms&&s.forms.ready],
       ['รายการที่ถูกลบ (กู้คืนได้ 30 วัน)',nBin+' รายการ',ONLINE?'บนระบบ':'ในเครื่องนี้',ONLINE]];
     var tb=el('div',{class:'qa-card'});
     rowsD.forEach(function(r){tb.appendChild(el('div',{class:'qa-row',style:'cursor:default'},el('span',{class:'qa-rt'},el('b',{style:'font-size:15px'},r[0]),el('span',null,r[1])),el('span',{class:'qa-pill '+(r[3]?'qa-p-ok':'qa-p-fix')},r[2])))});
@@ -755,18 +809,18 @@
       var dl=new Date(r.scheduled_at);d=dl.getFullYear()+'-'+String(dl.getMonth()+1).padStart(2,'0')+'-'+String(dl.getDate()).padStart(2,'0');
       add(d,{time:fmtTime(r.scheduled_at),title:r.title,sub:'ขอโดย '+W.nameOf(r.requested_by)+' · ผู้ตรวจ '+W.nameOf(r.inspector_id),tag:r.hold||'',state:r.status==='requested'?'รอรับนัด':r.status==='accepted'?'รับนัดแล้ว':r.status==='passed'?'ผ่าน':'ไม่ผ่าน',href:'#/tasks/req'})});
     M.items.forEach(function(x){if(x.st.open&&x.it.due)add(x.it.due,{time:'ครบกำหนด',title:itemTitle(x.it),sub:(x.zone?'#'+x.zone:'')+(x.it.asg?' · '+W.nameOf(x.it.asg):''),state:x.st.label,href:'#/t/'+encodeURIComponent(x.doc.id)+'/'+encodeURIComponent(x.it.id)})});
-    var strip=el('div',{role:'tablist','aria-label':'วันในสัปดาห์',style:'padding:10px 8px;background:#fff;border-bottom:1px solid var(--qa-bd);display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px'});
+    var strip=el('div',{role:'tablist','aria-label':'วันในสัปดาห์',style:'padding:10px 8px;background:var(--qa-card);border-bottom:1px solid var(--qa-bd);display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px'});
     var WD=['จ','อ','พ','พฤ','ศ','ส','อา'];
     for(var i=0;i<7;i++){(function(i){var d=new Date(mon.getTime()+i*864e5),k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),on=k===sel,has=!!ev[k];
       var b=el('a',{role:'tab',href:'#/cal/'+k,'aria-selected':on?'true':'false','aria-label':d.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'short'})+(has?' มี '+ev[k].length+' รายการ':''),
-        style:'min-height:64px;border-radius:8px;text-decoration:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;'+(on?'background:#0B1F3A;color:#fff':'color:#0B1220')},
-        el('span',{style:'font-size:12px'},WD[i]),el('b',{style:'font-size:18px'},String(d.getDate())),el('span',{style:'width:6px;height:6px;border-radius:3px;background:'+(has?(on?'#fff':'#2F5D9A'):'transparent')}));
+        style:'min-height:64px;border-radius:8px;text-decoration:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;'+(on?'background:var(--qa-on-bg);color:var(--qa-on-tx)':'color:var(--qa-tx)')},
+        el('span',{style:'font-size:12px'},WD[i]),el('b',{style:'font-size:18px'},String(d.getDate())),el('span',{style:'width:6px;height:6px;border-radius:3px;background:'+(has?(on?'var(--qa-on-tx)':'var(--qa-blu)'):'transparent')}));
       strip.appendChild(b)})(i)}
     mainEl.appendChild(strip);
     var sc=scroller(),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);mainEl.appendChild(sc);
     var list=ev[sel]||[];
     pad.appendChild(el('h3',{style:'margin:0 4px;font-size:15px;color:var(--qa-mu)'},new Date(sel).toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'short'})+' · '+list.length+' รายการ'));
-    list.forEach(function(e){pad.appendChild(el('a',{class:'qa-task',href:e.href,style:'border-left-color:#2F5D9A'},el('span',{class:'qa-pill qa-p-re'},e.time+' · '+e.state),el('b',null,e.title),el('span',{class:'m'},el('span',null,e.sub),el('span',null,''))))});
+    list.forEach(function(e){pad.appendChild(el('a',{class:'qa-task',href:e.href,style:'border-left-color:var(--qa-blu)'},el('span',{class:'qa-pill qa-p-re'},e.time+' · '+e.state),el('b',null,e.title),el('span',{class:'m'},el('span',null,e.sub),el('span',null,''))))});
     if(!list.length)pad.appendChild(el('p',{class:'qa-empty'},'ไม่มีนัดตรวจหรือกำหนดส่งงานวันนี้'));
     pad.appendChild(el('p',{style:'font-size:12px;color:var(--qa-mu)'},'H = จุดหยุดตรวจ ขั้นต่อไปเริ่มไม่ได้จนกว่าจะผ่าน · W = จุดเชิญตรวจ ไม่มาตามนัดทำต่อได้'));
   };
@@ -789,7 +843,7 @@
   /* ---------- view: company, join, billing (M11/M12/M14/M15, D-Members, D-Billing) ---------- */
   VIEWS.company=function(){
     var co=M.company||{};
-    mainEl.appendChild(header(co.name||'บริษัท','บริษัท = เซิร์ฟเวอร์ · โครงการ = ไอคอนแถบซ้าย',{back:'#/me'}));
+    mainEl.appendChild(header(co.name||'บริษัท','คนในบริษัท รหัสเข้า และการตั้งค่า',{back:'#/me'}));
     var sc=scroller(),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);mainEl.appendChild(sc);
     if(!ONLINE){pad.appendChild(el('div',{class:'qa-note info'},'โหมดออฟไลน์ใช้คนเดียวในเครื่องนี้ · บริษัท รหัสเข้า และการเพิ่มคน ใช้ได้ในโหมดออนไลน์ (เปลี่ยนได้ที่ ฉัน › ตั้งค่า)'));}
     pad.appendChild(el('div',{class:'qa-card',style:'padding:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center'},
@@ -830,7 +884,7 @@
     var co=M.company||{};
     mainEl.appendChild(header('แพ็กเกจ','เก็บเงินที่ระดับบริษัท · ผู้ถูกชวนใช้ฟรี',{back:'#/company'}));
     var sc=scroller(),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);mainEl.appendChild(sc);
-    [['free','เริ่มต้น','ฟรี','ทีมเล็ก · ทุกฟีเจอร์ตรวจงาน · ซิงก์ทีม'],['team','ทีม','1,490 ฿ / เดือน','หลายโครงการ · แผนงาน · ยศกำหนดเอง · LINE'],['org','องค์กร','ติดต่อ','หลายบริษัทในเครือ · รายงานผู้บริหาร · SSO']].forEach(function(p){
+    [['free','เริ่มต้น','ฟรี','ทีมเล็ก · ตรวจงานได้ครบ · ทำงานร่วมกันทั้งทีม'],['team','ทีม','1,490 ฿ / เดือน','หลายโครงการ · แผนงาน · ยศกำหนดเอง · LINE'],['org','องค์กร','ติดต่อ','หลายบริษัทในเครือ · รายงานผู้บริหาร · SSO']].forEach(function(p){
       var on=co.plan===p[0];pad.appendChild(el('div',{class:'qa-card',style:'padding:14px;display:flex;flex-direction:column;gap:4px;'+(on?'border:2px solid var(--qa-pri)':'')},el('b',{style:'font-size:17px'},p[1]+(on?' · ใช้อยู่':'')),el('span',{style:'font-size:20px;font-weight:700'},p[2]),el('span',{style:'color:var(--qa-mu)'},p[3])))});
     pad.appendChild(el('div',{class:'qa-note warn'},'ยังไม่มีระบบชำระเงินในแอป · เปลี่ยนแพ็กเกจผ่านผู้ดูแลระบบ'));
   };
@@ -844,7 +898,7 @@
     mainEl.appendChild(header('เข้าบริษัท','',{back:'#/'}));
     var sc=scroller(),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);mainEl.appendChild(sc);
     var co=M.company||{};
-    if(co.joined){pad.append(el('div',{class:'qa-note ok'},'คุณอยู่ใน '+(co.name||'บริษัท')+' แล้ว'),el('p',{class:'qa-empty'},M.projects.length?'เลือกโครงการที่แถบซ้าย':'รอ PM หรือแอดมินเพิ่มคุณเข้าโครงการ · ไม่ต้องมีรหัสโครงการ เมื่อถูกเพิ่ม โครงการจะขึ้นที่แถบซ้ายเอง'));return}
+    if(co.joined){pad.append(el('div',{class:'qa-note ok'},'คุณอยู่ใน '+(co.name||'บริษัท')+' แล้ว'),el('p',{class:'qa-empty'},M.projects.length?'เลือกโครงการที่ต้องการตรวจได้เลย':'ยังไม่มีโครงการให้ตรวจ · ขอให้ PM หรือผู้ดูแลเพิ่มคุณเข้าโครงการ แล้วโครงการจะขึ้นเอง'));return}
     var inp=el('input',{'aria-label':'รหัสเข้าบริษัท',placeholder:'เช่น SCC-4K7',autocapitalize:'characters',style:'font-size:24px;letter-spacing:.12em;text-align:center'});
     var b=el('button',{type:'button',class:'qa-btn pri big'},'เข้าบริษัท');
     b.addEventListener('click',function(){var v=inp.value.trim();if(!v)return;b.disabled=true;W.join(v).then(function(ok){b.disabled=false;if(ok){flash('เข้าบริษัทแล้ว');reloadAll()}else flash('รหัสไม่ถูกต้อง · ขอรหัสจากแอดมินของบริษัท')},function(e){b.disabled=false;flash(e.message)})});
@@ -853,9 +907,9 @@
 
   /* ---------- permissions catalogue (D-Roles) ---------- */
   var PERMS=[
-    ['รายงานตรวจงาน',[['ins_view','ดูรายงานและรายการตรวจ','ทุกช่องที่มองเห็น'],['ins_create','สร้างรายงาน','ตรวจงานและออก PDF'],['ins_recheck','ตรวจซ้ำ','ลงผลผ่าน / ยังไม่ผ่าน'],
+    ['รายงานตรวจงาน',[['ins_view','ดูรายงานและรายการตรวจ','ทุกโซนที่เห็น'],['ins_create','สร้างรายงาน','ตรวจงานและออก PDF'],['ins_recheck','ตรวจซ้ำ','ลงผลผ่าน / ยังไม่ผ่าน'],
       ['ins_assign','มอบหมายงานแก้','เลือกผู้แก้และวันครบกำหนด'],['ins_fix','รับงานแก้','แจ้งแก้แล้วพร้อมรูปหลังแก้'],['ins_approve','อนุมัติและลงนาม','ใบขอเท แบบฟอร์มที่ต้องอนุมัติ']]],
-    ['ช่องและแชท',[['ch_post','ส่งข้อความ','ในช่องที่มองเห็น'],['ch_manage','จัดการช่อง','สร้าง แก้ ตั้งสิทธิ์ช่อง โพสต์ประกาศ']]],
+    ['โซนและการคุย',[['ch_post','ส่งข้อความ','ในโซนที่เห็น'],['ch_manage','จัดการชั้น/โซน','เพิ่ม แก้ ตั้งว่าใครเห็น และประกาศ']]],
     ['คนและโครงการ',[['mem_manage','เพิ่มคนและให้ยศ','ได้เฉพาะยศที่ต่ำกว่าตัวเอง'],['dw_upload','อัปโหลดแบบ','แบบแปลนและรุ่นแบบ'],['req_create','ขอตรวจงาน','ใบขอตรวจ'],['req_answer','รับนัด / ตอบใบขอตรวจ','']]],
     ['แผนงาน',[['pl_edit','แก้แผนงาน','เลื่อนงาน ตั้งงานก่อน-หลัง'],['pl_baseline','อนุมัติแผนฐาน','ล็อกแผนเป็นเส้นฐานวัดความคืบหน้าและงวดงาน'],['pl_assign','มอบงานในแผน','ส่งงานประจำสัปดาห์ให้คน'],['pl_progress','รายงานความคืบหน้า','รับปาก / ติดอุปสรรค / %']]]];
   var BASE_TH={pm:'ผู้จัดการ (PM)',foreman:'ผู้ตรวจ / โฟร์แมน',headman:'ผู้แก้งาน',viewer:'ผู้ดู'};
@@ -874,7 +928,7 @@
         var line=el('div',{class:'qa-card',style:'padding:10px 12px;display:flex;flex-direction:column;gap:8px'});
         line.appendChild(el('div',{style:'display:flex;align-items:center;gap:10px'},avatar(u.id,u.name),el('span',{class:'qa-rt',style:'flex:1;min-width:0;display:flex;flex-direction:column'},el('b',null,(u.id===myId()?'คุณ · ':'')+(u.name||u.email)),el('span',{style:'font-size:13px;color:var(--qa-mu)'},u.email||''))));
         var chips=el('div',{style:'display:flex;gap:6px;flex-wrap:wrap'});
-        rr.forEach(function(x){chips.appendChild(el('span',{class:'qa-pill',style:'background:'+x.color+'1F;color:'+x.color},x.name))});
+        rr.forEach(function(x){chips.appendChild(el('span',{class:'qa-pill qa-p-mu',style:'display:inline-flex;align-items:center;gap:6px;color:var(--qa-tx)'},el('span',{class:'qa-dotc',style:'width:10px;height:10px;flex:0 0 10px;background:'+x.color}),txt(x.name)))});
         if(!rr.length)chips.appendChild(el('span',{class:'qa-pill qa-p-mu'},BASE_TH[u.base]||u.base));
         line.appendChild(chips);
         if(mng&&u.id!==myId()){var e=el('button',{type:'button',class:'qa-btn sm'},'แก้ยศ');e.addEventListener('click',function(){rolePicker(u,roles)});line.appendChild(e)}
@@ -926,7 +980,7 @@
     var admin=!ONLINE||(!M.legacy&&M.company&&M.company.is_admin);
     W.roles().then(function(rs){
       rs=(rs&&rs.length?rs:BUILTIN).slice().sort(function(a,b){return b.position-a.position});
-      if(M.legacy)pad.appendChild(el('div',{class:'qa-note warn'},'เซิร์ฟเวอร์ยังไม่ได้อัปเดต (migration 006): ตอนนี้ใช้สิทธิ์ตามบทบาทเดิม PM / โฟร์แมน / เฮดแมน · ยศกำหนดเองใช้ได้หลังอัปเดต'));
+      if(M.legacy)pad.appendChild(el('div',{class:'qa-note warn'},'ตอนนี้ใช้สิทธิ์ตามบทบาท PM / โฟร์แมน / เฮดแมน · การแก้ยศเองยังไม่เปิดใช้ (แจ้งผู้ดูแลระบบ)'));
       if(!sel){
         pad.appendChild(el('div',{class:'qa-note info'},'ยศบนกว่า = อาวุโสกว่า · จัดการได้เฉพาะยศที่ต่ำกว่าตัวเอง · สิทธิ์ของคนที่มีหลายยศรวมกัน · ยศเจ้าของล็อกไว้เพื่อไม่ให้บริษัทถูกล็อกออก'));
         rs.forEach(function(r){var a=el('a',{class:'qa-row qa-card',href:'#/roles/'+encodeURIComponent(r.id)},el('span',{class:'qa-dotc',style:'background:'+r.color}),el('span',{class:'qa-rt'},el('b',null,r.name),el('span',null,BASE_TH[r.base]+' · '+(r.perms.indexOf('*')>=0?'ทุกสิทธิ์':r.perms.length+' สิทธิ์'))),ic('chev',20));pad.appendChild(a)});
@@ -936,10 +990,10 @@
       var r=rs.filter(function(x){return x.id===sel})[0];if(!r){pad.appendChild(el('p',{class:'qa-empty'},'ไม่พบยศนี้'));return}
       var locked=r.id==='owner'||!admin,draft=JSON.parse(JSON.stringify(r));
       var nm=el('input',{value:r.name,'aria-label':'ชื่อยศ',disabled:locked||r.builtin&&r.id==='everyone'?true:null}),co=el('input',{type:'color',value:r.color,'aria-label':'สียศ',disabled:locked?true:null,style:'width:64px;padding:0'});
-      var base=el('select',{'aria-label':'สิทธิ์พื้นฐานบนเซิร์ฟเวอร์',disabled:locked||r.builtin?true:null});Object.keys(BASE_TH).forEach(function(k){base.appendChild(el('option',{value:k},BASE_TH[k]))});base.value=r.base;
+      var base=el('select',{'aria-label':'ระดับสิทธิ์หลัก',disabled:locked||r.builtin?true:null});Object.keys(BASE_TH).forEach(function(k){base.appendChild(el('option',{value:k},BASE_TH[k]))});base.value=r.base;
       var pos=el('input',{type:'number',value:String(r.position),min:'1',max:'95','aria-label':'ลำดับ (สูง = อาวุโส)',disabled:locked||r.builtin?true:null});
       pad.appendChild(el('div',{class:'qa-card',style:'padding:14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end'},el('label',{class:'qa-field'},el('span',null,'ชื่อยศ'),nm),el('label',{class:'qa-field'},el('span',null,'สี'),co),
-        el('label',{class:'qa-field'},el('span',null,'สิทธิ์พื้นฐานบนเซิร์ฟเวอร์'),base),el('label',{class:'qa-field'},el('span',null,'ลำดับ'),pos)));
+        el('label',{class:'qa-field'},el('span',null,'ระดับสิทธิ์หลัก'),base),el('label',{class:'qa-field'},el('span',null,'ลำดับ'),pos)));
       if(locked&&r.id==='owner')pad.appendChild(el('div',{class:'qa-note warn'},'ยศเจ้าของล็อกไว้ทุกสิทธิ์ เพื่อไม่ให้บริษัทถูกล็อกออก'));
       var all=draft.perms.indexOf('*')>=0;
       PERMS.forEach(function(g){var box=el('div',{class:'qa-card',style:'padding:4px 14px'});box.appendChild(el('div',{class:'qa-sec',style:'padding-left:0'},el('span',null,g[0])));
@@ -948,7 +1002,7 @@
           box.appendChild(el('div',{class:'qa-perm'},el('div',null,el('b',null,p[1]),p[2]?el('span',null,p[2]):null),sw))});
         pad.appendChild(box)});
       var acts=el('div',{class:'qa-actions'});
-      var pv=el('button',{type:'button',class:'qa-btn'},'ดูแอปในฐานะยศนี้');pv.addEventListener('click',function(){M.preview={name:draft.name,perms:draft.perms.slice()};flash('กำลังดูในฐานะ '+draft.name+' · กลับได้ที่แถบด้านบน');go('#/')});acts.appendChild(pv);
+      var pv=el('button',{type:'button',class:'qa-btn'},'ดูแอปในฐานะยศนี้');pv.addEventListener('click',function(){M.preview={name:draft.name,perms:draft.perms.slice()};flash('กำลังดูในฐานะ '+draft.name+' · กด “กลับเป็นตัวเอง” ด้านบนเพื่อเลิกดู');go('#/')});acts.appendChild(pv);
       if(!locked){var sv=el('button',{type:'button',class:'qa-btn pri'},'บันทึก');sv.addEventListener('click',function(){
           draft.name=nm.value.trim()||draft.name;draft.color=co.value;draft.base=base.value;draft.position=Math.max(1,Math.min(95,+pos.value||draft.position));
           W.saveRole({id:draft.id,name:draft.name,color:draft.color,position:draft.position,base:draft.base,perms:draft.perms,builtin:draft.builtin}).then(function(){flash('บันทึกยศแล้ว · บันทึกในประวัติแล้ว');go('#/roles')},function(e){flash(e.message)})});acts.appendChild(sv);
@@ -969,19 +1023,19 @@
 
   /* ---------- view: channel settings (D-ChannelSettings / M9) ---------- */
   VIEWS.cs=function(chId){
-    var c=chById(chId);if(!c){mainEl.appendChild(el('p',{class:'qa-empty'},'ไม่พบช่อง'));return}
+    var c=chById(chId);if(!c){mainEl.appendChild(el('p',{class:'qa-empty'},'ไม่พบโซนนี้'));return}
     mainEl.appendChild(header('ตั้งค่า #'+c.name,'ใครเห็น ใครโพสต์ได้',{back:'#/c/'+encodeURIComponent(chId)}));
     var sc=scroller(),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);mainEl.appendChild(sc);
-    var nm=el('input',{value:c.name,'aria-label':'ชื่อช่อง'}),cat=el('input',{value:c.category||'','aria-label':'หมวด',list:'qa-cats'}),ref=el('input',{value:c.standard_ref||'','aria-label':'มาตรฐานอ้างอิง',placeholder:'เช่น มยผ. 1103'});
+    var nm=el('input',{value:c.name,'aria-label':'ชื่อชั้นหรือโซน'}),cat=el('input',{value:c.category||'','aria-label':'หมวด',list:'qa-cats'}),ref=el('input',{value:c.standard_ref||'','aria-label':'มาตรฐานอ้างอิง',placeholder:'เช่น มยผ. 1103'});
     var dl=el('datalist',{id:'qa-cats'});['โซนงาน','โครงสร้าง','สถาปัตย์','ไฟฟ้า','สุขาภิบาล','ป้องกันอัคคีภัย'].forEach(function(x){dl.appendChild(el('option',{value:x}))});
     var hold=c.hold||'';var tri=el('div',{class:'qa-tri',role:'radiogroup','aria-label':'ชนิดจุดตรวจ'});
     [['','ปกติ'],['W','W เชิญตรวจ'],['H','H หยุดตรวจ']].forEach(function(h){var b=el('button',{type:'button',role:'radio','aria-checked':hold===h[0]?'true':'false'},h[1]);b.addEventListener('click',function(){hold=h[0];tri.querySelectorAll('button').forEach(function(y){y.setAttribute('aria-checked',y===b?'true':'false')})});tri.appendChild(b)});
-    pad.appendChild(el('div',{class:'qa-card',style:'padding:14px;display:flex;flex-direction:column;gap:10px'},el('label',{class:'qa-field'},el('span',null,'ชื่อช่อง'),nm),el('label',{class:'qa-field'},el('span',null,'หมวด'),cat,dl),
+    pad.appendChild(el('div',{class:'qa-card',style:'padding:14px;display:flex;flex-direction:column;gap:10px'},el('label',{class:'qa-field'},el('span',null,'ชื่อชั้นหรือโซน'),nm),el('label',{class:'qa-field'},el('span',null,'หมวด'),cat,dl),
       el('label',{class:'qa-field'},el('span',null,'มาตรฐานอ้างอิง'),ref),el('div',{class:'qa-field'},el('span',null,'จุดตรวจ'),tri),
       el('p',{style:'margin:0;font-size:12px;color:var(--qa-mu)'},'H = ห้ามทำขั้นต่อไปจนกว่าจะตรวจผ่าน (ผูกกับแผนงาน) · W = แจ้งผู้ตรวจ ถ้าไม่มาตามนัดทำต่อได้')));
     var rows=[];
     if(ONLINE&&!c.virtual){
-      var acc=el('div',{class:'qa-card',style:'padding:6px 14px'});acc.appendChild(el('div',{class:'qa-sec',style:'padding-left:0'},el('span',null,'สิทธิ์ในช่องนี้ · อนุญาต / ตามยศ / ห้าม')));pad.appendChild(acc);
+      var acc=el('div',{class:'qa-card',style:'padding:6px 14px'});acc.appendChild(el('div',{class:'qa-sec',style:'padding-left:0'},el('span',null,'ใครเห็นและพิมพ์ในโซนนี้ได้ · อนุญาต / ตามยศ / ห้าม')));pad.appendChild(acc);
       Promise.all([W.roles(),W.access(chId)]).then(function(r){var rs=(r[0]||[]).filter(function(x){return x.id!=='owner'&&x.id!=='admin'}),cur={};(r[1]||[]).forEach(function(a){cur[a.role_id]=a});
         rs.forEach(function(role){var a=cur[role.id]||{see:'inherit',post:'inherit'},o={role_id:role.id,channel_id:chId,see:a.see,post:a.post};rows.push(o);
           function tri3(k,lbl){var t=el('div',{class:'qa-tri',role:'radiogroup','aria-label':lbl+' '+role.name});[['allow','อนุญาต'],['inherit','ตามยศ'],['deny','ห้าม']].forEach(function(v){var b=el('button',{type:'button',role:'radio','aria-checked':o[k]===v[0]?'true':'false'},v[1]);b.addEventListener('click',function(){o[k]=v[0];t.querySelectorAll('button').forEach(function(y){y.setAttribute('aria-checked',y===b?'true':'false')})});t.appendChild(b)});return t}
@@ -997,7 +1051,7 @@
 
   /* ---------- view: new project (M6 / D-NewProject): channels from floors, forms by work category ---------- */
   VIEWS.newproject=function(){
-    mainEl.appendChild(header('สร้างโครงการ','ระบบสร้างช่องจากจำนวนชั้นให้',{back:'#/'}));
+    mainEl.appendChild(header('สร้างโครงการ','ใส่จำนวนชั้น แล้วแอปแบ่งชั้นให้',{back:'#/'}));
     var sc=scroller(),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);mainEl.appendChild(sc);
     if(ONLINE&&!(M.me&&M.me.org_role==='admin')){pad.appendChild(el('div',{class:'qa-note info'},'สร้างโครงการได้เฉพาะแอดมินบริษัท · ขอให้แอดมินสร้าง แล้วเพิ่มคุณเป็น PM'));return}
     var name=el('input',{'aria-label':'ชื่อโครงการ',placeholder:'เช่น อาคารพักอาศัย 8 ชั้น'}),site=el('input',{'aria-label':'สถานที่',placeholder:'เช่น บางนา'});
@@ -1008,8 +1062,8 @@
     [floors,base,roof].forEach(function(i){i.addEventListener('input',draw);i.addEventListener('change',draw)});draw();
     pad.appendChild(el('div',{class:'qa-card',style:'padding:14px;display:flex;flex-direction:column;gap:10px'},el('label',{class:'qa-field'},el('span',null,'ชื่อโครงการ'),name),el('label',{class:'qa-field'},el('span',null,'สถานที่'),site),
       el('label',{class:'qa-field'},el('span',null,'จำนวนชั้น'),floors),el('label',{style:'display:flex;gap:8px;align-items:center;min-height:44px'},base,txt('มีฐานราก')),el('label',{style:'display:flex;gap:8px;align-items:center;min-height:44px'},roof,txt('มีหลังคา')),
-      el('div',{class:'qa-field'},el('span',null,'ช่องที่จะสร้าง'),prev)));
-    pad.appendChild(el('p',{style:'font-size:13px;color:var(--qa-mu)'},'ช่อง = ชั้นหรือโซนงาน · เพิ่ม/แก้ภายหลังได้ · แบบฟอร์มตรวจงานหลัก ความปลอดภัย และแบบฟอร์มสำเร็จรูปใช้ได้ทุกโครงการ'));
+      el('div',{class:'qa-field'},el('span',null,'ชั้นและโซนที่จะมี'),prev)));
+    pad.appendChild(el('p',{style:'font-size:13px;color:var(--qa-mu)'},'เพิ่มหรือแก้ชั้นและโซนภายหลังได้ · แบบฟอร์มตรวจงานทุกแบบใช้ได้ทุกโครงการ'));
     var go_=el('button',{type:'button',class:'qa-btn pri big'},'สร้างโครงการ');
     go_.addEventListener('click',function(){var n=name.value.trim();if(!n){name.focus();return}go_.disabled=true;var z=zones();
       try{localStorage.setItem('qc-zones:'+n,JSON.stringify(z))}catch(e){}
@@ -1029,16 +1083,16 @@
     var sc=scroller(),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);mainEl.appendChild(sc);
     var t=tasks(),openAll=M.items.filter(function(x){return x.st.open});
     var kp=el('div',{style:'display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px'});
-    [[openAll.length,'จุดค้างแก้ทั้งหมด','#0B1220','#/tasks/mine'],[t.late.length,'เลยกำหนด','#C2372E','#/tasks/late'],[openAll.filter(function(x){return x.st.k==='re'}).length,'รอตรวจซ้ำ','#1F5FA8','#/tasks/re'],[M.docs.length,'รายงานทั้งหมด','#0B1220',null]].forEach(function(k){
+    [[openAll.length,'จุดค้างแก้ทั้งหมด','var(--qa-tx)','#/tasks/mine'],[t.late.length,'เลยกำหนด','var(--qa-red)','#/tasks/late'],[openAll.filter(function(x){return x.st.k==='re'}).length,'รอตรวจซ้ำ','var(--qa-blu)','#/tasks/re'],[M.docs.length,'รายงานทั้งหมด','var(--qa-tx)',null]].forEach(function(k){
       kp.appendChild(el(k[3]?'a':'div',{class:'qa-kpi',href:k[3]||null,style:'min-height:76px'},el('b',{style:'font-size:26px;color:'+k[2]},String(k[0])),el('span',null,k[1])))});
     pad.appendChild(kp);
     var held=M.channels.filter(function(c){return c.hold==='H'&&itemsIn(c.id).some(function(x){return x.st.open})});
     held.forEach(function(c){pad.appendChild(el('a',{class:'qa-note bad',href:'#/c/'+encodeURIComponent(c.id),style:'text-decoration:none;color:inherit;display:flex;gap:10px'},ic('lock',22),el('span',null,el('b',null,'จุดหยุดตรวจยังไม่ผ่าน: #'+c.name),el('br'),txt('ยังมี '+itemsIn(c.id).filter(function(x){return x.st.open}).length+' รายการต้องแก้ · งานในแผนที่ผูกไว้ยังเริ่มไม่ได้'))))});
     progressCard(pad);
-    var zs=el('div',{class:'qa-card',style:'padding:10px 14px'});zs.appendChild(el('div',{class:'qa-sec',style:'padding-left:0'},el('span',null,'จุดค้างแก้ตามช่อง')));
+    var zs=el('div',{class:'qa-card',style:'padding:10px 14px'});zs.appendChild(el('div',{class:'qa-sec',style:'padding-left:0'},el('span',null,'จุดค้างแก้ แยกตามชั้น/โซน')));
     var max=1,rowsZ=M.channels.filter(function(c){return c.kind==='zone'}).map(function(c){var o=itemsIn(c.id).filter(function(x){return x.st.open});max=Math.max(max,o.length);return [c,o.length,o.filter(function(x){return x.st.late}).length]});
     rowsZ.forEach(function(r){zs.appendChild(el('a',{href:'#/c/'+encodeURIComponent(r[0].id),style:'min-height:44px;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit'},el('span',{style:'width:96px;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'},'#'+r[0].name),
-      el('span',{style:'flex:1;height:10px;border-radius:5px;background:#EEF1F4;overflow:hidden;display:flex'},el('span',{style:'height:100%;background:#2F5D9A;width:'+((r[1]-r[2])/max*100)+'%'}),el('span',{style:'height:100%;background:#C2372E;width:'+(r[2]/max*100)+'%'})),el('b',{style:'width:28px;text-align:right'},String(r[1]))))});
+      el('span',{style:'flex:1;height:10px;border-radius:5px;background:var(--qa-soft);overflow:hidden;display:flex'},el('span',{style:'height:100%;background:var(--qa-blu);width:'+((r[1]-r[2])/max*100)+'%'}),el('span',{style:'height:100%;background:#C2372E;width:'+(r[2]/max*100)+'%'})),el('b',{style:'width:28px;text-align:right'},String(r[1]))))});
     zs.appendChild(el('span',{style:'font-size:12px;color:var(--qa-mu)'},'แถบแดง = เลยกำหนด'));pad.appendChild(zs);
     var who={};openAll.filter(function(x){return x.st.late&&x.it.asg}).forEach(function(x){who[x.it.asg]=(who[x.it.asg]||0)+1});
     if(Object.keys(who).length){var pc=el('div',{class:'qa-card'});Object.keys(who).forEach(function(u){pc.appendChild(el('div',{class:'qa-row',style:'cursor:default'},avatar(u,W.nameOf(u)),el('span',{class:'qa-rt'},el('b',null,W.nameOf(u))),el('b',{style:'color:#C2372E'},String(who[u]))))});
@@ -1097,7 +1151,7 @@
       if(!ts.length){box.appendChild(el('span',{style:'color:var(--qa-mu)'},'ยังไม่มีแผนงาน · เพิ่มได้ที่ “แผนงาน”'));return}
       var mode=planMode(),C=cpm(ts),pl=plannedPct(ts,C.R,mode,today()),ac=actualPct(ts,mode),gap=ac-pl;
       box.append(el('div',{style:'display:flex;gap:16px;flex-wrap:wrap'},el('span',null,'แผน ',el('b',null,pl.toFixed(1)+'%')),el('span',null,'ทำได้ ',el('b',null,ac.toFixed(1)+'%')),
-        el('span',{style:'color:'+(gap<-5?'#C2372E':gap<0?'#B26B00':'#1E7A46')},(gap>=0?'เร็วกว่าแผน ':'ช้ากว่าแผน ')+Math.abs(gap).toFixed(1)+'%')),
+        el('span',{style:'color:'+(gap<-5?'var(--qa-red)':gap<0?'var(--qa-ora)':'var(--qa-grn)')},(gap>=0?'เร็วกว่าแผน ':'ช้ากว่าแผน ')+Math.abs(gap).toFixed(1)+'%')),
         el('span',{style:'font-size:12px;color:var(--qa-mu)'},'ถ่วงน้ำหนักด้วย'+(mode==='days'?'จำนวนวัน':'มูลค่าตาม BOQ')+(base?' · แผนฐานอนุมัติ '+fmtDate(base.approved_at):' · ยังไม่มีแผนฐาน')));
       var sv=scurve(ts,C.R,base,mode);if(sv)box.appendChild(sv);
       box.appendChild(el('a',{href:'#/plan',class:'qa-btn sm'},'เปิดแผนงาน'));
@@ -1107,8 +1161,8 @@
     tab=tab||'master';
     var right=[];
     mainEl.appendChild(header('แผนงาน','แผนหลัก · 3 สัปดาห์ · สัปดาห์นี้',{back:'#/',right:right}));
-    var tl=el('div',{role:'tablist','aria-label':'มุมมองแผน',style:'display:flex;gap:6px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--qa-bd);overflow-x:auto'});
-    [['master','แผนหลัก'],['3w','3 สัปดาห์'],['week','สัปดาห์นี้']].forEach(function(x){tl.appendChild(el('a',{role:'tab',href:'#/plan/'+x[0],'aria-selected':tab===x[0]?'true':'false',class:'qa-chip'+(tab===x[0]?' on':''),style:tab===x[0]?'background:#0B1F3A;color:#fff':''},x[1]))});
+    var tl=el('div',{role:'tablist','aria-label':'มุมมองแผน',style:'display:flex;gap:6px;padding:8px 12px;background:var(--qa-card);border-bottom:1px solid var(--qa-bd);overflow-x:auto'});
+    [['master','แผนหลัก'],['3w','3 สัปดาห์'],['week','สัปดาห์นี้']].forEach(function(x){tl.appendChild(el('a',{role:'tab',href:'#/plan/'+x[0],'aria-selected':tab===x[0]?'true':'false',class:'qa-chip'+(tab===x[0]?' on':''),style:tab===x[0]?'background:var(--qa-on-bg);color:var(--qa-on-tx)':''},x[1]))});
     mainEl.appendChild(tl);
     var sc=scroller(),pad=el('div',{class:'qa-pad'});sc.appendChild(pad);mainEl.appendChild(sc);
     Promise.all([W.plan(),W.baselines()]).then(function(r){
@@ -1151,11 +1205,11 @@
     sheet(t?t.name:'งานใหม่',function(box,close){
       var d=t?JSON.parse(JSON.stringify(t)):{name:'',wbs:'',start:today(),dur:5,weight:0,pct:0,preds:[],channel_id:null,hold_channel_id:null};
       function inp(lbl,k,type,extra){var i=el('input',Object.assign({type:type||'text',value:d[k]==null?'':String(d[k]),'aria-label':lbl,disabled:edit?null:true},extra||{}));i.addEventListener('input',function(){d[k]=type==='number'?+i.value:i.value});return el('label',{class:'qa-field'},el('span',null,lbl),i)}
-      box.append(inp('ชื่องาน','name'),el('div',{style:'display:grid;grid-template-columns:1fr 1fr;gap:8px'},inp('รหัสงาน (WBS)','wbs'),inp('เริ่มไม่ก่อน','start','date')),
-        el('div',{style:'display:grid;grid-template-columns:1fr 1fr;gap:8px'},inp('ระยะเวลา (วัน)','dur','number',{min:'0'}),inp('มูลค่าตาม BOQ (บาท)','weight','number',{min:'0'})));
+      box.append(inp('ชื่องาน','name'),el('div',{style:'display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px'},inp('รหัสงาน (WBS)','wbs'),inp('เริ่มไม่ก่อน','start','date')),
+        el('div',{style:'display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px'},inp('ระยะเวลา (วัน)','dur','number',{min:'0'}),inp('มูลค่าตาม BOQ (บาท)','weight','number',{min:'0'})));
       function chSel(lbl,k,filter){var s=el('select',{'aria-label':lbl,disabled:edit?null:true,style:'min-height:48px;border-radius:8px;border:1px solid #C9D2DC;padding:0 8px'},el('option',{value:''},'—'));
         M.channels.filter(filter).forEach(function(c){s.appendChild(el('option',{value:c.id},'#'+c.name+(c.hold?' ('+c.hold+')':'')))});s.value=d[k]||'';s.addEventListener('change',function(){d[k]=s.value||null});return el('label',{class:'qa-field'},el('span',null,lbl),s)}
-      box.append(chSel('ช่อง (ชั้น/โซน)','channel_id',function(c){return c.kind==='zone'}),chSel('ต้องรอจุดหยุดตรวจผ่านก่อน','hold_channel_id',function(c){return c.hold==='H'}));
+      box.append(chSel('ชั้น / โซน','channel_id',function(c){return c.kind==='zone'}),chSel('ต้องรอจุดหยุดตรวจผ่านก่อน','hold_channel_id',function(c){return c.hold==='H'}));
       /* predecessors */
       var pr=el('div',{class:'qa-field'},el('span',null,'งานก่อนหน้า'));var plist=el('div',{style:'display:flex;flex-direction:column;gap:6px'});pr.appendChild(plist);
       function drawP(){plist.textContent='';(d.preds||[]).forEach(function(p,i){var o=ts.filter(function(x){return x.id===p.id})[0];
@@ -1166,7 +1220,7 @@
           var ty=el('select',{'aria-label':'ความสัมพันธ์',style:'min-height:44px;border-radius:8px;border:1px solid #C9D2DC'},el('option',{value:'FS'},'เสร็จแล้วเริ่ม'),el('option',{value:'SS'},'เริ่มพร้อมกัน'),el('option',{value:'FF'},'เสร็จพร้อมกัน'));
           var lag=el('input',{type:'number',value:'0','aria-label':'เผื่อ (วัน)',style:'width:72px;min-height:44px'});
           s.addEventListener('change',function(){if(!s.value)return;d.preds=d.preds||[];d.preds.push({id:s.value,type:ty.value,lag:+lag.value||0});drawP()});
-          plist.appendChild(el('div',{style:'display:flex;gap:6px;flex-wrap:wrap'},s,ty,lag))}}
+          plist.appendChild(el('div',{style:'display:flex;gap:6px;flex-wrap:wrap;align-items:center'},s,ty,el('label',{style:'display:inline-flex;align-items:center;gap:6px;font-size:13px'},'เผื่อ',lag,'วัน')))}}
       drawP();box.appendChild(pr);
       if(prog&&t){var pc=el('input',{type:'range',min:'0',max:'100',step:'5',value:String(+d.pct||0),'aria-label':'ความคืบหน้า %'}),pv=el('b',null,(+d.pct||0)+'%');
         pc.addEventListener('input',function(){d.pct=+pc.value;pv.textContent=pc.value+'%'});box.appendChild(el('label',{class:'qa-field'},el('span',null,'ความคืบหน้า ',pv),pc))}
@@ -1238,8 +1292,8 @@
     var steps=[['ติดตั้งแอปลงเครื่อง','เปิดเร็วขึ้น ใช้ได้แม้ไม่มีสัญญาณ · Android: เมนู ⋮ › ติดตั้งแอป · iPhone: แชร์ › เพิ่มไปยังหน้าจอโฮม'],
       ['อนุญาตกล้อง','ใช้ถ่ายรูปก่อน/หลังแก้ · กดอนุญาตเมื่อเบราว์เซอร์ถาม'],
       [ONLINE?'อนุญาตการแจ้งเตือน':'สำรองข้อมูลเป็นไฟล์',ONLINE?'รู้ทันทีเมื่อมีงานแก้ ใบขอตรวจ หรือข้อความถึงคุณ':'ข้อมูลอยู่ในเครื่องนี้ · สำรองเป็น ZIP อย่างน้อยสัปดาห์ละครั้ง'],
-      ['ใช้แบบนี้','ช่องทางซ้าย = ชั้นหรือโซน · กด + รายงาน เพื่อตรวจ · แตะรายการเพื่อคุยและติดตามงานแก้ · งานของฉัน = สิ่งที่ต้องทำ']];
-    steps.forEach(function(s,i){pad.appendChild(el('div',{class:'qa-card',style:'padding:12px 14px;display:flex;gap:12px'},el('b',{style:'width:28px;height:28px;border-radius:14px;background:#0B1F3A;color:#fff;display:flex;align-items:center;justify-content:center'},String(i+1)),el('div',null,el('b',null,s[0]),el('p',{style:'margin:4px 0 0;color:var(--qa-mu)'},s[1]))))});
+      ['ใช้แบบนี้','เลือกชั้นหรือโซนที่จะตรวจ · กด “+ รายงาน” เพื่อเริ่มตรวจ · แตะจุดที่ต้องแก้เพื่อคุยกับทีมและดูว่าแก้แล้วหรือยัง · “งานของฉัน” คือสิ่งที่คุณต้องทำต่อ']];
+    steps.forEach(function(s,i){pad.appendChild(el('div',{class:'qa-card',style:'padding:12px 14px;display:flex;gap:12px'},el('b',{style:'width:28px;height:28px;border-radius:14px;background:var(--qa-pri);color:#fff;display:flex;align-items:center;justify-content:center'},String(i+1)),el('div',null,el('b',null,s[0]),el('p',{style:'margin:4px 0 0;color:var(--qa-mu)'},s[1]))))});
     if(ONLINE&&'Notification' in window&&Notification.permission==='default'){var nb=el('button',{type:'button',class:'qa-btn pri'},'อนุญาตการแจ้งเตือน');nb.addEventListener('click',function(){Notification.requestPermission().then(function(){render()})});pad.appendChild(nb)}
     var ok=el('button',{type:'button',class:'qa-btn pri big'},'เริ่มใช้งาน');ok.addEventListener('click',function(){lsSJ('qa-welcomed',1);go('#/')});pad.appendChild(ok);
   };
@@ -1249,8 +1303,8 @@
     if(document.querySelector('.qa-pal'))return;
     sheet('ไปที่…',function(box,close){
       box.parentNode.classList.add('qa-pal');
-      var q=el('input',{type:'search',placeholder:'ช่อง จุดตรวจ หรือหน้า','aria-label':'ค้นหาเพื่อไปที่'}),list=el('div',{class:'qa-card',role:'listbox'});box.append(q,list);
-      var pages=[['งานของฉัน','#/tasks'],['แจ้งเตือน','#/noti'],['แผนงาน','#/plan'],['ภาพรวม','#/overview'],['ปฏิทิน','#/cal'],['สมาชิก','#/members'],['ยศและสิทธิ์','#/roles'],['ข้อมูลและการซิงก์','#/data'],['บริษัท','#/company'],['แบบล่าสุด','#/drawings']];
+      var q=el('input',{type:'search',placeholder:'ชั้น/โซน จุดตรวจ หรือเมนู','aria-label':'ค้นหาเพื่อไปที่'}),list=el('div',{class:'qa-card',role:'listbox'});box.append(q,list);
+      var pages=[['งานของฉัน','#/tasks'],['แจ้งเตือน','#/noti'],['แผนงาน','#/plan'],['ภาพรวม','#/overview'],['ปฏิทิน','#/cal'],['สมาชิก','#/members'],['ยศและสิทธิ์','#/roles'],['ข้อมูลและการส่งให้ทีม','#/data'],['บริษัท','#/company'],['แบบล่าสุด','#/drawings']];
       var sel=0,opts=[];
       function draw(){list.textContent='';var v=q.value.trim().toLowerCase();opts=[];
         M.channels.forEach(function(c){if(!v||c.name.toLowerCase().indexOf(v)>=0)opts.push(['#'+c.name,'#/c/'+encodeURIComponent(c.id)])});
@@ -1311,9 +1365,9 @@
     root=el('div',{id:'qa'});
     var body=el('div',{class:'qa-body'});
     railEl=el('nav',{class:'qa-rail','aria-label':'บริษัทและโครงการ'});
-    sideEl=el('aside',{class:'qa-side','aria-label':'ช่องในโครงการ'});
+    sideEl=el('aside',{class:'qa-side','aria-label':'ชั้นและโซนในโครงการ'});
     mainEl=el('main',{class:'qa-main',id:'qa-main'});
-    asideEl=el('aside',{class:'qa-aside','aria-label':'รายงานในช่องนี้',hidden:true});
+    asideEl=el('aside',{class:'qa-aside','aria-label':'รายการตรวจในโซนนี้',hidden:true});
     body.append(railEl,sideEl,mainEl,asideEl);
     navEl=el('nav',{class:'qa-nav','aria-label':'เมนูหลัก'});
     var fl=el('div',{id:'qa-flash',role:'status','aria-live':'polite',hidden:true});

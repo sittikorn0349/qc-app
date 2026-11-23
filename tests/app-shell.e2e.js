@@ -47,7 +47,7 @@ const ONLINE = MODE !== 'offline';
   console.log('\n[report from a channel: zone + project prefilled, back bar returns to the channel]');
   let ch2 = await chHref('ชั้น 2'); ok(!!ch2, 'channel ชั้น 2 exists');
   await hash(ch2);
-  await page.click('#qa-main .qa-hd .qa-btn.pri'); // + รายงาน
+  await page.click('.qa-aside .qa-zh .qa-btn.pri'); // สร้างรายงาน in the zone panel
   ok(await until(() => !!document.querySelector('#qh-sheet button[data-form]')), 'form picker opens over the shell');
   await page.click('#qh-sheet button[data-form]'); await page.waitForTimeout(900);
   ok(await S(() => document.getElementById('qa').hidden && getComputedStyle(document.getElementById('qa-back-bar')).display !== 'none'), 'form engine shown with the back bar');
@@ -60,7 +60,7 @@ const ONLINE = MODE !== 'offline';
   await page.click('#qa-back-bar button'); await page.waitForTimeout(700);
   ok(await S(h => !document.getElementById('qa').hidden && location.hash === h, ch2), 'back to the same channel');
   ok((await mainText()).includes('SH-1'), 'report card in the channel feed');
-  ok(await until(() => [...document.querySelectorAll('.qa-aside .qa-task')].some(b => /เสา C-3/.test(b.textContent))), 'open item listed in the side panel');
+  ok(await until(() => [...document.querySelectorAll('.qa-aside .qa-post')].some(b => /เสา C-3/.test(b.textContent))), 'open item listed in the side panel');
 
   console.log('\n[item thread: chat on one check item]');
   await page.locator('#qa-main .qa-it', { hasText: 'เสา C-3' }).first().click(); await page.waitForTimeout(600);
@@ -135,6 +135,31 @@ const ONLINE = MODE !== 'offline';
     await page.fill('.qa-sheet textarea', 'ต่อทาบเพิ่มแล้ว'); await page.click('.qa-sheet button:has-text("ส่งให้ผู้ตรวจตรวจซ้ำ")');
     ok(await until(() => window.__fake.S.items['ish.x1'].status === 'fixed'), 'แจ้งแก้แล้ว reaches the server');
   }
+
+  console.log('\n[wording: field language, no system terms]');
+  const bad = [];
+  for (const h of ['#/', ch2, '#/tasks', '#/me', '#/data', '#/company', '#/join', '#/members', '#/roles', '#/plan', '#/overview', '#/newproject', '#/welcome', '#/search', '#/cal', '#/drawings']) {
+    await hash(h); const t = await S(() => document.getElementById('qa').innerText + ' ' + [...document.querySelectorAll('#qa [aria-label],#qa [placeholder]')].map(e => (e.getAttribute('aria-label') || '') + ' ' + (e.getAttribute('placeholder') || '')).join(' '));
+    for (const w of ['เซิร์ฟเวอร์', 'แถบซ้าย', 'ช่อง', 'Discord', 'migration', 'ซิงก์']) if (t.includes(w)) bad.push(h + ': ' + w);
+  }
+  ok(bad.length === 0, 'no system wording on screens' + (bad.length ? ' (' + bad.slice(0, 6).join(', ') + ')' : ''));
+
+  console.log('\n[zone panel (desktop right column)]');
+  await hash(ch2);
+  ok(await S(() => [...document.querySelectorAll('.qa-aside .qa-zf .qa-chip')].map(b => b.textContent).join('|').includes('ต้องแก้')), 'filter chips: ทั้งหมด / ต้องแก้ / รอตรวจซ้ำ / เลยกำหนด');
+  ok(await S(() => !!document.querySelector('.qa-aside .qa-post .qa-th') && !!document.querySelector('.qa-aside .qa-post .rp')), 'cards: thumbnail, status, replies count');
+  await page.fill('.qa-aside .qa-zs input', 'ไม่มีแน่นอน'); ok(await S(() => [...document.querySelectorAll('.qa-aside .qa-post')].every(p => p.hidden)), 'search in the zone filters cards');
+  await page.fill('.qa-aside .qa-zs input', '');
+  await page.locator('.qa-aside .qa-post').first().click(); await page.waitForTimeout(500);
+  ok(await S(() => location.hash.startsWith('#/t/') && !!document.querySelector('.qa-aside .qa-post.sel')), 'thread keeps the panel with the item selected');
+  if (ONLINE && MODE !== 'no006') {
+    await S(() => { window.__fake.addShared('ish2', 'PM-2'); window.__fake.S.items['ish2.x1'].loc = 'ชั้น 2 · เสา A-1'; window.__fake.fire(); });
+    await page.waitForTimeout(1500); await hash(ch2);
+    ok(await until(() => !!document.querySelector('.qa-aside .qa-post.un .qa-ud')), "a teammate's item shows as unread");
+    await page.click('.qa-aside .qa-zu button'); await page.waitForTimeout(400);
+    ok(await S(() => !document.querySelector('.qa-aside .qa-post.un')), 'อ่านทั้งหมดแล้ว clears unread');
+  }
+  ok(await S(() => getComputedStyle(document.querySelector('.qa-aside')).backgroundColor === 'rgb(27, 34, 44)'), 'desktop uses the dark design palette');
 
   console.log('\n[phone layout]');
   await page.setViewportSize({ width: 390, height: 844 }); await hash('#/');

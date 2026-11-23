@@ -15,6 +15,7 @@ const ONLINE = process.argv[3] === 'online';
   let pass = 0, fail = 0;
   const ok = (c, m) => { if (c) { pass++; console.log('  ✓', m); } else { fail++; console.log('  ✗', m); } };
   const S = (f, a) => page.evaluate(f, a);
+  async function until(fn, arg, ms = 8000) { const t = Date.now(); while (Date.now() - t < ms) { if (await page.evaluate(fn, arg)) return true; await page.waitForTimeout(200); } return false; }
   /* a 300x200 "drawing" */
   const plan = '/tmp/qc-app-review/plan.png';
   fs.mkdirSync('/tmp/qc-app-review', { recursive: true });
@@ -41,6 +42,13 @@ const ONLINE = process.argv[3] === 'online';
   ok(await page.isVisible('.pl-back'), 'plan screen opens');
   await page.locator('.pl-tab.add input').setInputFiles(plan); await page.waitForTimeout(1500);
   ok(await S(() => window.__qcPlan.has()), 'drawing added to the document');
+  // a 2-page PDF drawing: each page becomes a sheet
+  const pdfB64 = await S(() => { const d = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' }); d.rect(20, 20, 250, 160); d.text('PLAN 1', 30, 30); d.addPage(); d.rect(30, 30, 200, 120); d.text('PLAN 2', 40, 40); return btoa(String.fromCharCode.apply(null, new Uint8Array(d.output('arraybuffer')))); });
+  const pdfPath = '/tmp/qc-app-review/plan-2p.pdf'; fs.writeFileSync(pdfPath, Buffer.from(pdfB64, 'base64'));
+  await page.locator('.pl-tab.add input').setInputFiles(pdfPath);
+  ok(await until(() => document.querySelectorAll('.pl-tabs .pl-tab:not(.add)').length === 3, null, 15000), 'PDF drawing: both pages added as sheets (' + await S(() => [...document.querySelectorAll('.pl-tabs .pl-tab:not(.add)')].map(t => t.textContent).join(', ')) + ')');
+  ok(await until(() => { const i = document.querySelector('.pl-stage img'); return i && i.naturalWidth > 1000 }), 'PDF page rendered as a sharp image');
+  await page.locator('.pl-tabs .pl-tab').first().click(); await page.waitForTimeout(400);
   const box = await page.locator('.pl-stage img').boundingBox();
   await page.mouse.click(box.x + box.width * 0.25, box.y + box.height * 0.4); await page.waitForTimeout(300);
   const nPin = await page.locator('.pl-pin.mine').count();
@@ -57,7 +65,7 @@ const ONLINE = process.argv[3] === 'online';
   const lt = await rows.nth(0).locator('.plink').textContent();
   ok(/บนแบบ: plan · หมุด 1/.test(lt), 'row shows "บนแบบ: plan · หมุด 1" (' + lt + ')');
   const saved = await S(() => { const d = window.__qcGetDoc(window.__qcForm.cur()); return d && d.plan; });
-  ok(saved && saved.sheets.length === 1 && Object.keys(saved.pins).length === 3, 'saved with the document: 1 sheet, 3 pinned items');
+  ok(saved && saved.sheets.length === 3 && Object.keys(saved.pins).length === 3, 'saved with the document: 3 sheets (image + 2 PDF pages), 3 pinned items');
   ok(await S(() => { const d = window.__qcGetDoc(window.__qcForm.cur()); return d.plan.pins[d.items[0].id][0].x > 0.2 && d.plan.pins[d.items[0].id][0].x < 0.3; }), 'pin position stored as a fraction of the sheet');
 
   console.log('\n[the drawing goes everywhere the document goes]');
@@ -69,12 +77,12 @@ const ONLINE = process.argv[3] === 'online';
     const bk = await S(async () => { const r = await QC.buildBackup({ records: [{ id: window.__qcForm.cur(), data: window.__qcGetDoc(window.__qcForm.cur()) }], folders: [], trashRecs: [], trashFolders: [], getPhoto: id => window.__qcBlob(id) });
       const z = await QC.readZip(r.blob), data = JSON.parse(await (await z.read('data.json')).text()); const insp = data.inspections[0];
       return { plan: insp.plan && insp.plan.sheets.length, inPhotos: data.photos.some(p => p.id === insp.plan.sheets[0].a), back: QC.implode(insp, data.items.filter(i => i.inspectionId === insp.id)).plan }; });
-    ok(bk.plan === 1 && bk.inPhotos, 'backup: plan in data.json, drawing in photos/');
+    ok(bk.plan === 3 && bk.inPhotos, 'backup: plan in data.json, drawing in photos/');
     ok(bk.back && Object.keys(bk.back.pins).length === 3, 'restore (implode) keeps the pins');
   } else {
     await page.waitForTimeout(2500);
     const srv = await S(() => { const h = Object.values(window.__fake.S.insp).find(x => x.docno === 'PL-1'); return h && h.extra && h.extra.plan; });
-    ok(srv && srv.sheets.length === 1 && /\//.test(srv.sheets[0].a), 'online: plan in the header (drawing as a storage path)');
+    ok(srv && srv.sheets.length === 3 && /\//.test(srv.sheets[0].a), 'online: plan in the header (drawing as a storage path)');
     ok(srv && Object.keys(srv.pins).length === 3, 'online: pins synced');
     ok(await S(() => { const h = Object.values(window.__fake.S.insp).find(x => x.docno === 'PL-1'); return !!window.__fake.S.blobs[h.extra.plan.sheets[0].a]; }), 'online: drawing uploaded');
   }
@@ -92,7 +100,7 @@ const ONLINE = process.argv[3] === 'online';
   console.log('\n[follow-up keeps the pins of open items]');
   await S(() => window.__qcActions.followUp()); await page.waitForTimeout(1200);
   const fu = await S(() => { const d = window.__qcGetDoc(window.__qcForm.cur()); return d && d.plan && { s: d.plan.sheets.length, p: Object.keys(d.plan.pins).length, n: d.items.length }; });
-  ok(fu && fu.s === 1 && fu.p === 2 && fu.n === 2, 'follow-up document: same drawing, pins for its 2 items');
+  ok(fu && fu.s === 3 && fu.p === 2 && fu.n === 2, 'follow-up document: same drawing, pins for its 2 items (' + JSON.stringify(fu) + ')');
 
   console.log('\n[the drawing is never cleaned up as an unused photo]');
   ok(await S(async () => { const d = window.__qcGetDoc(window.__qcForm.cur()); const b = await window.__qcBlob(d.plan.sheets[0].a); return !!b; }), 'drawing still stored');

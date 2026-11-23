@@ -1403,6 +1403,29 @@ button{font:inherit;cursor:pointer}
     var txt=pn.length?('บนแบบ: '+pn.map(function(q){return (sh[q.s]&&sh[q.s].name)||('แผ่น '+(q.s+1))}).filter(function(v,k,a){return a.indexOf(v)===k}).join(', ')+' · หมุด '+(i+1)+(pn.length>1?' ('+pn.length+' จุด)':'')):'+ ระบุบนแบบแปลน (ไม่บังคับ)';
     return el('button',{type:'button',class:'plink'+(pn.length?' has':''),'aria-label':(pn.length?'แก้ตำแหน่งบนแบบ':'ระบุตำแหน่งบนแบบแปลน')+' รายการที่ '+(i+1),onclick:function(){openPlan(it.id)}},txt);
   }
+  /* PDF drawings: each page becomes an image sheet (pdf.js, loaded on first use and cached for offline) */
+  var PDF_MAX_PAGES=20,pdfLibP=null;
+  function pdfLib(){
+    if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+    if(!pdfLibP)pdfLibP=new Promise(function(ok,no){var sc=document.createElement('script');sc.src='./libs/pdfjs/pdf.min.js';
+      sc.onload=function(){if(!window.pdfjsLib){no({code:'pdflib'});return}window.pdfjsLib.GlobalWorkerOptions.workerSrc='./libs/pdfjs/pdf.worker.min.js';ok(window.pdfjsLib)};
+      sc.onerror=function(){pdfLibP=null;no({code:'pdflib'})};document.head.appendChild(sc)});
+    return pdfLibP;
+  }
+  function pdfPages(file,progress){
+    return pdfLib().then(function(lib){return file.arrayBuffer().then(function(buf){return lib.getDocument({data:new Uint8Array(buf),isEvalSupported:false}).promise})})
+      .catch(function(e){throw (e&&e.code)?e:{code:'pdf'}})
+      .then(function(doc){
+        var n=Math.min(doc.numPages,PDF_MAX_PAGES),out=[],chain=Promise.resolve();
+        for(var i=1;i<=n;i++)(function(i){chain=chain.then(function(){if(progress)progress(i,n);return doc.getPage(i).then(function(pg){
+          var v=pg.getViewport({scale:1}),k=PLAN_LONG/Math.max(v.width,v.height),vp=pg.getViewport({scale:k});
+          var c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);
+          var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+          return pg.render({canvasContext:x,viewport:vp}).promise.then(function(){return new Promise(function(ok,no){c.toBlob(function(b){b?ok(b):no({code:'pdf'})},'image/png')})}).then(function(b){out.push(b);pg.cleanup()});
+        })})})(i);
+        return chain.then(function(){out.total=doc.numPages;out.more=doc.numPages>n;doc.destroy();return out});
+      });
+  }
   function shrinkPlan(file){
     return new Promise(function(res,rej){
       var url=URL.createObjectURL(file),img=new Image();
@@ -1432,7 +1455,7 @@ button{font:inherit;cursor:pointer}
     (pinsOf(itm())[0])&&(cur=pinsOf(itm())[0].s);
     var back=el('div',{class:'pl-back noprint',role:'dialog','aria-modal':'true','aria-label':'ระบุตำแหน่งบนแบบแปลน'});
     var title=el('h2',null,''),tabs=el('div',{class:'pl-tabs',role:'tablist','aria-label':'แผ่นแบบ'}),stage=el('div',{class:'pl-stage'}),view=el('div',{class:'pl-view'},stage),hint=el('div',{class:'pl-hint',role:'status'});
-    var file=el('input',{type:'file',accept:'image/*',class:'sr','aria-label':'เพิ่มรูปแบบแปลน'});
+    var file=el('input',{type:'file',accept:'image/*,application/pdf,.pdf',class:'sr','aria-label':'เพิ่มแบบแปลน (รูป หรือ PDF)'});
     var close=function(){back.remove();renderItems()};
     function idx(){return state.items.indexOf(itm())+1}
     function draw(){
@@ -1444,7 +1467,7 @@ button{font:inherit;cursor:pointer}
       stage.textContent='';stage.style.width=(zoom*100)+'%';
       if(!sh){
         var reuse=projectSheets();
-        stage.appendChild(el('div',{class:'pl-empty'},el('p',null,'ยังไม่มีแบบแปลนในฉบับนี้ เพิ่มรูปแบบแปลน (ถ่ายจากแบบ หรือไฟล์ภาพ) แล้วแตะจุดบนแบบเพื่อวางหมุด ส่วนนี้ไม่บังคับ'),
+        stage.appendChild(el('div',{class:'pl-empty'},el('p',null,'ยังไม่มีแบบแปลนในฉบับนี้ เพิ่มแบบแปลน (ไฟล์ PDF รูปถ่ายจากแบบ หรือไฟล์ภาพ) แล้วแตะจุดบนแบบเพื่อวางหมุด ส่วนนี้ไม่บังคับ'),
           reuse.length?el('div',null,el('p',{style:'margin:8px 0 4px'},'ใช้แบบที่มีในโครงการนี้แล้ว:'),reuse.map(function(x){return el('button',{type:'button',class:'btn',onclick:function(){addSheet(x)}},x.name||'แบบแปลน')})):null));
         hint.textContent='';return;
       }
@@ -1465,11 +1488,18 @@ button{font:inherit;cursor:pointer}
       (P.pins[curId]=P.pins[curId]||[]).push({s:cur,x:x,y:y});save();draw();
     });
     function addSheet(x){state.plan=state.plan||{sheets:[],pins:{}};state.plan.sheets.push({a:x.a,name:x.name,w:x.w,h:x.h});cur=state.plan.sheets.length-1;save();draw()}
+    function addImage(blob,name){return shrinkPlan(blob).then(function(sx){return ASSETS.upload(sx.blob).then(function(r){PH[r.id]=sx.dataURL;addSheet({a:r.id,name:name,w:sx.w,h:sx.h})})})}
     file.addEventListener('change',function(){
       var f=file.files&&file.files[0];file.value='';if(!f)return;
-      hint.textContent='กำลังเตรียมรูปแบบ…';
-      shrinkPlan(f).then(function(sx){return ASSETS.upload(sx.blob).then(function(r){PH[r.id]=sx.dataURL;addSheet({a:r.id,name:(f.name||'แบบ').replace(/\.[a-z0-9]+$/i,'').slice(0,30),w:sx.w,h:sx.h})})})
-        .catch(function(e){hint.textContent='เพิ่มแบบไม่สำเร็จ'+(e&&e.code==='too_large'?' (ไฟล์ใหญ่เกิน)':'')});
+      var base=(f.name||'แบบ').replace(/\.[a-z0-9]+$/i,'').slice(0,30);
+      var isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name||'');
+      hint.textContent=isPdf?'กำลังเปิดไฟล์ PDF…':'กำลังเตรียมรูปแบบ…';
+      (isPdf?pdfPages(f,function(i,n){hint.textContent='กำลังเตรียมแบบจาก PDF หน้า '+i+' / '+n+'…'}).then(function(pages){
+          var chain=Promise.resolve();
+          pages.forEach(function(b,i){chain=chain.then(function(){return addImage(b,pages.length>1?(base.slice(0,24)+' น.'+(i+1)):base)})});
+          return chain.then(function(){if(pages.more)hint.textContent='เพิ่ม '+pages.length+' หน้าแรกแล้ว (ไฟล์มี '+pages.total+' หน้า) · แยกไฟล์ถ้าต้องการหน้าที่เหลือ'});
+        }):addImage(f,base))
+        .catch(function(e){hint.textContent='เพิ่มแบบไม่สำเร็จ'+(e&&e.code==='too_large'?' (ไฟล์ใหญ่เกิน)':e&&e.code==='pdf'?' (เปิดไฟล์ PDF นี้ไม่ได้ · ลองบันทึกเป็นรูปแล้วเพิ่มใหม่)':e&&e.code==='pdflib'?' (ยังไม่ได้โหลดตัวอ่าน PDF · ต่อเน็ตครั้งแรกแล้วลองใหม่)':'')});
     });
     var zo=el('button',{type:'button',class:'btn','aria-label':'ย่อ'},'−'),zi=el('button',{type:'button',class:'btn','aria-label':'ขยาย'},'+');
     zo.addEventListener('click',function(){zoom=Math.max(1,zoom/1.5);draw()});zi.addEventListener('click',function(){zoom=Math.min(4,zoom*1.5);draw()});
