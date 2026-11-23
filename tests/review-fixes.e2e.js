@@ -94,6 +94,7 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
   ok(modalTxt.includes('รายงานประจำวัน'), 'receive dialog lists the daily report');
   await page.click('#qc-modal button.btn.primary'); await page.waitForTimeout(800);
   ok(/นำเข้าสำเร็จ/.test(await page.textContent('#qc-modal')), 'import confirmed and read back');
+  ok(/รหัสตอบรับ [0-9A-F]{4}-[0-9A-F]{4}/.test(await page.textContent('#rc-text')), 'receiver gets a receipt to send back (2.1)');
   ok(await S(async (id) => !!(await window.__qcForms.getDocs([id]))[0], fid), 'form document is back on the device');
 
   ok(!errs.length, 'no console / page errors' + (errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''));

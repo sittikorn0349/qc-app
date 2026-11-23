@@ -379,6 +379,7 @@
     var list=el('div',{style:'display:grid;gap:6px;max-height:34vh;overflow:auto;margin:6px 0'});
     var info=el('div',{role:'status',style:'margin:6px 0'}),acts=el('div',{class:'rb-actions',style:'margin-top:10px'});
     var body=el('div',null,
+      window.__ONLINE?errBox('สมาชิกในโครงการเห็นเอกสารผ่านการซิงก์อยู่แล้ว ไม่ต้องส่งไฟล์ ใช้ไฟล์ส่งงานเฉพาะกับคนนอกโครงการหรือต่างบริษัท'):null,
       para('เลือกเอกสารที่จะส่ง ระบบจะสร้างไฟล์ ตรวจความครบถ้วนให้ แล้วค่อยให้กดส่งทาง LINE หรืออีเมล'),
       el('div',{class:'meta'},el('div',null,el('label',{class:'fl',for:'sd-name'},'ชื่อผู้ส่ง'),nameIn),el('div',null,el('label',{class:'fl',for:'sd-code'},'รหัสผู้ตรวจ (กันเลขที่เอกสารซ้ำ)'),codeIn)),
       el('small',{style:'display:block;color:var(--muted)'},'รหัสผู้ตรวจจะนำหน้าเลขที่เอกสารใหม่ เช่น A-INS-006 ผู้ตรวจแต่ละคนใช้รหัสต่างกัน'),
@@ -388,7 +389,7 @@
     var rcBtn=el('button',{class:'btn',type:'button',id:'sd-receipt-ok'},'ตรวจใบตอบรับ');
     rcBtn.addEventListener('click',async function(){var r=await verifyReceipt(rcIn.value);rcMsg.textContent=r.msg;rcMsg.className=r.ok?'':'notice'});
     body.appendChild(el('details',{style:'margin-top:12px'},el('summary',null,'ยืนยันว่าผู้รับได้ไฟล์ครบ (ใบตอบรับ)'),el('div',{style:'margin-top:6px'},rcIn,el('div',{class:'rb-actions',style:'margin-top:6px'},rcBtn),rcMsg)));
-    var card=openModal('ส่งเอกสาร',body);
+    var card=openModal(window.__ONLINE?'ส่งให้คนนอกโครงการ':'ส่งเอกสาร',body);
     function counts(){var n=Object.keys(sel).filter(function(k){return sel[k]}).length;go.disabled=!n;go.textContent=n?'สร้างไฟล์ส่ง ('+n+' ฉบับ)':'เลือกเอกสารก่อน'}
     if(!all.length)list.appendChild(el('div',{class:'empty'},'ยังไม่มีเอกสารในเครื่อง'));
     all.forEach(function(x){
@@ -480,7 +481,9 @@
   }
   function mount(){
     var acts=$('.rb .rb-actions')||$('.rb-actions'),bd=$('#badge');if(!acts||!bd||!window.__qcDocs)return;
-    var btn=el('button',{class:'btn primary',id:'btn-send',type:'button',title:'สร้างไฟล์ส่งงาน (ตรวจความครบถ้วน) แล้วส่งทาง LINE หรืออีเมล'},'ส่งเอกสาร');
+    var ON=!!window.__ONLINE;
+    /* online: the project team already sees every document through sync; the file is only for people outside the project */
+    var btn=el('button',{class:'btn primary',id:'btn-send',type:'button',title:ON?'สมาชิกในโครงการเห็นงานผ่านการซิงก์อยู่แล้ว ใช้ปุ่มนี้เฉพาะส่งให้คนนอกโครงการ / ต่างบริษัท':'สร้างไฟล์ส่งงาน (ตรวจความครบถ้วน) แล้วส่งทาง LINE หรืออีเมล'},ON?'ส่งให้คนนอกโครงการ':'ส่งเอกสาร');
     btn.addEventListener('click',openSend);acts.insertBefore(btn,acts.firstChild);
     badge=el('span',{class:'badge',id:'qc-sentbadge',hidden:true});bd.parentNode.appendChild(badge);
     window.addEventListener('qc-change',function(){clearTimeout(bt);bt=setTimeout(refreshBadge,400)});

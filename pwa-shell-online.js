@@ -289,16 +289,21 @@
   var db={collection:function(p){return mkQuery(p)},doc:function(p){return mkQuery(colOf(p)).doc(p.split('/').pop())}};
 
   /* ---------- sync ---------- */
-  var syncing=false,again=false,st=null,lastErr='',conflicts=0,stopRealtime=null;
+  var syncing=false,again=false,st=null,lastErr='',conflicts=0,stopRealtime=null,authErr=false;
+  /* a sync failure because the sign-in expired is not the same as "no internet": local work continues either way,
+     but the user has to sign in again before the outbox can be sent */
+  function isAuth(e){return !!e&&(e.status===401||e.status===403&&/jwt|token/i.test(e.message||'')||e.code==='PGRST301'||e.code==='PGRST303'||/jwt|refresh token|not authenticated|session.*(expired|missing)|invalid claim/i.test((e.message||'')+' '+(e.error_description||'')))}
   function schedule(ms){clearTimeout(st);st=setTimeout(runSync,ms==null?600:ms)}
   function isNet(e){return !navigator.onLine||(e&&(e.name==='TypeError'||/fetch|network|Failed to fetch|Load failed/i.test(e.message||'')))}
   function runSync(){
     if(!UID||!CUR)return;
     if(syncing){again=true;return}
     if(!navigator.onLine){status();return}
+    if(authErr){status();return}            /* waiting for a new sign-in; local writes still go to the outbox */
     syncing=true;status();
     uploadAll().then(pushAll).then(pull).then(function(){lastErr=''},function(e){
-      lastErr=isNet(e)?'':(e&&(e.message||e.code))||'error';
+      if(isAuth(e)){authErr=true;lastErr='';}
+      else lastErr=isNet(e)?'':(e&&(e.message||e.code))||'error';
       try{console.warn('[qc-online] sync',e)}catch(x){}
     }).then(function(){
       syncing=false;status();
@@ -462,16 +467,17 @@
 
   /* ---------- project members (names for owners, assignee picker) ---------- */
   var MEMBERS=[];
-  function loadMembers(){
+  function loadMembers(strict){
     var k='qc-online-members:'+CUR;
     try{MEMBERS=JSON.parse(lsGet(k)||'[]')}catch(e){MEMBERS=[]}
-    return api.members(CUR).then(function(ms){
+    var p=api.members(CUR).then(function(ms){
       return api.profiles(ms.map(function(m){return m.user_id})).then(function(ps){
         var by={};ps.forEach(function(p){by[p.id]=p});
         MEMBERS=ms.map(function(m){var p=by[m.user_id]||{};return {id:m.user_id,role:m.role,name:p.display_name||p.email||'สมาชิก',email:p.email||''}});
         lsSet(k,JSON.stringify(MEMBERS));notify();
       });
-    }).catch(function(){});
+    });
+    return strict?p:p.catch(function(e){if(isAuth(e)){authErr=true;status()}});
   }
   function nameOf(u){if(u===UID)return 'คุณ';var m=MEMBERS.filter(function(x){return x.id===u})[0];return m?m.name:'สมาชิก'}
 
@@ -842,16 +848,18 @@
   function syncState(){
     var n=outbox.size+uploads.size;
     return {online:navigator.onLine,pending:n,syncing:syncing,error:lastErr,conflicts:conflicts,project:CUR,role:ROLE,
-      state:!navigator.onLine?'offline':lastErr?'error':(n||syncing)?'pending':'ok'};
+      setup:!!setupInfo(),auth:authErr,
+      state:!navigator.onLine?'offline':authErr?'auth':lastErr?'error':(n||syncing)?'pending':'ok'};
   }
   window.__qcSync=syncState;
+  window.__qcPendingUpload=function(id){return uploads.has(id)};
   var ROLE_TH={pm:'PM',foreman:'โฟร์แมน',headman:'เฮดแมน',viewer:'ผู้ดู'};
   function status(){
     var s=syncState();
     try{window.dispatchEvent(new Event('qc-sync'))}catch(e){}
     if(!pill)return;
     var p=PROJECTS.filter(function(x){return x.id===CUR})[0];
-    var txt=s.state==='offline'?'ออฟไลน์ · รอส่ง '+s.pending:s.state==='error'?'ซิงก์ไม่สำเร็จ':s.state==='pending'?'กำลังซิงก์…':'ซิงก์แล้ว';
+    var txt=s.state==='offline'?'ออฟไลน์ · รอส่ง '+s.pending:s.state==='auth'?'ต้องเข้าสู่ระบบใหม่ · รอส่ง '+s.pending:s.state==='error'?'ซิงก์ไม่สำเร็จ ชั่วคราว':s.state==='pending'?'กำลังซิงก์…':'ซิงก์แล้ว';
     pill.querySelector('.qo-t').textContent=(p?p.name:'')+' · '+txt;
     pill.className='qo-pill qo-'+s.state;
     pill.title=(ME?ME.email+' · ':'')+(ROLE_TH[ROLE]||'')+(s.error?' · '+s.error:'')+(conflicts?' · ผลตรวจซ้ำชนกัน '+conflicts+' รายการ (ใช้ผลที่ถึงระบบก่อน ของคุณเก็บไว้ในประวัติ)':'');
@@ -1012,6 +1020,8 @@
       el('p',null,s.state==='offline'?'ออฟไลน์อยู่ · รอส่งขึ้นระบบ '+s.pending+' รายการ (จะส่งเองเมื่อมีสัญญาณ)':s.state==='error'?'ซิงก์ไม่สำเร็จ: '+s.error:s.pending?'กำลังส่งขึ้นระบบ '+s.pending+' รายการ':'ข้อมูลตรงกับระบบแล้ว'),
       conflicts?el('p',null,'ผลตรวจซ้ำชนกับคนอื่น '+conflicts+' รายการ: ระบบใช้ผลที่ถึงก่อน ผลของคุณเก็บไว้ในประวัติ'):null);
     if(!canCreate())v.c.appendChild(el('p',null,'บทบาทนี้เปิดดูเอกสารของทีมได้ แต่สร้างเอกสารใหม่ไม่ได้'));
+    if(s.state==='auth')v.c.append(el('p',{class:'qo-err'},'การเข้าสู่ระบบหมดอายุ ข้อมูลที่ทำไว้ยังอยู่ในเครื่องครบ '+s.pending+' รายการ และจะส่งขึ้นระบบหลังเข้าสู่ระบบใหม่'),
+      el('button',{class:'btn primary',type:'button',onclick:function(){v.close();showLogin()}},'เข้าสู่ระบบใหม่'));
     v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();tasksPanel()}},'งาน · ใบขอตรวจ'));
     v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();searchPanel()}},'ค้นหาทุกเอกสาร'));
     v.c.append(el('button',{class:'btn',type:'button',onclick:function(){v.close();linePanel()}},'เชื่อม LINE รับแจ้งเตือน'));
@@ -1043,27 +1053,95 @@
     });
   }
   function whenBody(){return document.body?Promise.resolve():new Promise(function(r){document.addEventListener('DOMContentLoaded',r)})}
-  var ready=whenBody().then(function(){return api.session()}).then(function(s){
-    if(!s)return showLogin();
-    UID=s.user.id;UIDH=UID.replace(/-/g,'');PFX='data/users/'+UID+'/';
-    ME={id:UID,email:s.user.email||'',name:(s.user.user_metadata&&(s.user.user_metadata.full_name||s.user.user_metadata.name))||''};
-    return Promise.all([openDb().then(function(d){idb=d;return loadAll()}),loadProjects(),
-      api.myProfile(UID).then(function(p){if(p)ME.org_role=p.org_role},function(){})]).then(function(){
-      var isAdmin=ME.org_role==='admin',saved=lsGet(PK);
-      var pick=PROJECTS.filter(function(p){return p.id===saved})[0]||(PROJECTS.length===1&&!isAdmin?PROJECTS[0]:null);
-      return pick?pick.id:pickProject(isAdmin);
+  /* ---------- setup (once per device, needs internet) and cache-first start ---------- */
+  var SETUP='qc-setup-done';
+  function setupInfo(){try{var o=JSON.parse(lsGet(SETUP)||'null');return o&&o.uid?o:null}catch(e){return null}}
+  function meKey(u){return 'qc-online-me:'+u}
+  function withTimeout(p,ms){return Promise.race([p,new Promise(function(res){setTimeout(function(){res('timeout')},ms)})])}
+  function showNotSetup(why){
+    var v=overlay();
+    v.c.append(el('h2',null,'เครื่องนี้ยังไม่เคยเชื่อมต่อ'),
+      el('p',null,why||'การใช้แบบออนไลน์ครั้งแรกในเครื่องนี้ต้องมีอินเทอร์เน็ต เพื่อเข้าสู่ระบบและดึงโครงการ สมาชิก และเอกสารมาเก็บไว้ในเครื่อง หลังจากนั้นใช้งานได้แม้ไม่มีสัญญาณหลายวัน'),
+      el('button',{class:'btn primary',type:'button',onclick:function(){location.reload()}},'ลองใหม่'),
+      el('button',{class:'btn',type:'button',onclick:toOffline},'ใช้แบบออฟไลน์ (เฉพาะเครื่องนี้) ไปก่อน'));
+    return new Promise(function(){});
+  }
+  function identify(u,cached){
+    UID=u.id;UIDH=UID.replace(/-/g,'');PFX='data/users/'+UID+'/';
+    ME={id:UID,email:u.email||'',name:(u.user_metadata&&(u.user_metadata.full_name||u.user_metadata.name))||''};
+    if(cached){try{var m=JSON.parse(lsGet(meKey(UID))||'null');if(m)ME=Object.assign(ME,m)}catch(e){}}
+  }
+  function choose(){
+    var isAdmin=ME.org_role==='admin',saved=lsGet(PK);
+    var pick=PROJECTS.filter(function(p){return p.id===saved})[0]||(PROJECTS.length===1&&!isAdmin?PROJECTS[0]:null);
+    return pick?pick.id:pickProject(isAdmin);
+  }
+  /* everything offline work needs, fetched up front (not on demand): profile, projects + roles, members, documents */
+  function runSetup(){
+    var fail=function(){throw {setup:true}};
+    return Promise.all([api.myProjects().then(function(ps){PROJECTS=ps||[];lsSet(PL+':'+UID,JSON.stringify(PROJECTS))}),
+      api.myProfile(UID).then(function(p){if(p)ME.org_role=p.org_role})]).catch(fail).then(function(){
+      lsSet(meKey(UID),JSON.stringify({email:ME.email,name:ME.name,org_role:ME.org_role||null}));
+      return choose();
     }).then(function(id){
       CUR=id;lsSet(PK,id);
-      ROLE=(PROJECTS.filter(function(p){return p.id===id})[0]||{}).role||null;
-      try{bc=new BroadcastChannel('qc-online-'+UID);bc.onmessage=function(){loadAll().then(notify)}}catch(e){}
-      try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
-      loadMembers();loadReqCache();
-      showPill();
-      window.addEventListener('online',function(){schedule(0)});window.addEventListener('offline',status);
-      setInterval(function(){if(!document.hidden)schedule(0)},60000);
-      document.addEventListener('visibilitychange',function(){if(!document.hidden)schedule(0)});
-      try{stopRealtime=api.subscribe(CUR,function(){schedule(1500)})}catch(e){}
-      schedule(0);
+      return loadMembers(true).then(function(){return pull()}).catch(fail);
+    }).then(function(){
+      lsSet(SETUP,JSON.stringify({uid:UID,at:new Date().toISOString(),projects:PROJECTS.length}));
+    });
+  }
+  function start(){
+    ROLE=(PROJECTS.filter(function(p){return p.id===CUR})[0]||{}).role||null;
+    try{bc=new BroadcastChannel('qc-online-'+UID);bc.onmessage=function(){loadAll().then(notify)}}catch(e){}
+    try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+    loadReqCache();
+    showPill();
+    window.addEventListener('online',function(){schedule(0)});window.addEventListener('offline',status);
+    setInterval(function(){if(!document.hidden)schedule(0)},60000);
+    document.addEventListener('visibilitychange',function(){if(!document.hidden)schedule(0)});
+    try{stopRealtime=api.subscribe(CUR,function(){schedule(1500)})}catch(e){}
+    schedule(0);
+  }
+  var ready=whenBody().then(function(){
+    /* the session check never gates the form on a set-up device: it runs with a short timeout and the cache wins */
+    return withTimeout(api.session().catch(function(e){return {err:e}}),navigator.onLine?4000:300);
+  }).then(function(s){
+    var set=setupInfo(),sess=s&&s.user?s:null;
+    /* devices that used the online beta before the setup flag existed already hold a full cache: adopt it */
+    if(!set){
+      var legacyUid=sess?sess.user.id:null;
+      if(!legacyUid)try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf(PL+':')===0){legacyUid=k.slice(PL.length+1);break}}}catch(e){}
+      var lp=legacyUid&&lsGet(PL+':'+legacyUid);
+      if(lp&&lp!=='[]'&&lsGet(PK)){lsSet(SETUP,JSON.stringify({uid:legacyUid,at:new Date().toISOString(),migrated:true}));set=setupInfo()}
+    }
+    if(set){
+      if(sess&&sess.user.id!==set.uid){lsSet(SETUP,'');set=null}       /* a different account signed in: set up again */
+    }
+    if(set){
+      identify(sess?sess.user:{id:set.uid},true);
+      if(!sess)authErr=navigator.onLine&&s!=='timeout'&&!(s&&s.err&&isNet(s.err));   /* online but no session = sign-in expired */
+      try{PROJECTS=JSON.parse(lsGet(PL+':'+UID)||'[]')}catch(e){PROJECTS=[]}
+      return Promise.all([openDb().then(function(d){idb=d;return loadAll()})]).then(function(){
+        var saved=lsGet(PK),ok=PROJECTS.filter(function(p){return p.id===saved})[0];
+        return ok?saved:choose();
+      }).then(function(id){
+        CUR=id;lsSet(PK,id);loadMembers();start();
+        /* background refresh of what setup cached */
+        if(sess&&navigator.onLine){
+          loadProjects().then(function(){ROLE=(PROJECTS.filter(function(p){return p.id===CUR})[0]||{}).role||ROLE;status()}).catch(function(){});
+          api.myProfile(UID).then(function(p){if(p){ME.org_role=p.org_role;lsSet(meKey(UID),JSON.stringify({email:ME.email,name:ME.name,org_role:ME.org_role||null}))}},function(){});
+        }
+      });
+    }
+    if(!sess){
+      if(!navigator.onLine||s==='timeout'||(s&&s.err&&isNet(s.err)))return showNotSetup();
+      return showLogin();
+    }
+    identify(sess.user,false);
+    if(!navigator.onLine)return showNotSetup();
+    return openDb().then(function(d){idb=d;return loadAll()}).then(runSetup).then(start,function(e){
+      if(e&&e.setup)return showNotSetup('ดึงข้อมูลตั้งต้นไม่ครบ (สัญญาณหลุดระหว่างดึง) เครื่องนี้ยังไม่พร้อมใช้แบบออฟไลน์ ต่ออินเทอร์เน็ตแล้วลองใหม่');
+      throw e;
     });
   });
 

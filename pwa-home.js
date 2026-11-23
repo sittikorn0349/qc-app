@@ -175,7 +175,7 @@
       tile('new','สร้างรายงาน','เลือกแบบฟอร์ม','plus',{primary:true,run:openPicker}),
       tile('lib','คลังเอกสาร','','folder',{run:openLib}),
       tile('forms','รายงานแบบอื่น','แบบฟอร์มสำเร็จรูป / สร้างเอง','folder',{run:function(){if(window.__qcForms)window.__qcForms.library()}}),
-      tile('send','ส่งเอกสาร','ไฟล์ ZIP','send',{need:true,run:function(){click('#btn-send')}}),
+      tile('send',window.__ONLINE?'ส่งให้คนนอกโครงการ':'ส่งเอกสาร',window.__ONLINE?'ทีมในโครงการเห็นผ่านซิงก์แล้ว':'ไฟล์ ZIP','send',{need:true,run:function(){click('#btn-send')}}),
       tile('follow','ตรวจรอบใหม่','จากรายการค้าง','recheck',{need:true,run:function(){run('followUp')}}),
       tile('dup','ทำสำเนา','เป็นฉบับใหม่','copy',{need:true,run:function(){run('dupRecord')}}),
       tile('imp','รับไฟล์ ZIP','งานที่เพื่อนส่งมา','inbox',{run:openFile}),
@@ -194,7 +194,7 @@
     var back=el('button',{type:'button',class:'btn',id:'qf-back','aria-label':'กลับหน้าแรก'},icon('back'),'หน้าแรก');
     back.addEventListener('click',goHome);
     var title=el('div',{class:'qf-t',id:'qf-title'},'');
-    var send=el('button',{type:'button',class:'btn primary',id:'qf-send'},icon('send'),'ส่งเอกสาร');
+    var send=el('button',{type:'button',class:'btn primary',id:'qf-send'},icon('send'),window.__ONLINE?'ส่งคนนอก':'ส่งเอกสาร');
     send.addEventListener('click',function(){click('#btn-send')});
     var more=el('button',{type:'button',class:'btn',id:'qf-more','aria-haspopup':'menu','aria-expanded':'false','aria-label':'เมนูเพิ่มเติม'},icon('more'));
     more.addEventListener('click',function(e){e.stopPropagation();menuEl?closeMenu():openMenu(more)});
