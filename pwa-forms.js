@@ -7,9 +7,7 @@
   var U=window.QCU;  /* shared helpers: pwa-util.js */
   var $=U.$,el=U.el,ls=U.ls,lsSet=U.lsSet,clone=U.clone;
   /* ---------- helpers ---------- */
-  function uid(p){return (p||'')+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
-  function today(){var d=new Date(),p=function(n){return String(n).padStart(2,'0')};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}
-  function fmtDate(iso){if(!iso)return '';var p=String(iso).split('-');if(p.length!==3)return iso;return (+p[2])+'/'+(+p[1])+'/'+(+p[0]+543)}
+  var uid=QCU.uid,today=QCU.today,fmtDate=QCU.thDate;   /* shared helpers (pwa-util.js) */
   function lines(s){return String(s||'').split('\n').map(function(x){return x.trim()}).filter(Boolean)}
   function status(t){var s=$('#qcf-status');if(s)s.textContent=t||''}
 

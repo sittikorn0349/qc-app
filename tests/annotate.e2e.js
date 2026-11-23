@@ -28,7 +28,7 @@ const BASE = 'http://localhost:8911/' + (process.argv[2] || '');
   ok(await page.isVisible('.an-txt input'), 'text box appears after tapping the photo');
   await page.fill('.an-txt input', 'ระยะหุ้มไม่พอ'); await page.keyboard.press('Enter');
   ok(await page.evaluate(() => !document.querySelector('.an-bar button[aria-label="ย้อนกลับ"]').disabled), 'undo available');
-  const btnMin = await page.evaluate(() => Math.min(...[...document.querySelectorAll('.an-bar button')].map(x => x.getBoundingClientRect().height)));
+  const btnMin = await page.evaluate(() => Math.min(...[...document.querySelectorAll('.an-bar button')].filter(x => !x.hidden).map(x => x.getBoundingClientRect().height)));
   ok(btnMin >= 48, 'toolbar buttons ≥ 48px for gloves (' + btnMin + ')');
   await page.screenshot({ path: '/tmp/annotate-screen.png' });
   await page.click('.an-head .done'); await page.waitForTimeout(400);

@@ -52,5 +52,61 @@
   function sha256Blob(b){return b.arrayBuffer().then(function(ab){return sha256(new Uint8Array(ab))})}
   function sha256Text(t){return sha256(new TextEncoder().encode(t))}
 
-  window.QCU={$:$,$$:$$,ls:ls,lsSet:lsSet,lsDel:lsDel,jget:jget,clone:clone,uid:uid,S:S,el:el,sha256js:sha256js,sha256:sha256,sha256Blob:sha256Blob,sha256Text:sha256Text,hex:hex};
+  /* ---------- one way to confirm a risky action, used everywhere (no native browser dialogs) ----------
+     arm(btn,{armed,onConfirm,timeoutMs,need}): first press turns the button red (.armed) and changes its text,
+       a second press within the time runs onConfirm; need() false -> runs at once (nothing risky to confirm).
+     ask({title,text,ok,cancel,danger}): small in-app sheet, resolves true/false; the OK button is red when danger. */
+  function armReset(btn){clearTimeout(btn._armT);btn.classList.remove('armed');if(btn._armLabel!=null){setText(btn,btn._armLabel);btn._armLabel=null}}
+  function setText(btn,t){var n=btn.lastChild;if(n&&n.nodeType===3&&btn.childNodes.length>1)n.textContent=t;else btn.textContent=t}   /* keep a leading icon */
+  function arm(btn,o){
+    o=o||{};
+    btn.addEventListener('click',function(e){
+      if(o.need&&!o.need()){armReset(btn);o.onConfirm(e);return}
+      if(btn.classList.contains('armed')){armReset(btn);o.onConfirm(e);return}
+      btn._armLabel=btn.lastChild&&btn.lastChild.nodeType===3?btn.lastChild.textContent:btn.textContent;
+      btn.classList.add('armed');setText(btn,o.armed||'กดอีกครั้งเพื่อยืนยัน');
+      if(o.onArm)o.onArm();
+      btn._armT=setTimeout(function(){armReset(btn);if(o.onDisarm)o.onDisarm()},o.timeoutMs||3500);
+    });
+    return {reset:function(){armReset(btn)},armed:function(){return btn.classList.contains('armed')}};
+  }
+  var askCss=false;
+  function ask(o){
+    o=o||{};
+    if(!askCss){askCss=true;document.head.appendChild(el('style',null,
+      '.qc-ask{position:fixed;inset:0;z-index:90;background:rgba(15,20,25,.5);display:flex;align-items:flex-end;justify-content:center}'+
+      '.qc-ask-b{background:var(--card,#fff);color:var(--ink,#111);width:100%;max-width:520px;border-radius:14px 14px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px rgba(0,0,0,.2)}'+
+      '@media (min-width:700px){.qc-ask{align-items:center}.qc-ask-b{border-radius:12px}}'+
+      '.qc-ask h2{margin:0 0 6px;font-size:1.05rem}.qc-ask p{margin:0 0 14px;line-height:1.5}'+
+      '.qc-ask-a{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.qc-ask-a button{min-height:48px;min-width:96px}'+
+      '.qc-ask .btn.danger{background:var(--bad,#b42318);border-color:var(--bad,#b42318);color:#fff}'));}
+    return new Promise(function(resolve){
+      var prev=document.activeElement;
+      var okB=el('button',{type:'button',class:'btn '+(o.danger===false?'primary':'danger'),id:'qc-ask-ok'},o.ok||'ยืนยัน');
+      var noB=el('button',{type:'button',class:'btn',id:'qc-ask-no'},o.cancel||'ยกเลิก');
+      var box=el('div',{class:'qc-ask-b',role:'alertdialog','aria-modal':'true','aria-labelledby':'qc-ask-t','aria-describedby':'qc-ask-p'},
+        el('h2',{id:'qc-ask-t'},o.title||'ยืนยัน'),o.text?el('p',{id:'qc-ask-p'},o.text):null,el('div',{class:'qc-ask-a'},noB,okB));
+      var back=el('div',{class:'qc-ask qc-sheet-confirm'},box);
+      function done(v){document.removeEventListener('keydown',key,true);back.remove();try{prev&&prev.focus&&prev.focus()}catch(e){}resolve(v)}
+      function key(e){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();done(false)}}
+      okB.addEventListener('click',function(){done(true)});noB.addEventListener('click',function(){done(false)});
+      back.addEventListener('click',function(e){if(e.target===back)done(false)});
+      document.addEventListener('keydown',key,true);
+      document.body.appendChild(back);noB.focus();
+    });
+  }
+
+  /* dates and ids used by several modules (P2-5: one copy only) */
+  function pad2(n){return String(n).padStart(2,'0')}
+  function today(){var d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())}   /* this device's local date, YYYY-MM-DD */
+  function thDate(iso){if(!iso)return '';var p=String(iso).split('-');if(p.length!==3)return iso;return (+p[2])+'/'+(+p[1])+'/'+(+p[0]+543)}
+  function randHex(n){return Array.prototype.map.call(crypto.getRandomValues(new Uint8Array(n)),function(b){return ('0'+b.toString(16)).slice(-2)}).join('')}
+
+  /* names used in the confirm-pattern guideline: QC.armConfirm(btn,onConfirm,{armedLabel,timeoutMs}) and
+     QC.confirmSheet(message,{okLabel,cancelLabel,title}) -> Promise<boolean>; same code as arm()/ask() above */
+  window.QC=window.QC||{};
+  QC.armConfirm=function(btn,onConfirm,o){o=o||{};return arm(btn,{armed:o.armedLabel,timeoutMs:o.timeoutMs,need:o.need,onConfirm:onConfirm})};
+  QC.confirmSheet=function(message,o){o=o||{};return ask({title:o.title||'ยืนยัน',text:message,ok:o.okLabel,cancel:o.cancelLabel,danger:o.danger})};
+
+  window.QCU={today:today,thDate:thDate,randHex:randHex,pad2:pad2,$:$,$$:$$,ls:ls,lsSet:lsSet,lsDel:lsDel,jget:jget,clone:clone,uid:uid,S:S,el:el,sha256js:sha256js,sha256:sha256,sha256Blob:sha256Blob,sha256Text:sha256Text,hex:hex,arm:arm,ask:ask};
 })();

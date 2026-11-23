@@ -125,6 +125,9 @@ button{font:inherit;cursor:pointer}
 .fd-in{min-height:36px!important}
 .fd-add{margin-top:6px;justify-content:center}
 .rec.m3{grid-template-columns:auto minmax(0,1fr) auto auto}
+.rec .rec-cb{width:24px;height:24px;margin:10px;accent-color:var(--accent);cursor:pointer}.rec.picked{border-color:var(--accent);background:var(--accent-bg,#eaf2fb)}
+#sel-mode[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sel-bar{position:sticky;bottom:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px;margin-top:8px;border:1px solid var(--line);border-radius:10px;background:var(--card,#fff);box-shadow:0 -4px 14px rgba(0,0,0,.08)}.sel-bar select{min-height:40px;max-width:220px}.sel-bar #sel-n{font-weight:600;margin-right:auto}
 .rec.m2{grid-template-columns:minmax(0,1fr) auto auto}
 .dlg-opts{display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center;font-size:.85rem}
 .dlg-opts select{width:auto;min-height:34px;font-size:.85rem;padding:4px 8px}
@@ -185,6 +188,7 @@ button{font:inherit;cursor:pointer}
 .thumb .rep{bottom:4px;right:4px}
 .thumb .ann{top:4px;left:4px}
 .thumb .tb{width:32px;height:32px}
+.thumb .tb::after{content:'';position:absolute;inset:-8px;border-radius:50%}   /* hit area >= 44px without a bigger icon (P3-2) */
 .thumb .tb.more{display:none;top:4px;right:4px;width:44px;height:44px;font-size:22px}
 @media (pointer:coarse){.thumb .tb{display:none}.thumb .tb.more{display:flex}}
 .ph-sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;background:var(--surface,#fff);color:var(--fg);border-radius:16px 16px 0 0;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 -6px 24px rgba(0,0,0,.3)}
@@ -228,7 +232,7 @@ button{font:inherit;cursor:pointer}
 /* photo markup */
 .an-back{position:fixed;inset:0;z-index:70;background:#0d1113;display:flex;flex-direction:column;color:#fff;touch-action:none}
 .an-stage{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px;overflow:hidden}
-.an-stage canvas{max-width:100%;max-height:100%;touch-action:none;border-radius:4px;background:#222}
+.an-stage canvas{max-width:100%;max-height:100%;touch-action:none;border-radius:4px;background:#222;transform-origin:center center}
 .an-bar{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;padding:8px;background:#161b1e;border-top:1px solid #2a3236}
 .an-bar button{min-width:48px;min-height:48px;border-radius:10px;border:1px solid #3a4448;background:#20272a;color:#fff;font:inherit;font-size:.9rem;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
 .an-bar button.on{background:#fff;color:#111;border-color:#fff}
@@ -334,7 +338,9 @@ button{font:inherit;cursor:pointer}
 
 /* Photo viewer */
 #lb{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
-#lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px}
+#lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;touch-action:pan-y;user-select:none;-webkit-user-drag:none}
+#lb .lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:64px;border:0;border-radius:10px;background:rgba(0,0,0,.55);color:#fff;font-size:34px;line-height:1;cursor:pointer}#lb .lb-prev{left:8px}#lb .lb-next{right:8px}#lb .lb-nav:disabled{opacity:.3;cursor:default}
+#lb .lb-count{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);padding:4px 12px;border-radius:12px;background:rgba(0,0,0,.6);color:#fff;font-size:14px}
 
 @media screen and (max-width:760px){
   h1{font-size:1.4rem}
@@ -511,7 +517,7 @@ button{font:inherit;cursor:pointer}
           <span class="rb-actions" style="flex:0 0 auto"><button class="btn sm" id="lib-tip-ok" type="button">เข้าใจแล้ว</button></span>
         </div>
         <div class="dlg-tools">
-          <input type="search" id="q" placeholder="ค้นหาโครงการ / งานที่ตรวจ / เลขที่เอกสาร" aria-label="ค้นหาฉบับตรวจ">
+          <input type="search" id="q" placeholder="ค้นหาโครงการ / งาน / เลขที่ / ตำแหน่ง" aria-label="ค้นหาฉบับตรวจ (รวมตำแหน่งในรายการ)">
           <button class="btn primary sm" id="dlg-new" type="button">+ ฉบับใหม่</button>
         </div>
         <div class="dlg-opts" id="dlg-opts">
@@ -521,6 +527,7 @@ button{font:inherit;cursor:pointer}
             <option value="date">เรียง: วันที่ตรวจ (ใหม่ → เก่า)</option>
             <option value="docno">เรียง: เลขที่เอกสาร</option>
           </select>
+          <button class="btn sm" id="sel-mode" type="button" aria-pressed="false">เลือกหลายฉบับ</button>
           <span class="sp"></span>
           <button class="btn sm" id="exp-pdf" type="button" title="PDF รวมรายการค้างแก้ของฉบับที่แสดงอยู่">PDF รายการค้าง</button>
           <button class="btn sm" id="exp-csv" type="button" title="CSV รวมรายการค้างแก้ของฉบับที่แสดงอยู่">CSV รายการค้าง</button>
@@ -528,6 +535,14 @@ button{font:inherit;cursor:pointer}
         <div class="dlg-scope" id="scope"></div>
         <div class="dlg-msg" id="dlg-msg" role="status"></div>
         <div class="lp-list" id="reclist"></div>
+        <div class="sel-bar" id="sel-bar" hidden role="region" aria-label="จัดการฉบับที่เลือก">
+          <span id="sel-n" aria-live="polite">เลือก 0 ฉบับ</span>
+          <select id="sel-mv" aria-label="ย้ายฉบับที่เลือกไปโฟลเดอร์"></select>
+          <button class="btn sm" id="sel-move" type="button">ย้าย</button>
+          <button class="btn sm del" id="sel-del" type="button">ลบที่เลือก</button>
+          <button class="btn sm" id="sel-all" type="button">เลือกทั้งหมด</button>
+          <button class="btn sm" id="sel-cancel" type="button">เสร็จ</button>
+        </div>
       </div>
     </div>
   </div>
@@ -725,7 +740,7 @@ button{font:inherit;cursor:pointer}
       var add=z[p].filter(function(x){return typeof x==='string'&&x.trim()&&cur.indexOf(x)<0});if(add.length){try{localStorage.setItem(k,JSON.stringify(cur.concat(add)));n++}catch(e){}}});
     return n;
   }
-  window.QC={zonesAll:zonesAll,restoreZones:restoreZones,restoreForms:restoreForms,h32:h32,explode:explode,implode:implode,makeZip:makeZip,readZip:readZip,buildBackup:buildBackup,dataURLBlob:dataURLBlob,projectId:projectId,partyId:partyId};
+  window.QC=Object.assign(window.QC||{},{zonesAll:zonesAll,restoreZones:restoreZones,restoreForms:restoreForms,h32:h32,explode:explode,implode:implode,makeZip:makeZip,readZip:readZip,buildBackup:buildBackup,dataURLBlob:dataURLBlob,projectId:projectId,partyId:partyId});
 })();
 </script>
 <script src="./libs/jspdf.umd.min.js"></script>
@@ -1104,15 +1119,31 @@ button{font:inherit;cursor:pointer}
         }
         function draw(){cx.drawImage(img,0,0,W,H);shapes.forEach(drawShape);if(cur)drawShape(cur)}
         function pt(e){var r=cv.getBoundingClientRect();return {x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+        /* two fingers = pinch-zoom / pan (P3-7); pt() reads the transformed box, so drawing stays exact at any zoom */
+        var ptrs={},pinch=null,Z=1,TX=0,TY=0;
+        function np(){return Object.keys(ptrs).length}
+        function two(){var k=Object.keys(ptrs),a=ptrs[k[0]],b=ptrs[k[1]];return {d:Math.hypot(a.x-b.x,a.y-b.y)||1,x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
+        function applyZ(){if(Z<=1.01){Z=1;TX=0;TY=0}cv.style.transform=Z===1?'':'translate('+TX+'px,'+TY+'px) scale('+Z+')';zoomB.hidden=Z===1;zoomB.textContent='พอดีจอ ('+Math.round(Z*100)+'%)'}
         cv.addEventListener('pointerdown',function(e){
-          e.preventDefault();var q=pt(e);
-          if(tool==='text'){pendText=q;txtBar.hidden=false;txtIn.value='';txtIn.focus();return}
+          e.preventDefault();ptrs[e.pointerId]={x:e.clientX,y:e.clientY};
           try{cv.setPointerCapture(e.pointerId)}catch(x){}
+          if(np()===2){cur=null;draw();var t=two();pinch={d:t.d,x:t.x,y:t.y,z:Z,tx:TX,ty:TY};return}
+          if(np()>2||pinch)return;
+          var q=pt(e);
+          if(tool==='text'){pendText=q;txtBar.hidden=false;txtIn.value='';txtIn.focus();return}
           cur=tool==='pen'?{t:'pen',c:color,p:[q]}:{t:tool,c:color,a:q,b:q};draw();
         });
-        cv.addEventListener('pointermove',function(e){if(!cur)return;var q=pt(e);if(cur.t==='pen')cur.p.push(q);else cur.b=q;draw()});
-        function up(){if(!cur)return;var ok=cur.t==='pen'?cur.p.length>1:Math.hypot(cur.b.x-cur.a.x,cur.b.y-cur.a.y)>lw*2;if(ok)shapes.push(cur);cur=null;draw();sync()}
+        cv.addEventListener('pointermove',function(e){
+          if(ptrs[e.pointerId])ptrs[e.pointerId]={x:e.clientX,y:e.clientY};
+          if(pinch&&np()>=2){var t=two();Z=Math.max(1,Math.min(5,pinch.z*t.d/pinch.d));TX=pinch.tx+(t.x-pinch.x);TY=pinch.ty+(t.y-pinch.y);applyZ();return}
+          if(!cur)return;var q=pt(e);if(cur.t==='pen')cur.p.push(q);else cur.b=q;draw()});
+        function up(e){
+          if(e&&e.pointerId!=null)delete ptrs[e.pointerId];
+          if(pinch){if(np()<2)pinch=null;if(!np())cur=null;return}
+          if(!cur)return;var ok=cur.t==='pen'?cur.p.length>1:Math.hypot(cur.b.x-cur.a.x,cur.b.y-cur.a.y)>lw*2;if(ok)shapes.push(cur);cur=null;draw();sync()}
         cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+        cv.addEventListener('wheel',function(e){if(!e.ctrlKey)return;e.preventDefault();Z=Math.max(1,Math.min(5,Z*(e.deltaY<0?1.15:1/1.15)));applyZ()},{passive:false});
+        var zoomB=el('button',{type:'button',hidden:true,onclick:function(){Z=1;applyZ()}},'พอดีจอ');
         var back=el('div',{class:'an-back',role:'dialog','aria-modal':'true','aria-label':'ขีดเขียนบนรูป'});
         var bar=el('div',{class:'an-bar'}),tb={};
         [['circle','◯ วงกลม'],['arrow','➜ ลูกศร'],['pen','✎ ปากกา'],['text','T ข้อความ']].forEach(function(t){
@@ -1124,7 +1155,7 @@ button{font:inherit;cursor:pointer}
         var undo=el('button',{type:'button','aria-label':'ย้อนกลับ',onclick:function(){shapes.pop();draw();sync()}},'↶ ย้อน');
         var cancel=el('button',{type:'button',onclick:function(){finish(false)}},'ยกเลิก');
         var doneB=el('button',{type:'button',class:'done',onclick:function(){finish(true)}},'เสร็จ');
-        bar.append(undo);
+        bar.append(undo,zoomB);
         var head=el('div',{class:'an-head'},cancel,el('strong',null,'ขีดเขียนบนรูป'),doneB);
         var txtIn=el('input',{type:'text',placeholder:'พิมพ์ข้อความ เช่น ระยะหุ้มไม่พอ','aria-label':'ข้อความบนรูป'});
         var txtOk=el('button',{type:'button',class:'btn primary',style:'min-height:48px'},'ใส่ข้อความ');
@@ -1136,7 +1167,7 @@ button{font:inherit;cursor:pointer}
           Object.keys(tb).forEach(function(k){tb[k].classList.toggle('on',k===tool);tb[k].setAttribute('aria-pressed',k===tool?'true':'false')});
           Object.keys(sw).forEach(function(k){sw[k].classList.toggle('on',k===color);sw[k].setAttribute('aria-pressed',k===color?'true':'false')});
           undo.disabled=!shapes.length;
-          hint.textContent=tool==='text'?'แตะตรงที่จะวางข้อความ':tool==='pen'?'ลากนิ้วเพื่อวาด':'ลากนิ้วเพื่อวาด'+(tool==='circle'?'วงกลมรอบจุดที่พบ':'ลูกศรชี้จุดที่พบ');
+          hint.textContent=(tool==='text'?'แตะตรงที่จะวางข้อความ':tool==='pen'?'ลากนิ้วเพื่อวาด':'ลากนิ้วเพื่อวาด'+(tool==='circle'?'วงกลมรอบจุดที่พบ':'ลูกศรชี้จุดที่พบ'))+' · ใช้สองนิ้วถ่างเพื่อซูม';
         }
         back.append(head,el('div',{class:'an-stage'},cv),hint,txtBar,bar);
         document.body.appendChild(back);draw();sync();
@@ -1205,15 +1236,23 @@ button{font:inherit;cursor:pointer}
     var p=it[key][j];if(p.a)queueDel(p.a);
     it[key].splice(j,1);refreshRow(it);save();
   }
-  var lb=$('#lb');
-  lb.addEventListener('click',function(){lb.hidden=true});
-  document.addEventListener('keydown',function(e){if(e.key==='Escape')lb.hidden=true});
-  function openPhoto(src){lb.querySelector('img').src=src;lb.hidden=false}
+  /* lightbox: swipe left/right (or ‹ › / arrow keys) through the photos of the same set (P3-6) */
+  var lb=$('#lb'),lbList=[],lbI=0,lbX=null,lbMoved=false;
+  var lbPrev=el('button',{type:'button',class:'lb-nav lb-prev','aria-label':'รูปก่อนหน้า'},'‹'),lbNext=el('button',{type:'button',class:'lb-nav lb-next','aria-label':'รูปถัดไป'},'›'),lbCount=el('div',{class:'lb-count','aria-live':'polite'});
+  lb.append(lbPrev,lbNext,lbCount);
+  function lbShow(){lb.querySelector('img').src=lbList[lbI];var many=lbList.length>1;lbPrev.hidden=lbNext.hidden=lbCount.hidden=!many;lbCount.textContent=(lbI+1)+' / '+lbList.length;lbPrev.disabled=lbI<=0;lbNext.disabled=lbI>=lbList.length-1}
+  function lbGo(d){var n=lbI+d;if(n<0||n>=lbList.length)return;lbI=n;lbShow()}
+  lbPrev.addEventListener('click',function(e){e.stopPropagation();lbGo(-1)});lbNext.addEventListener('click',function(e){e.stopPropagation();lbGo(1)});
+  lb.addEventListener('pointerdown',function(e){lbX=e.clientX;lbMoved=false});
+  lb.addEventListener('pointerup',function(e){if(lbX==null)return;var dx=e.clientX-lbX;lbX=null;if(Math.abs(dx)>40&&lbList.length>1){lbMoved=true;lbGo(dx<0?1:-1)}});
+  lb.addEventListener('click',function(e){if(lbMoved){lbMoved=false;return}if(e.target.closest&&e.target.closest('.lb-nav'))return;lb.hidden=true});
+  document.addEventListener('keydown',function(e){if(lb.hidden)return;if(e.key==='Escape')lb.hidden=true;else if(e.key==='ArrowLeft')lbGo(-1);else if(e.key==='ArrowRight')lbGo(1)});
+  function openPhoto(src,list,i){lbList=list&&list.length?list:[src];lbI=list&&list.length?Math.max(0,Math.min(i||0,list.length-1)):0;lbShow();lb.hidden=false}
 
   function thumb(it,key,j,tag){
     var p=it[key][j],th=el('div',{class:'thumb'});
     var img=el('img',{src:photoSrc(p),alt:tag+' รูปที่ '+(j+1)});
-    img.addEventListener('click',function(){openPhoto(photoSrc(p))});
+    img.addEventListener('click',function(){openPhoto(photoSrc(p),it[key].map(photoSrc),j)});
     img.addEventListener('error',function(){th.classList.add('broken')});
     function shape(){if(img.naturalWidth&&img.naturalHeight){var d={w:img.naturalWidth,h:img.naturalHeight};DIM[dimKey(p)]=d;th.setAttribute('data-o',orient(d.w,d.h))}}
     img.addEventListener('load',shape);if(DIM[dimKey(p)])th.setAttribute('data-o',orientOf(p));
@@ -1596,7 +1635,7 @@ button{font:inherit;cursor:pointer}
     if(it.rnote&&it.rres)p.appendChild(el('div',{class:'hint'},'หมายเหตุตรวจซ้ำล่าสุด: '+it.rnote));
     if(it.after.length){
       var ph=el('div',{class:'act-ph'});
-      it.after.forEach(function(x,j){var im=el('img',{src:photoSrc(x),alt:'รูปหลังแก้ '+(j+1)});im.addEventListener('click',function(){openPhoto(photoSrc(x))});ph.appendChild(im)});
+      it.after.forEach(function(x,j){var im=el('img',{src:photoSrc(x),alt:'รูปหลังแก้ '+(j+1)});im.addEventListener('click',function(){openPhoto(photoSrc(x),it.after.map(photoSrc),j)});ph.appendChild(im)});
       p.appendChild(el('div',{class:'f'},el('span',{class:'lbl'},'รูปหลังแก้ที่มีอยู่'),ph));
     }
     p.appendChild(el('div',{class:'f'},el('span',{class:'lbl'},'ถ่ายรูปหลังแก้เพิ่ม'),photoStrip(it,'_na','หลังแก้ (ใหม่) รายการที่ '+(i+1),'+ ถ่าย/เลือกรูป')));
@@ -1610,9 +1649,10 @@ button{font:inherit;cursor:pointer}
       var fx=el('button',{type:'button',class:'btn primary big'},'แจ้งแก้แล้ว');
       fx.addEventListener('click',function(){
         if(!ready())return;
-        if(!it._na.length&&!it.after.length&&!window.confirm('ยังไม่มีรูปหลังแก้ ต้องการแจ้งแก้แล้วโดยไม่มีรูปใช่ไหม'))return;
-        fx.disabled=true;
-        onl().reportFixed(state.id,it.id,it._n,after()).then(function(){sent('แจ้งแก้แล้ว · ส่งให้ผู้ตรวจตรวจซ้ำ')},function(e){fx.disabled=false;flash(e.message||'แจ้งไม่สำเร็จ')});
+        var go=function(){fx.disabled=true;
+        onl().reportFixed(state.id,it.id,it._n,after()).then(function(){sent('แจ้งแก้แล้ว · ส่งให้ผู้ตรวจตรวจซ้ำ')},function(e){fx.disabled=false;flash(e.message||'แจ้งไม่สำเร็จ')})};
+        if(it._na.length||it.after.length){go();return}
+        QCU.ask({title:'ยังไม่มีรูปหลังแก้',text:'ผู้ตรวจจะไม่มีรูปไว้เทียบ ต้องการแจ้งแก้แล้วโดยไม่มีรูปใช่ไหม',ok:'แจ้งโดยไม่มีรูป',cancel:'กลับไปถ่ายรูป'}).then(function(y){if(y)go()});
       });
       p.appendChild(fx);
       p.appendChild(el('div',{class:'hint'},'หรือบันทึกผลตรวจซ้ำเองด้านล่าง'));
@@ -1814,15 +1854,7 @@ button{font:inherit;cursor:pointer}
 
   /* ---------- saved inspections: bar, list, open / new / copy / delete ---------- */
   var resetBtn=$('#reset'),newBtn=$('#btn-new'),dupBtn=$('#btn-dup'),followBtn=$('#btn-follow'),listBtn=$('#btn-list'),dlg=$('#docdlg');
-  function armBtn(btn,armedText,fn,need){
-    var t;
-    btn.addEventListener('click',function(){
-      if(need&&!need()){fn();return}
-      if(btn.classList.contains('armed')){clearTimeout(t);btn.classList.remove('armed');btn.textContent=btn._label;fn();return}
-      btn.classList.add('armed');btn.textContent=armedText;
-      t=setTimeout(function(){btn.classList.remove('armed');btn.textContent=btn._label},3500);
-    });
-  }
+  function armBtn(btn,armedText,fn,need){QCU.arm(btn,{armed:armedText,onConfirm:function(){fn()},need:need})}   /* one confirm pattern app-wide (pwa-util.js) */
   function setLabel(btn,t){btn._label=t;if(!btn.classList.contains('armed'))btn.textContent=t}
   function persisted(){return records.some(function(r){return r.id===state.id})}
   function renderBar(){
@@ -1867,6 +1899,7 @@ button{font:inherit;cursor:pointer}
   }
   function closeList(){
     if(dlg.hidden)return;
+    if(selMode){selMode=false;selIds={};$('#sel-mode').setAttribute('aria-pressed','false');$('#sel-bar').hidden=true}
     dlg.hidden=true;listBtn.setAttribute('aria-expanded','false');document.body.style.overflow='';
     renamingF=null;addingF=false;
     try{listBtn.focus({preventScroll:true})}catch(e){}
@@ -2068,6 +2101,7 @@ button{font:inherit;cursor:pointer}
     if(!trashV&&activeF!=='all'&&activeF!=='none'&&activeF!=='shared'&&!m[activeF])activeF='none';
     var sharedV=activeF==='shared',real=activeF!=='all'&&activeF!=='none'&&!trashV&&!sharedV;
     var q=($('#q').value||'').trim().toLowerCase(),host=$('#reclist'),shown=0;
+    var canSel=!trashV&&!sharedV;if(!canSel&&selMode)setSel(false);$('#sel-mode').hidden=!canSel;
     host.textContent='';
     $('#dlg-new').hidden=trashV||sharedV;$('#dlg-opts').hidden=trashV||sharedV;
     if(trashV){$('#scope').textContent='ถังขยะ';renderTrash(host);return}
@@ -2075,7 +2109,7 @@ button{font:inherit;cursor:pointer}
     var list=[];
     records.forEach(function(r){
       var d=r.id===state.id?state:r.data,inf=info(d),fid=recFolder(r,m);
-      var hay=(inf.title+' '+inf.sub+' '+((d.meta||{}).work||'')).toLowerCase();
+      var hay=(inf.title+' '+inf.sub+' '+((d.meta||{}).work||'')+' '+(d.items||[]).map(function(it){return it.loc||''}).join(' ')).toLowerCase();   /* locations searchable too (P3-5) */
       if(q){if(hay.indexOf(q)<0)return}
       else if(activeF==='none'){if(fid)return}
       else if(real){if(fid!==activeF)return}
@@ -2100,7 +2134,7 @@ button{font:inherit;cursor:pointer}
       if(inf.date)chips.appendChild(el('span',null,'ตรวจ '+fmtDate(inf.date)));
       if(!window.__PWA)chips.appendChild(el('span',d.sub?{class:'c-ok'}:null,d.sub?'ส่งแล้ว':'ร่าง'));
       if(fid&&(q||activeF==='all'))chips.appendChild(el('span',null,'โฟลเดอร์: '+fname(fid)));
-      var open=el('button',{type:'button',class:'rec-open','aria-label':'เปิดฉบับ '+inf.title,onclick:function(){if(!cur)openRecord(r.id);else closeList()}},
+      var open=el('button',{type:'button',class:'rec-open','aria-label':'เปิดฉบับ '+inf.title,onclick:function(){if(selMode)return;if(!cur)openRecord(r.id);else closeList()}},
         el('span',{class:'rec-t'},inf.title+(cur?'  ● เปิดอยู่':'')),
         el('span',{class:'rec-s'},[inf.sub,fmtShort((d.updatedAt||'')||'')?('แก้ไขล่าสุด '+fmtShort(d.updatedAt)):''].filter(Boolean).join(' · ')),chips);
       var sel=el('select',{class:'rec-mv','aria-label':'ย้ายฉบับ '+inf.title+' ไปโฟลเดอร์',onchange:function(){moveRecord(r.id,sel.value)}},
@@ -2110,13 +2144,21 @@ button{font:inherit;cursor:pointer}
       var del=el('button',{type:'button',class:'del','aria-label':'ย้ายฉบับ '+inf.title+' ไปถังขยะ',title:'ย้ายไปถังขยะ'},'ลบ');
       del._label='ลบ';armBtn(del,'ยืนยัน?',function(){deleteRecord(r.id)});
       var grip=el('span',{class:'grip',draggable:'true',title:'ลากไปวางที่โฟลเดอร์','aria-hidden':'true'},'⠿');
-      var row=el('div',{class:'rec m3'+(cur?' cur':'')},grip,open,sel,del);
+      var picked=!!selIds[r.id];
+      if(selMode){
+        var cb=el('input',{type:'checkbox',class:'rec-cb','aria-label':'เลือก '+inf.title});cb.checked=picked;
+        cb.addEventListener('change',function(){if(cb.checked)selIds[r.id]=1;else delete selIds[r.id];row.classList.toggle('picked',cb.checked);selCount()});
+        open.addEventListener('click',function(e){e.preventDefault();cb.checked=!cb.checked;cb.dispatchEvent(new Event('change'))});
+        grip=cb;
+      }
+      var row=el('div',{class:'rec m3'+(cur?' cur':'')+(selMode&&picked?' picked':'')},grip,open,sel,del);
       grip.addEventListener('dragstart',function(e){
         e.dataTransfer.setData('text/plain',r.id);e.dataTransfer.effectAllowed='move';
         try{e.dataTransfer.setDragImage(row,16,16)}catch(x){}
       });
       host.appendChild(row);
     });
+    selCount();
     if(!shown)host.appendChild(el('div',{class:'empty'},records.length?(q?'ไม่พบฉบับที่ค้นหา':(onlyPend?'ไม่มีฉบับที่มีรายการค้างในมุมมองนี้':'ไม่มีฉบับในโฟลเดอร์นี้')):'ยังไม่มีฉบับที่บันทึก'));
     /* documents from the form engine (pwa-forms.js) in the same library: shown under all / search / no-folder */
     if(window.__qcForms&&(activeF==='all'||activeF==='none'||q)&&!onlyPend){
@@ -2140,6 +2182,19 @@ button{font:inherit;cursor:pointer}
 
   listBtn.addEventListener('click',function(){if(dlg.hidden)openList();else closeList()});
   $('#q').addEventListener('input',renderList);
+  /* multi-select (P3-5): move to a folder / move to trash for many documents at once */
+  var selMode=false,selIds={};
+  function setSel(on){selMode=on;selIds={};$('#sel-mode').setAttribute('aria-pressed',on?'true':'false');$('#sel-bar').hidden=!on;if(on){var mv=$('#sel-mv');mv.textContent='';mv.appendChild(el('option',{value:''},'ไม่ได้จัดโฟลเดอร์'));folders.forEach(function(f){mv.appendChild(el('option',{value:f.id},f.name))})}}
+  function selList(){return Object.keys(selIds).filter(function(id){return records.some(function(x){return x.id===id})})}
+  function selCount(){if(!selMode)return;var n=selList().length;$('#sel-n').textContent='เลือก '+n+' ฉบับ';$('#sel-move').disabled=$('#sel-del').disabled=!n}
+  $('#sel-mode').addEventListener('click',function(){setSel(!selMode);renderList()});
+  $('#sel-cancel').addEventListener('click',function(){setSel(false);renderList()});
+  $('#sel-all').addEventListener('click',function(){(shownRecs||[]).forEach(function(x){selIds[x.r.id]=1});renderList()});
+  $('#sel-move').addEventListener('click',function(){var ids=selList(),fid=$('#sel-mv').value;ids.forEach(function(id){moveRecord(id,fid)});dmsg('ย้าย '+ids.length+' ฉบับไปที่ “'+fname(fid)+'”');setSel(false);renderList()});
+  armBtn($('#sel-del'),'ยืนยันลบที่เลือก?',function(){
+    var ids=selList();if(!ids.length)return;
+    ids.reduce(function(p,id){return p.then(function(){return deleteRecord(id)})},Promise.resolve()).then(function(){dmsg('ย้าย '+ids.length+' ฉบับไปถังขยะแล้ว · กู้คืนได้ 30 วัน');setSel(false);renderList()});
+  });
   $('#dlg-close').addEventListener('click',closeList);
   $('#f-pend').addEventListener('change',function(){onlyPend=this.checked;renderList()});
   $('#sortby').addEventListener('change',function(){sortBy=this.value;renderList()});
@@ -2269,7 +2324,10 @@ button{font:inherit;cursor:pointer}
     followUp:function(){return followUp().then(function(r){return r===true})},
     openRecord:function(id){return openRecord(id).then(function(r){return r===true})},
     trashCurrent:function(){return Promise.resolve(mode==='store'?deleteRecord(state.id):clearLocal()).then(function(){return true},function(){return false})},
-    openList:function(){if(dlg.hidden)openList()},closeList:closeList,listOpen:function(){return !dlg.hidden}
+    openList:function(){if(dlg.hidden)openList()},closeList:closeList,listOpen:function(){return !dlg.hidden},
+    /* direct calls (no timed synthetic clicks from other modules) */
+    openTrash:function(){if(dlg.hidden)openList();activeF='trash';renamingF=null;addingF=false;var mm=$('#dlg-msg');if(mm)mm.textContent='';renderList()},
+    exportBackup:function(){if(dlg.hidden)openList();var b=$('#bk-export');if(b&&!b.disabled)b.click()}
   };
 
   window.__qcForm={cur:function(){return state.id},drain:function(){return drain()},viewing:function(){return !!viewing},

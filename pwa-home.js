@@ -251,21 +251,21 @@
     var lib=el('button',{type:'button',role:'menuitem'},icon('folder'),'ไปที่คลังเอกสาร');
     lib.addEventListener('click',function(){closeMenu();openList()});
     var del=el('button',{type:'button',role:'menuitem',class:'danger'},icon('trash'),'ย้ายไปถังขยะ');
-    del.addEventListener('click',function(){
-      if(del.classList.contains('armed')){
-        clearTimeout(armT);closeMenu();
-        var a=A();if(a)a.trashCurrent().then(function(ok){if(ok){goHome();setMsg(($('#status')||{}).textContent||'')}});
-        return;
-      }
-      del.classList.add('armed');del.lastChild.textContent='กดอีกครั้งเพื่อยืนยัน';
-      armT=setTimeout(function(){del.classList.remove('armed');del.lastChild.textContent='ย้ายไปถังขยะ'},3500);
-    });
+    QCU.arm(del,{armed:'กดอีกครั้งเพื่อยืนยัน',onConfirm:function(){
+      closeMenu();
+      var a=A();if(a)a.trashCurrent().then(function(ok){if(ok){goHome();setMsg(($('#status')||{}).textContent||'')}});
+    }});
     /* 8.1, optional: kept in this menu so the main flow stays the same */
     var Pl=window.__qcPlan,pm=Pl?el('button',{type:'button',role:'menuitem',id:'qf-plan'},icon('pin'),'ระบุตำแหน่งบนแบบแปลน (ไม่บังคับ)'):null;
     if(pm)pm.addEventListener('click',function(){closeMenu();Pl.open()});
     var pp=Pl?el('button',{type:'button',role:'menuitem',id:'qf-planprint'},icon('print'),'พิมพ์แผ่นแผนผังสำหรับช่าง (A3)'):null;
     if(pp)pp.addEventListener('click',function(){closeMenu();Pl.print(false)});
-    menuEl=el('div',{class:'qf-menu',role:'menu'},lib,pm,pp,del);
+    /* every action on this document in one place (P3-9) */
+    function mi(id,ic,label,fn){var b=el('button',{type:'button',role:'menuitem',id:id},icon(ic),label);b.addEventListener('click',function(){closeMenu();fn()});return b}
+    var dup=mi('qf-dup','copy','ทำสำเนาเป็นฉบับใหม่',function(){run('dupRecord')});
+    var fu=mi('qf-follow','recheck','ตรวจรอบใหม่จากรายการค้าง',function(){run('followUp')});
+    var snd=$('#btn-send')?mi('qf-sendm','send',window.__ONLINE?'ส่งให้คนนอกโครงการ':'ส่งเอกสาร (ZIP)',function(){click('#btn-send')}):null;
+    menuEl=el('div',{class:'qf-menu',role:'menu'},dup,fu,snd,pm,pp,lib,del);
     formbar.appendChild(menuEl);anchor.setAttribute('aria-expanded','true');
   }
   function closeMenu(){
@@ -305,7 +305,7 @@
   function openSheet(title,nodes){
     closeSheet();
     var card=el('div',{class:'qh-card',role:'dialog','aria-modal':'true','aria-label':title},el('h2',null,title));
-    nodes.forEach(function(n){card.appendChild(n)});
+    nodes.forEach(function(n){if(n)card.appendChild(n)});
     var close=el('button',{type:'button',class:'btn'},'ปิด');close.addEventListener('click',closeSheet);card.appendChild(close);
     sheet=el('div',{id:'qh-sheet'},card);
     sheet.addEventListener('mousedown',function(e){if(e.target===sheet)closeSheet()});
@@ -390,16 +390,14 @@
     openSheet('สำรอง / กู้คืนข้อมูล',[
       coverageView(),
       el('div',{class:'qh-kv'},'ไฟล์สำรองเก็บทุกฉบับ โฟลเดอร์ และรูป เก็บไว้ในที่ปลอดภัย (เช่น Drive, LINE Keep) เผื่อเครื่องหาย'),
-      big('db','สำรองข้อมูลทั้งหมด (ZIP)','บันทึกไฟล์ลงเครื่อง',function(){closeSheet();openList();setTimeout(function(){click('#bk-export')},60)}),
+      big('db','สำรองข้อมูลทั้งหมด (ZIP)','บันทึกไฟล์ลงเครื่อง',function(){closeSheet();var a=A();if(a&&a.exportBackup)a.exportBackup();else{openList();click('#bk-export')}}),
       big('inbox','กู้คืนจากไฟล์ ZIP','เลือกไฟล์สำรองหรือไฟล์ส่งงาน',openFile)
     ]);
   }
   function openTrash(){
-    openList();
-    var n=0,iv=setInterval(function(){
-      var b=$('.fd-trash .fd-open');
-      if(b){clearInterval(iv);b.click()}else if(++n>20)clearInterval(iv);
-    },60);
+    var a=A();
+    if(a&&a.openTrash){libFromHome=true;a.openTrash();return}
+    openList();var t=$('.fd-trash .fd-open');if(t)t.click();
   }
   function openSettings(){
     var code=el('input',{type:'text',id:'qs-code',maxlength:'6',value:ls(CODE_K)||'',placeholder:'เช่น A',autocapitalize:'characters'});
@@ -431,7 +429,7 @@
       el('div',{class:'qh-row'},el('label',{class:'qh-lbl','for':'qs-code'},'รหัสผู้ตรวจ (นำหน้าเลขที่เอกสาร สูงสุด 6 ตัว)'),code),
       el('div',{class:'qh-row'},el('label',{class:'qh-lbl','for':'qs-name'},'ชื่อผู้ส่งไฟล์'),name),
       save,saved,store,persist,ver,
-      el('a',{href:'./share-test.html',class:'qh-kv'},'ทดสอบการส่งไฟล์จากมือถือ (หน้าทดสอบ)')
+      /[?&]dev=1\b/.test(location.search)?el('a',{href:'./share-test.html',class:'qh-kv'},'ทดสอบการส่งไฟล์จากมือถือ (หน้าทดสอบ)'):null   /* developers only */
     ]);
   }
 
