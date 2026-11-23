@@ -67,7 +67,7 @@ button{font:inherit;cursor:pointer}
 .rb-actions{display:flex;gap:8px;flex-wrap:wrap}
 .badge.sub{background:var(--ok-bg);color:var(--ok);border-color:transparent}
 .badge.draft{background:var(--warn-bg);color:var(--fg);border-color:var(--line)}
-.ro .wrap .card:not(.rb) :is(.sp-btn,.mic,.zsel,.tb,.addphoto,.addbar,.del,.re-toggle,.rb-actions):not(.act *){display:none!important}
+.ro .wrap .card:not(.rb) :is(.plink,.sp-btn,.mic,.zsel,.tb,.addphoto,.addbar,.del,.re-toggle,.rb-actions):not(.act *){display:none!important}
 .ro .wrap .card:not(.rb) :is(input,textarea,select,button):not(.act *){pointer-events:none}
 /* online: status, assignment and actions on items */
 .wf{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -195,6 +195,19 @@ button{font:inherit;cursor:pointer}
 /* quick entry */
 .qfast{display:flex;gap:6px}
 .f.note{position:relative}
+.plink{display:block;width:100%;min-height:36px;margin-top:4px;padding:0 6px;border:0;background:none;color:var(--muted);font:inherit;font-size:.82rem;text-align:left;cursor:pointer}
+.plink.has{color:var(--accent)}
+.pl-back{position:fixed;inset:0;z-index:85;background:rgba(0,0,0,.6);display:flex;align-items:stretch;justify-content:center}
+.pl-card{width:100%;max-width:1100px;background:var(--surface,#fff);color:var(--fg);display:flex;flex-direction:column;gap:8px;padding:10px 12px}
+.pl-head{display:flex;align-items:center;gap:8px}.pl-head h2{flex:1;margin:0;font-size:1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-tabs{display:flex;gap:6px;overflow-x:auto}.pl-tab{flex:0 0 auto;min-height:40px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:none;color:var(--fg);font:inherit;font-size:.9rem;display:inline-flex;align-items:center;cursor:pointer}
+.pl-tab[aria-selected="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}.pl-tab.add{border-style:dashed;color:var(--accent)}
+.pl-view{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:8px;background:#f4f4f2}
+.pl-stage{position:relative;min-width:100%;cursor:crosshair}.pl-stage img{display:block;width:100%;user-select:none;-webkit-user-drag:none}
+.pl-pin{position:absolute;width:32px;height:32px;margin:-16px 0 0 -16px;border-radius:50%;border:2px solid #fff;background:#888;color:#fff;font:inherit;font-size:.85rem;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.45);cursor:pointer;padding:0}
+.pl-pin.mine{background:#c0261d;width:38px;height:38px;margin:-19px 0 0 -19px}
+.pl-empty{padding:24px;max-width:520px}.pl-empty .btn{margin:4px 6px 0 0}
+.pl-hint{font-size:.85rem;color:var(--muted);min-height:1.2em}.pl-foot{display:flex;gap:6px;align-items:center}.pl-foot .btn{min-height:44px}
 .zsel{width:100%;min-height:40px;margin-bottom:6px}
 .zadd{border:1px dashed var(--line);border-radius:8px;background:none;color:var(--accent);font:inherit;font-size:.85rem;text-align:left;padding:0 10px;cursor:pointer}
 .mic{position:absolute;right:6px;bottom:6px;min-width:44px;min-height:44px;padding:0 8px;border-radius:22px;border:1px solid var(--line);background:var(--surface,#fff);color:var(--accent);font:inherit;font-size:.85rem;cursor:pointer}
@@ -553,7 +566,7 @@ button{font:inherit;cursor:pointer}
     var insp={id:id,schema:2,
       projectId:proj?proj.id:null,inspectorId:ip?partyId('inspector',ip):null,contractorId:cn?partyId('contractor',cn):null,
       folderId:d.folder||null,docno:m.docno||'',date:m.date||'',site:m.site||'',work:m.work||'',weather:m.weather||'',
-      summary:d.summary||'',remarks:d.remarks||'',sign:d.sign||{},meta:m,
+      summary:d.summary||'',remarks:d.remarks||'',sign:d.sign||{},meta:m,plan:d.plan||null,
       createdAt:d.createdAt||'',updatedAt:upd,deletedAt:d.deletedAt||null,rev:+d.rev||0,by:d.by||''};
     var items=(d.items||[]).map(function(it,i){
       return {id:it.id,inspectionId:id,order:i,loc:it.loc||'',chk:it.chk||'',res:it.res||'',note:it.note||'',cat:it.cat||'',ref:it.ref||'',
@@ -564,7 +577,7 @@ button{font:inherit;cursor:pointer}
   }
   /* rows -> the document the form works with */
   function implode(r,items){
-    return {v:2,meta:r.meta||{},sign:r.sign||{},summary:r.summary||'',remarks:r.remarks||'',
+    return {v:2,meta:r.meta||{},sign:r.sign||{},summary:r.summary||'',remarks:r.remarks||'',plan:r.plan||null,
       items:items.map(function(i){return {id:i.id,loc:i.loc,chk:i.chk,res:i.res,note:i.note,cat:i.cat,ref:i.ref,rres:i.rres,rdate:i.rdate,rnote:i.rnote,before:i.before||[],after:i.after||[]}}),
       createdAt:r.createdAt||'',updatedAt:r.updatedAt||'',rev:+r.rev||0,folder:r.folderId||'',deletedAt:r.deletedAt||'',by:r.by||''};
   }
@@ -647,6 +660,7 @@ button{font:inherit;cursor:pointer}
       e.parties.forEach(function(p){parties[p.id]=p});
     });
     items.forEach(function(it){it.before.concat(it.after).forEach(function(x){ids[x]=1})});
+    inspections.forEach(function(r){(r.plan&&r.plan.sheets||[]).forEach(function(x){if(x&&x.a&&x.a.indexOf('data:')!==0)ids[x.a]=1})});   /* plan images */
     var folders=(o.folders||[]).concat(o.trashFolders||[]).map(function(f){return {id:f.id,name:f.name,createdAt:f.createdAt||'',updatedAt:f.createdAt||'',deletedAt:f.deletedAt||null}});
     var entries=[],list=[],missing=0,keys=Object.keys(ids),n=0;
     for(var i=0;i<keys.length;i++){
@@ -677,12 +691,12 @@ button{font:inherit;cursor:pointer}
     var data={format:'qc-inspection-backup',version:1,exportedAt:new Date().toISOString(),source:o.source||'',
       projects:Object.keys(projects).map(function(k){return projects[k]}),parties:Object.keys(parties).map(function(k){return parties[k]}),
       folders:folders,inspections:inspections,items:items,photos:list,
-      formDocs:fdocs,customForms:fforms,formPhotos:flist};
+      formDocs:fdocs,customForms:fforms,formPhotos:flist,zones:o.zones||{}};
     var txt='QC inspection backup\nformat: qc-inspection-backup v1\nนำเข้าได้ที่แอปตรวจงานก่อสร้าง > คลังเอกสาร > นำเข้า\ndata.json = ข้อมูลแยกตาราง (projects, parties, folders, inspections, items, photos, formDocs, customForms, formPhotos)\nphotos/ = รูปถ่าย\nform-photos/ = รูปในรายงานแบบอื่น (รายงานประจำวัน ใบขอเท ตรวจรับวัสดุ แบบฟอร์มที่สร้างเอง)\n';
     entries.unshift({name:'data.json',blob:new Blob([JSON.stringify(data)],{type:'application/json'})});
     entries.push({name:'README.txt',blob:new Blob([txt],{type:'text/plain'})});
     return {blob:await makeZip(entries),missing:missing,
-      counts:{inspections:inspections.length,items:items.length,photos:list.length,folders:folders.length,formDocs:fdocs.length,formPhotos:flist.length}};
+      counts:{inspections:inspections.length,items:items.length,photos:list.length,folders:folders.length,formDocs:fdocs.length,formPhotos:flist.length,zones:Object.keys(o.zones||{}).length}};
   }
 
   /* restore form-engine documents from a backup zip (no-op for backups without them) */
@@ -703,7 +717,15 @@ button{font:inherit;cursor:pointer}
     return window.__qcForms.importAll({docs:(data.formDocs||[]).map(back),forms:data.customForms||[]});
   }
 
-  window.QC={restoreForms:restoreForms,h32:h32,explode:explode,implode:implode,makeZip:makeZip,readZip:readZip,buildBackup:buildBackup,dataURLBlob:dataURLBlob,projectId:projectId,partyId:partyId};
+  /* standard zone lists per project (localStorage 'qc-zones:<project>') travel in the backup; restore = union, nothing removed */
+  function zonesAll(){var o={};try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('qc-zones:')===0){var v=JSON.parse(localStorage.getItem(k)||'[]');if(Array.isArray(v)&&v.length)o[k.slice(9)]=v}}}catch(e){}return o}
+  function restoreZones(data){
+    var z=data&&data.zones,n=0;if(!z||typeof z!=='object')return 0;
+    Object.keys(z).forEach(function(p){if(!Array.isArray(z[p]))return;var k='qc-zones:'+p,cur=[];try{cur=JSON.parse(localStorage.getItem(k)||'[]')}catch(e){}
+      var add=z[p].filter(function(x){return typeof x==='string'&&x.trim()&&cur.indexOf(x)<0});if(add.length){try{localStorage.setItem(k,JSON.stringify(cur.concat(add)));n++}catch(e){}}});
+    return n;
+  }
+  window.QC={zonesAll:zonesAll,restoreZones:restoreZones,restoreForms:restoreForms,h32:h32,explode:explode,implode:implode,makeZip:makeZip,readZip:readZip,buildBackup:buildBackup,dataURLBlob:dataURLBlob,projectId:projectId,partyId:partyId};
 })();
 </script>
 <script src="./libs/jspdf.umd.min.js"></script>
@@ -763,8 +785,17 @@ button{font:inherit;cursor:pointer}
       items:Array.isArray(raw.items)?raw.items.map(normItem):[blankItem(),blankItem(),blankItem()],
       createdAt:raw.createdAt||'',updatedAt:raw.updatedAt||'',rev:+raw.rev||0,folder:raw.folder||'',deletedAt:raw.deletedAt||'',
       sub:(raw.sub&&raw.sub.at)?{rev:+raw.sub.rev||0,at:raw.sub.at}:null,
-      rx:(raw.rx&&raw.rx.hash)?raw.rx:null
+      rx:(raw.rx&&raw.rx.hash)?raw.rx:null,
+      plan:normPlan(raw.plan)
     };
+  }
+  /* plan pins (8.1, optional): plan={sheets:[{a,name,w,h}], pins:{itemId:[{s,x,y}]}} · x,y = 0..1 of the sheet */
+  function normPlan(p){
+    if(!p||!Array.isArray(p.sheets))return null;
+    var sh=p.sheets.filter(function(x){return x&&typeof x.a==='string'&&x.a}).map(function(x){return {a:x.a,name:String(x.name||''),w:+x.w||0,h:+x.h||0}});
+    if(!sh.length)return null;
+    var pins={};Object.keys(p.pins||{}).forEach(function(k){var l=(p.pins[k]||[]).filter(function(q){return q&&q.s>=0&&q.s<sh.length&&q.x>=0&&q.x<=1&&q.y>=0&&q.y<=1}).map(function(q){return {s:+q.s,x:+q.x,y:+q.y}});if(l.length)pins[k]=l});
+    return {sheets:sh,pins:pins};
   }
   function carryOf(s){
     var m=s.meta||{},g=s.sign||{};
@@ -860,11 +891,19 @@ button{font:inherit;cursor:pointer}
         if(window.__ONLINE){o.asg=it.asg||'';o.due=it.due||'';o.st=it.st||'';o.rat=it.rat||'';o.fnote=it.fnote||''}
         return o;
       }),
-      createdAt:state.createdAt,updatedAt:state.updatedAt,rev:state.rev,folder:state.folder||'',deletedAt:state.deletedAt||'',sub:state.sub||null,rx:state.rx||null,by:CLIENT
+      createdAt:state.createdAt,updatedAt:state.updatedAt,rev:state.rev,folder:state.folder||'',deletedAt:state.deletedAt||'',sub:state.sub||null,rx:state.rx||null,by:CLIENT,
+      plan:inStore?planOut():null
     };
+  }
+  function planOut(){
+    var p=state.plan;if(!p||!p.sheets.length)return null;
+    var ids={},pins={};state.items.forEach(function(it){ids[it.id]=1});
+    Object.keys(p.pins).forEach(function(k){if(ids[k]&&p.pins[k].length)pins[k]=p.pins[k].map(function(q){return {s:q.s,x:Math.round(q.x*10000)/10000,y:Math.round(q.y*10000)/10000}})});
+    return {sheets:p.sheets.map(function(x){return {a:x.a,name:x.name,w:x.w,h:x.h}}),pins:pins};
   }
   function photosOf(d){
     var out=[];(d&&d.items||[]).forEach(function(it){(it.before||[]).concat(it.after||[]).forEach(function(a){if(typeof a==='string'&&a.indexOf('data:')!==0)out.push(a)})});
+    (d&&d.plan&&d.plan.sheets||[]).forEach(function(x){if(x&&x.a)out.push(x.a)});   /* plan images are in use too (never collected as orphans) */
     return out;
   }
 
@@ -1227,7 +1266,14 @@ button{font:inherit;cursor:pointer}
     if(!pj){b.appendChild(el('p',null,'กรอกชื่อโครงการในส่วน “ข้อมูลโครงการ” ก่อน รายชื่อโซนผูกกับชื่อโครงการ'));bk.hidden=false;$('#phsheet-x').onclick=function(){bk.hidden=true};return}
     var ta=el('textarea',{rows:8,'aria-label':'รายชื่อโซน หนึ่งบรรทัดต่อหนึ่งโซน',placeholder:'ฐานราก\nชั้น 1\nชั้น 2\nชั้น 3\nหลังคา'});ta.value=zonesFor().join('\n');
     var ok=el('button',{type:'button',class:'btn primary'},'บันทึกรายชื่อโซน');
-    ok.addEventListener('click',function(){var z=ta.value.split('\n').map(function(x){return x.trim()}).filter(Boolean);lsSet(zoneKey(),JSON.stringify(z));bk.hidden=true;renderItems();setStatus('บันทึกรายชื่อโซน '+z.length+' โซน · ใช้กับทุกฉบับของโครงการ “'+pj+'” ในเครื่องนี้')});
+    ok.addEventListener('click',function(){
+      var z=ta.value.split('\n').map(function(x){return x.trim()}).filter(Boolean);lsSet(zoneKey(),JSON.stringify(z));bk.hidden=true;renderItems();
+      var O=window.__qcOnline;
+      if(!O||!O.saveZones){setStatus('บันทึกรายชื่อโซน '+z.length+' โซน · ใช้กับทุกฉบับของโครงการ “'+pj+'” ในเครื่องนี้ และอยู่ในไฟล์สำรอง');return}
+      O.saveZones(pj,z).then(function(r){
+        setStatus(r.ok?'บันทึกรายชื่อโซน '+z.length+' โซน ให้ทุกคนในโครงการแล้ว':r.denied?'บันทึกในเครื่องนี้แล้ว · รายชื่อโซนของโครงการ PM หรือโฟร์แมนเป็นคนตั้ง':'บันทึกในเครื่องนี้แล้ว'+(r.why?' · ยังไม่ขึ้นเซิร์ฟเวอร์ ('+r.why+')':''));
+      });
+    });
     b.append(el('p',{style:'margin:0;color:var(--muted)'},'หนึ่งบรรทัดต่อหนึ่งโซน ช่องตำแหน่งจะให้เลือกโซนก่อนแล้วพิมพ์รายละเอียดต่อท้าย เช่น “ชั้น 3 · เสา C-3” ทุกคนเขียนตำแหน่งตรงกัน'),ta,ok);
     bk.hidden=false;ta.focus();$('#phsheet-x').onclick=function(){bk.hidden=true};bk.onclick=function(e){if(e.target===bk)bk.hidden=true};
   }
@@ -1267,6 +1313,142 @@ button{font:inherit;cursor:pointer}
     back.addEventListener('mousedown',function(e){if(e.target===back)close()});
     document.body.appendChild(back);
   }
+  /* ---------- 8.1 plan pins (optional): mark where an item is on a drawing; printed as an A3 sheet for the crew ---------- */
+  var PLAN_LONG=2400;
+  function pinsOf(it){return (state.plan&&state.plan.pins[it.id])||[]}
+  function planLink(it,i){
+    if(!canUpload())return null;
+    var pn=pinsOf(it),sh=state.plan&&state.plan.sheets;
+    var txt=pn.length?('บนแบบ: '+pn.map(function(q){return (sh[q.s]&&sh[q.s].name)||('แผ่น '+(q.s+1))}).filter(function(v,k,a){return a.indexOf(v)===k}).join(', ')+' · หมุด '+(i+1)+(pn.length>1?' ('+pn.length+' จุด)':'')):'+ ระบุบนแบบแปลน (ไม่บังคับ)';
+    return el('button',{type:'button',class:'plink'+(pn.length?' has':''),'aria-label':(pn.length?'แก้ตำแหน่งบนแบบ':'ระบุตำแหน่งบนแบบแปลน')+' รายการที่ '+(i+1),onclick:function(){openPlan(it.id)}},txt);
+  }
+  function shrinkPlan(file){
+    return new Promise(function(res,rej){
+      var url=URL.createObjectURL(file),img=new Image();
+      img.onload=function(){
+        var W=img.naturalWidth,H=img.naturalHeight;URL.revokeObjectURL(url);if(!W||!H){rej(new Error('image'));return}
+        var k=Math.min(1,PLAN_LONG/Math.max(W,H)),w=Math.round(W*k),h=Math.round(H*k),c=document.createElement('canvas');c.width=w;c.height=h;
+        var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.imageSmoothingQuality='high';x.drawImage(img,0,0,w,h);
+        c.toBlob(function(b){if(!b){rej(new Error('blob'));return}blobToDataURL(b).then(function(d){res({blob:b,dataURL:d,w:w,h:h})},rej)},'image/jpeg',0.8);
+      };
+      img.onerror=function(){URL.revokeObjectURL(url);rej(new Error('image'))};img.src=url;
+    });
+  }
+  /* drawings already used in other documents of the same project, so a sheet is uploaded once */
+  function projectSheets(){
+    var pj=((state.meta&&state.meta.project)||'').trim(),seen={},out=[];
+    (state.plan&&state.plan.sheets||[]).forEach(function(x){seen[x.a]=1});
+    records.forEach(function(r){var d=r.data||{};if(r.id===state.id||((d.meta||{}).project||'').trim()!==pj||!d.plan)return;
+      (d.plan.sheets||[]).forEach(function(x){if(x&&x.a&&!seen[x.a]){seen[x.a]=1;out.push(x)}})});
+    return out;
+  }
+  function openPlan(itemId){
+    if(!canUpload()){setStatus('ระบุบนแบบแปลนใช้ได้เมื่อเก็บข้อมูลในแอป (ไม่ใช่โหมดฉบับร่างชั่วคราว)');return}
+    /* follow the item by id: a remote update can replace state and its item objects while this screen is open */
+    var curId=(state.items.filter(function(x){return x.id===itemId})[0]||state.items[0]||{}).id;if(!curId)return;
+    var itm=function(){return state.items.filter(function(x){return x.id===curId})[0]||state.items[0]};
+    var cur=0,zoom=1;
+    (pinsOf(itm())[0])&&(cur=pinsOf(itm())[0].s);
+    var back=el('div',{class:'pl-back noprint',role:'dialog','aria-modal':'true','aria-label':'ระบุตำแหน่งบนแบบแปลน'});
+    var title=el('h2',null,''),tabs=el('div',{class:'pl-tabs',role:'tablist','aria-label':'แผ่นแบบ'}),stage=el('div',{class:'pl-stage'}),view=el('div',{class:'pl-view'},stage),hint=el('div',{class:'pl-hint',role:'status'});
+    var file=el('input',{type:'file',accept:'image/*',class:'sr','aria-label':'เพิ่มรูปแบบแปลน'});
+    var close=function(){back.remove();renderItems()};
+    function idx(){return state.items.indexOf(itm())+1}
+    function draw(){
+      var P=state.plan,sh=P&&P.sheets[cur],it=itm();
+      title.textContent='ระบุตำแหน่งบนแบบ · รายการที่ '+idx()+(it.loc?' · '+it.loc:'');
+      tabs.textContent='';
+      (P?P.sheets:[]).forEach(function(x,k){var b=el('button',{type:'button',role:'tab','aria-selected':k===cur?'true':'false',class:'pl-tab'},x.name||('แผ่น '+(k+1)));b.addEventListener('click',function(){cur=k;draw()});tabs.appendChild(b)});
+      tabs.appendChild(el('label',{class:'pl-tab add'},'+ เพิ่มแบบแปลน',file));
+      stage.textContent='';stage.style.width=(zoom*100)+'%';
+      if(!sh){
+        var reuse=projectSheets();
+        stage.appendChild(el('div',{class:'pl-empty'},el('p',null,'ยังไม่มีแบบแปลนในฉบับนี้ เพิ่มรูปแบบแปลน (ถ่ายจากแบบ หรือไฟล์ภาพ) แล้วแตะจุดบนแบบเพื่อวางหมุด ส่วนนี้ไม่บังคับ'),
+          reuse.length?el('div',null,el('p',{style:'margin:8px 0 4px'},'ใช้แบบที่มีในโครงการนี้แล้ว:'),reuse.map(function(x){return el('button',{type:'button',class:'btn',onclick:function(){addSheet(x)}},x.name||'แบบแปลน')})):null));
+        hint.textContent='';return;
+      }
+      var img=el('img',{alt:'แบบ '+(sh.name||''),draggable:'false'});
+      getDataURL({a:sh.a}).then(function(d){if(d)img.src=d;else hint.textContent='โหลดรูปแบบแปลนไม่ได้ (ยังไม่ได้ดาวน์โหลดลงเครื่อง)'});
+      stage.appendChild(img);
+      state.items.forEach(function(x,k){(P.pins[x.id]||[]).forEach(function(q,j){
+        if(q.s!==cur)return;
+        var mine=x.id===curId,b=el('button',{type:'button',class:'pl-pin'+(mine?' mine':''),style:'left:'+(q.x*100)+'%;top:'+(q.y*100)+'%','aria-label':(mine?'ลบหมุดรายการที่ ':'หมุดรายการที่ ')+(k+1)},String(k+1));
+        b.addEventListener('click',function(e){e.stopPropagation();if(!mine){curId=x.id;draw();return}P.pins[x.id].splice(j,1);if(!P.pins[x.id].length)delete P.pins[x.id];save();draw()});
+        stage.appendChild(b);
+      })});
+      hint.textContent='แตะบนแบบเพื่อวางหมุดเลข '+idx()+' · แตะหมุดเลข '+idx()+' เพื่อลบ · แตะหมุดเลขอื่นเพื่อสลับรายการ · ไม่บังคับ';
+    }
+    stage.addEventListener('click',function(e){
+      var P=state.plan;if(!P||!P.sheets[cur]||e.target.closest('.pl-pin'))return;
+      var r=stage.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;if(x<0||x>1||y<0||y>1)return;
+      (P.pins[curId]=P.pins[curId]||[]).push({s:cur,x:x,y:y});save();draw();
+    });
+    function addSheet(x){state.plan=state.plan||{sheets:[],pins:{}};state.plan.sheets.push({a:x.a,name:x.name,w:x.w,h:x.h});cur=state.plan.sheets.length-1;save();draw()}
+    file.addEventListener('change',function(){
+      var f=file.files&&file.files[0];file.value='';if(!f)return;
+      hint.textContent='กำลังเตรียมรูปแบบ…';
+      shrinkPlan(f).then(function(sx){return ASSETS.upload(sx.blob).then(function(r){PH[r.id]=sx.dataURL;addSheet({a:r.id,name:(f.name||'แบบ').replace(/\.[a-z0-9]+$/i,'').slice(0,30),w:sx.w,h:sx.h})})})
+        .catch(function(e){hint.textContent='เพิ่มแบบไม่สำเร็จ'+(e&&e.code==='too_large'?' (ไฟล์ใหญ่เกิน)':'')});
+    });
+    var zo=el('button',{type:'button',class:'btn','aria-label':'ย่อ'},'−'),zi=el('button',{type:'button',class:'btn','aria-label':'ขยาย'},'+');
+    zo.addEventListener('click',function(){zoom=Math.max(1,zoom/1.5);draw()});zi.addEventListener('click',function(){zoom=Math.min(4,zoom*1.5);draw()});
+    var prev=el('button',{type:'button',class:'btn'},'‹ รายการก่อน'),next=el('button',{type:'button',class:'btn'},'รายการถัดไป ›');
+    prev.addEventListener('click',function(){var k=state.items.indexOf(itm());if(k>0){curId=state.items[k-1].id;draw()}});
+    next.addEventListener('click',function(){var k=state.items.indexOf(itm());if(k<state.items.length-1){curId=state.items[k+1].id;draw()}});
+    back.appendChild(el('div',{class:'pl-card'},
+      el('div',{class:'pl-head'},title,el('button',{type:'button',class:'btn primary',onclick:close},'เสร็จ')),
+      tabs,view,hint,el('div',{class:'pl-foot'},prev,next,el('span',{style:'flex:1'}),zo,zi)));
+    document.body.appendChild(back);draw();
+    back.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
+  }
+  /* A3 landscape sheet(s) for the crew: drawing + pins of items still to fix + a table to tick off */
+  function printPlan(all){
+    var P=state.plan;
+    if(!P||!P.sheets.length){setStatus('ยังไม่มีแบบแปลนในฉบับนี้ (ระบุบนแบบได้จากช่องตำแหน่งของแต่ละรายการ · ไม่บังคับ)');return Promise.resolve(false)}
+    var O=window.__qcOnline,m=state.meta||{};
+    var rows=state.items.map(function(it,k){return {it:it,n:k+1}}).filter(function(r){return all?!!r.it.res:isPend(r.it)});
+    if(!rows.length){setStatus('ไม่มีรายการค้างแก้ในฉบับนี้');return Promise.resolve(false)}
+    return Promise.all(P.sheets.map(function(x){return getDataURL({a:x.a})})).then(function(srcs){
+      var E=function(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+      var who=function(it){return it.asg?(O&&O.name?O.name(it.asg):'')||'':''};
+      var used=P.sheets.map(function(x,s){return rows.some(function(r){return (P.pins[r.it.id]||[]).some(function(q){return q.s===s})})});
+      var pages=[];
+      P.sheets.forEach(function(x,s){
+        if(!used[s])return;
+        var mine=rows.filter(function(r){return (P.pins[r.it.id]||[]).some(function(q){return q.s===s})});
+        var pins=mine.map(function(r){return (P.pins[r.it.id]||[]).filter(function(q){return q.s===s}).map(function(q){var done=!isPend(r.it);return '<span class="pin'+(done?' done':'')+'" style="left:'+(q.x*100)+'%;top:'+(q.y*100)+'%">'+r.n+'</span>'}).join('')}).join('');
+        pages.push({s:s,x:x,src:srcs[s],pins:pins,rows:mine});
+      });
+      var loose=rows.filter(function(r){return !(P.pins[r.it.id]||[]).length});
+      if(!pages.length){pages.push({s:-1,x:{name:''},src:'',pins:'',rows:[]})}
+      if(loose.length)pages[0].rows=pages[0].rows.concat(loose);
+      var tbl=function(list){return '<table><thead><tr><th>ที่</th><th>ตำแหน่ง / สิ่งที่ต้องแก้</th><th>ผู้แก้ · กำหนด</th><th>เสร็จ</th></tr></thead><tbody>'+list.map(function(r){var it=r.it,np=!(P.pins[it.id]||[]).length;
+        return '<tr><td class="n">'+r.n+'</td><td><b>'+E(it.loc||'-')+'</b><br>'+E(it.note||it.chk||'')+(np?'<br><i>ไม่ได้ระบุบนแบบ · ดูตำแหน่งตามข้อความ</i>':'')+'</td><td>'+E(who(it))+(it.due?'<br>ครบ '+E(it.due):'')+'</td><td class="c">☐</td></tr>'}).join('')+'</tbody></table>'};
+      var html='<!doctype html><html lang="th"><head><meta charset="utf-8"><title>แผ่นแผนผังสำหรับช่าง</title><style>'+
+        '@page{size:A3 landscape;margin:10mm}body{margin:0;font-family:Sarabun,"Noto Sans Thai",sans-serif;color:#111}'+
+        '.pg{display:flex;gap:12px;height:277mm;page-break-after:always;box-sizing:border-box}.pg:last-child{page-break-after:auto}'+
+        '.dw{flex:1;min-width:0;border:1.5px solid #111;display:flex;align-items:center;justify-content:center;overflow:hidden}.dw .wrap{position:relative;display:inline-block;max-width:100%;max-height:100%}.dw img{display:block;max-width:100%;max-height:273mm}'+
+        '.pin{position:absolute;width:9mm;height:9mm;margin:-4.5mm 0 0 -4.5mm;border-radius:50%;border:2.5px solid #c0261d;background:#fff;color:#c0261d;font-weight:700;font-size:12pt;display:flex;align-items:center;justify-content:center;box-sizing:border-box}.pin.done{border-color:#888;color:#888}'+
+        '.side{width:105mm;display:flex;flex-direction:column;gap:6px;font-size:9.5pt}h1{font-size:14pt;margin:0;border-bottom:2px solid #111;padding-bottom:4px}'+
+        'table{width:100%;border-collapse:collapse}th,td{border:1px solid #555;padding:3px 4px;vertical-align:top;text-align:left}th{background:#eef1f5}td.n{font-weight:700;width:7mm}td.c{text-align:center;width:9mm}i{color:#555}'+
+        '.tb{margin-top:auto;border:1.5px solid #111}.tb div{padding:3px 6px;border-bottom:1px solid #111}.tb div:last-child{border-bottom:0}'+
+        '</style></head><body>'+pages.map(function(pg,k){
+          return '<section class="pg"><div class="dw">'+(pg.src?'<div class="wrap"><img src="'+pg.src+'">'+pg.pins+'</div>':'<p>ไม่มีหมุดบนแบบ</p>')+'</div><div class="side"><h1>แผ่นแผนผังสำหรับช่าง</h1>'+
+            '<div>'+(all?'ทุกรายการที่ตรวจ':'เฉพาะจุดที่ยังต้องแก้')+' · '+pg.rows.length+' รายการ</div>'+tbl(pg.rows)+
+            '<div class="tb"><div><b>โครงการ</b> '+E(m.project)+'</div><div><b>อ้างอิงรายงาน</b> '+E(m.docno)+' · ตรวจ '+E(m.date)+'</div><div><b>แบบ</b> '+E(pg.x.name||'-')+'</div><div>พิมพ์ '+E(new Date().toLocaleDateString('th-TH'))+' · หน้า '+(k+1)+'/'+pages.length+' · A3</div></div></div></section>'}).join('')+'</body></html>';
+      var fr=document.getElementById('plan-print');if(fr)fr.remove();
+      fr=el('iframe',{id:'plan-print',title:'แผ่นแผนผังสำหรับช่าง',style:'position:fixed;right:0;bottom:0;width:0;height:0;border:0'});
+      document.body.appendChild(fr);
+      var doc=fr.contentWindow.document;doc.open();doc.write(html);doc.close();
+      window.__qcPlanHTML=html;
+      return new Promise(function(res){
+        var imgs=doc.images,left=imgs.length,go=function(){try{fr.contentWindow.focus();if(!window.__qcNoPrint)fr.contentWindow.print()}catch(e){}res(true)};
+        if(!left){setTimeout(go,50);return}
+        Array.prototype.forEach.call(imgs,function(im){if(im.complete){if(!--left)go()}else{im.onload=im.onerror=function(){if(!--left)go()}}});
+      });
+    });
+  }
+  window.__qcPlan={open:function(id){openPlan(id||((state.items.filter(isPend)[0]||state.items[0]||{}).id))},print:printPlan,has:function(){return !!(state.plan&&state.plan.sheets.length)}};
   function photoSheet(th,title){
     var bk=$('#phsheet'),b=$('#phsheet-b');b.textContent='';$('#phsheet-t').textContent=title;
     var close=function(){bk.hidden=true;try{th.querySelector('.tb.more').focus()}catch(e){}};
@@ -1489,6 +1671,7 @@ button{font:inherit;cursor:pointer}
     main.appendChild(photoStrip(it,'before','ที่พบ รายการที่ '+(i+1),'+ เพิ่มรูป'));
     var locCell=el('div',{class:'loc'});
     locCell.appendChild(zonePick(it,i));
+    var pl=planLink(it,i);if(pl)locCell.appendChild(pl);
     locCell.appendChild(textField('ตำแหน่ง','','loc',it,'เช่น เสา C-3 ชั้น 1'));
     var cs=el('select',{'aria-label':'หมวดงาน (แนะนำให้เลือก ช่วยค้นหาภายหลัง)'},el('option',{value:''},'+ เลือกหมวดงาน (แนะนำ)'));
     var cats=catsFor(state).slice();if(it.cat&&cats.indexOf(it.cat)<0)cats.push(it.cat);
@@ -2038,11 +2221,14 @@ button{font:inherit;cursor:pointer}
       var prev=titleOf(state),work=state.meta.work;
       var s=freshState(carryOf(state));
       s.meta.work=work;s.folder=state.folder||'';if(isSafety(state))s.meta.form='safety';
+      var op=state.plan,np=op?{sheets:op.sheets.slice(),pins:{}}:null;
       s.items=pend.map(function(it){
         var n=normItem({loc:it.loc,chk:it.chk,note:it.note,cat:it.cat,ref:it.ref});
         n.before=(it.after.length?it.after:it.before).filter(function(p){return p.a}).map(function(p){return {a:p.a}});
+        if(np&&op.pins[it.id])np.pins[n.id]=op.pins[it.id].slice();   /* pins follow the open items */
         return n;
       });
+      s.plan=np;
       s.remarks='ตรวจรอบใหม่ต่อจากฉบับ: '+prev;
       state=s;touched=true;flt='all';$('#flt').value='all';
       renderAll();save();closeList();window.scrollTo({top:0});
@@ -2633,7 +2819,7 @@ button{font:inherit;cursor:pointer}
     drain().then(function(){
       return window.__qcForms?window.__qcForms.exportAll():null;
     }).then(function(forms){
-      return QC.buildBackup({records:records,folders:folders,trashRecs:trashRecs,trashFolders:trashFolders,source:IS_PWA?'pwa':'claude-artifact',forms:forms,
+      return QC.buildBackup({records:records,folders:folders,trashRecs:trashRecs,trashFolders:trashFolders,source:IS_PWA?'pwa':'claude-artifact',forms:forms,zones:QC.zonesAll(),
         getPhoto:getPhotoBlob,onProgress:function(n,t){if(n%5===0||n===t)dmsg('กำลังรวมรูป '+n+' / '+t)}});
     }).then(function(r){
       return dlP.then(function(dl){
@@ -2658,7 +2844,7 @@ button{font:inherit;cursor:pointer}
           if(!t)throw new Error('no data');
           var dj=JSON.parse(t);
           return window.__qc.importData(dj,function(ph){return z.read(ph.file,ph.mime)},function(n,t2){if(n%5===0||n===t2)dmsg('กำลังนำเข้ารูป '+n+' / '+t2)}).then(function(n){
-            return QC.restoreForms(z,dj).then(function(fr){n.forms=fr;return n});
+            return QC.restoreForms(z,dj).then(function(fr){n.forms=fr;n.zones=QC.restoreZones(dj);return n});
           });
         });
       }).then(function(n){

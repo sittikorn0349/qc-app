@@ -11,18 +11,27 @@
 
   /* ---------- canonical content of a document (what "the same document" means) ---------- */
   function ids(a){return (Array.isArray(a)?a:[]).filter(function(x){return typeof x==='string'&&x})}
+  function planContent(p){
+    if(!p||!Array.isArray(p.sheets)||!p.sheets.length)return null;
+    var pins=p.pins||{};
+    return [p.sheets.map(function(x){return [S(x.a),S(x.name)]}),Object.keys(pins).sort().map(function(k){return [k,(pins[k]||[]).map(function(q){return [+q.s,+q.x,+q.y]})]})];
+  }
   function content(d){
-    var m=d.meta||{},g=d.sign||{};
-    return JSON.stringify({
+    var m=d.meta||{},g=d.sign||{},pc=planContent(d.plan),o;
+    o={
       meta:['project','docno','site','date','work','inspector','contractor','weather'].map(function(k){return S(m[k])}),
       sign:['inspector','supervisor','contractor'].map(function(k){var o=g[k]||{},a=[S(o.name),S(o.date)];if(o.img)a.push(S(o.img));return a}),   /* a drawn signature is content (no img = same hash as before) */
       summary:S(d.summary),remarks:S(d.remarks),
       items:(d.items||[]).map(function(it){return [S(it.id),S(it.loc),S(it.chk),S(it.res),S(it.note),S(it.cat),S(it.ref),S(it.rres),S(it.rdate),S(it.rnote),ids(it.before),ids(it.after)]})
-    });
+    };
+    if(pc)o.plan=pc;    /* plan pins are content; documents without a plan hash exactly as before */
+    return JSON.stringify(o);
   }
   function hashDoc(d){return sha256Text(content(d))}
   function titleOf(d){var m=d.meta||{},t=(m.work||m.project||'').trim(),no=(m.docno||'').trim();return (no&&t)?no+' · '+t:(no||t||'ฉบับยังไม่ตั้งชื่อ')}
-  function photosOf(d){var o=[],seen={};(d.items||[]).forEach(function(it){ids(it.before).concat(ids(it.after)).forEach(function(x){if(!seen[x]){seen[x]=1;o.push(x)}})});return o}
+  function photosOf(d){var o=[],seen={};(d.items||[]).forEach(function(it){ids(it.before).concat(ids(it.after)).forEach(function(x){if(!seen[x]){seen[x]=1;o.push(x)}})});
+    ((d.plan&&d.plan.sheets)||[]).forEach(function(x){if(x&&x.a&&x.a.indexOf('data:')!==0&&!seen[x.a]){seen[x.a]=1;o.push(x.a)}});   /* drawings travel with the document */
+    return o}
   function sniff(b){
     return b.slice(0,12).arrayBuffer().then(function(ab){
       var u=new Uint8Array(ab);
@@ -324,6 +333,7 @@
     if(bad.length){dmsg('ไม่นำเข้า: ไฟล์รูปเสียหายหรือหายในไฟล์สำรอง '+bad.length+' รูป (ไม่ได้นำเข้าอะไรเลย) เช่น '+bad[0],true);return}
     try{
       var n=await window.__qc.importData(data,function(p){return Promise.resolve(cache[p.id]||null)},function(a,t){if(a%5===0||a===t)dmsg('กำลังนำเข้ารูป '+a+' / '+t)});
+      try{QC.restoreZones(data)}catch(e){}
       var fr=null;try{fr=await QC.restoreForms(z,data)}catch(e){dmsg('นำเข้าฉบับตรวจงานแล้ว แต่รายงานแบบอื่นในไฟล์สำรองนำเข้าไม่ได้ ('+e.message+')',true);return}
       var listed={};(data.photos||[]).forEach(function(p){listed[p.id]=1});
       var miss=0,seen={};(data.items||[]).forEach(function(it){(it.before||[]).concat(it.after||[]).forEach(function(x){if(x&&!listed[x]&&!seen[x]){seen[x]=1;miss++}})});

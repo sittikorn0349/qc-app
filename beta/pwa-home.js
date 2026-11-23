@@ -19,7 +19,9 @@
     gear:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
     back:'<path d="M19 12H5"/><path d="m11 18-6-6 6-6"/>',
     more:'<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>',
-    chev:'<path d="m6 9 6 6 6-6"/>'
+    chev:'<path d="m6 9 6 6 6-6"/>',
+    pin:'<path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/>',
+    print:'<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>'
   };
   function icon(n){var s=document.createElement('span');s.className='qh-ic';s.setAttribute('aria-hidden','true');
     s.innerHTML='<svg viewBox="0 0 24 24" focusable="false">'+P[n]+'</svg>';return s}
@@ -68,6 +70,7 @@
     '#qh-sheet{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;padding:0}',
     '#qh-sheet .qh-card{width:100%;max-width:520px;max-height:90vh;overflow:auto;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:16px 16px 0 0;padding:16px max(16px,env(safe-area-inset-left,0px)) max(18px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}',
     '@media (min-width:700px){#qh-sheet{align-items:center}#qh-sheet .qh-card{border-radius:16px}}',
+    '.qh-cov h3{margin:4px 0 6px;font-size:.95rem}.qh-covt{display:grid;gap:4px;margin-bottom:6px}.qh-covr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:.85rem}.qh-covr.warn{border-color:var(--warn,#d98a00);background:var(--warn-bg,#fff7e6)}',
     '.qd-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}.qd-kpi div{border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}.qd-kpi b{display:block;font-size:1.4rem}.qd-kpi small{color:var(--muted)}',
     '.qd-sec{margin-top:12px}.qd-sec h3{margin:0 0 6px;font-size:.95rem}.qd-row{display:grid;grid-template-columns:minmax(0,9rem) 1fr 2.4rem;gap:8px;align-items:center;margin:4px 0;font-size:.9rem}.qd-k{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.qd-bar{height:12px;border-radius:6px;background:var(--bg)}.qd-bar i{display:block;height:100%;border-radius:6px;background:var(--warn,#d98a00)}.qd-row b{text-align:right}',
     '.qd-late{display:block;width:100%;text-align:left;margin:4px 0;min-height:48px}',
@@ -257,7 +260,12 @@
       del.classList.add('armed');del.lastChild.textContent='กดอีกครั้งเพื่อยืนยัน';
       armT=setTimeout(function(){del.classList.remove('armed');del.lastChild.textContent='ย้ายไปถังขยะ'},3500);
     });
-    menuEl=el('div',{class:'qf-menu',role:'menu'},lib,del);
+    /* 8.1, optional: kept in this menu so the main flow stays the same */
+    var Pl=window.__qcPlan,pm=Pl?el('button',{type:'button',role:'menuitem',id:'qf-plan'},icon('pin'),'ระบุตำแหน่งบนแบบแปลน (ไม่บังคับ)'):null;
+    if(pm)pm.addEventListener('click',function(){closeMenu();Pl.open()});
+    var pp=Pl?el('button',{type:'button',role:'menuitem',id:'qf-planprint'},icon('print'),'พิมพ์แผ่นแผนผังสำหรับช่าง (A3)'):null;
+    if(pp)pp.addEventListener('click',function(){closeMenu();Pl.print(false)});
+    menuEl=el('div',{class:'qf-menu',role:'menu'},lib,pm,pp,del);
     formbar.appendChild(menuEl);anchor.setAttribute('aria-expanded','true');
   }
   function closeMenu(){
@@ -349,8 +357,38 @@
     nodes.push(el('small',{class:'qh-kv'},D.online?'นับจากเอกสารของคุณในโครงการนี้ที่อยู่ในเครื่อง':'นับจากเอกสารที่อยู่ในเครื่องนี้'));
     openSheet('สรุปงานค้างแก้',nodes);
   }
+  /* where each kind of data lives (the review's main point: users must see what is and is not backed up / synced) */
+  function coverage(){
+    var ON=!!window.__ONLINE,sy=ON&&window.__qcSync?window.__qcSync():null,lb=+(ls('qc-last-backup')||0),lbIso=lb?new Date(lb).toISOString():'';
+    var docs=window.__qcDocs?window.__qcDocs():[],changed=docs.filter(function(d){return !lb||(d.data.updatedAt||'')>lbIso}).length;
+    var F=window.__qcForms,zn=window.QC&&QC.zonesAll?Object.keys(QC.zonesAll()).length:0;
+    return Promise.all([F?F.listDocs():[],F?F.customs():[]]).then(function(r){
+      var fd=r[0]||[],cf=r[1]||[],fch=fd.filter(function(d){return !lb||(d.updatedAt||'')>lbIso}).length,fs=sy&&sy.forms;
+      var BK='อยู่ในไฟล์สำรอง และส่งเอกสารได้';
+      var rows=[
+        ['ฉบับตรวจงาน รูป ลายเซ็น หมุดบนแบบ',docs.length,ON?('ซิงก์ขึ้นเซิร์ฟเวอร์'+(sy&&sy.pending?' · รอส่ง '+sy.pending+' รายการ':' ครบแล้ว')):'ในเครื่องนี้ · '+BK,ON?!(sy&&sy.pending):true],
+        ['รายงานแบบอื่น (ประจำวัน ใบขอเท ฯลฯ)',fd.length,ON?(fs&&fs.ready?('ซิงก์ขึ้นเซิร์ฟเวอร์'+(fs.pending?' · รอส่ง '+fs.pending:' ครบแล้ว')):'ในเครื่องนี้เท่านั้น ยังไม่ซิงก์ ('+((fs&&fs.why)||'เซิร์ฟเวอร์ยังไม่เปิดส่วนนี้')+') · สำรองด้วยไฟล์'):'ในเครื่องนี้ · '+BK,ON?!!(fs&&fs.ready&&!fs.pending):true],
+        ['แบบฟอร์มที่สร้างเอง',cf.length,ON&&fs&&fs.ready?'แชร์ให้ทีมในโครงการผ่านเซิร์ฟเวอร์':'ในเครื่องนี้ · อยู่ในไฟล์สำรอง · แชร์ให้ทีมด้วยไฟล์แบบฟอร์ม',true],
+        ['รายชื่อโซน / ชั้นของโครงการ',zn,'ในเครื่องนี้ · อยู่ในไฟล์สำรอง',true],
+        ['การตั้งค่าเครื่อง (ชื่อผู้ส่ง รหัสเลขที่ กรอกเร็ว)','','ในเครื่องนี้เท่านั้น ไม่ต้องสำรอง',true]
+      ];
+      return {rows:rows,lb:lb,changed:changed+fch,online:ON};
+    });
+  }
+  function coverageView(){
+    var box=el('section',{class:'qh-cov',id:'qh-cov','aria-label':'ข้อมูลของคุณเก็บไว้ที่ไหน'},el('h3',null,'ข้อมูลของคุณเก็บไว้ที่ไหน'),el('div',{class:'qh-kv'},'กำลังตรวจ…'));
+    coverage().then(function(c){
+      box.lastChild.remove();
+      var tb=el('div',{class:'qh-covt',role:'table'});
+      c.rows.forEach(function(r){tb.appendChild(el('div',{class:'qh-covr'+(r[3]?'':' warn'),role:'row'},el('span',{role:'cell'},r[0]+(r[1]!==''?' ('+r[1]+')':'')),el('span',{role:'cell'},r[2])))});
+      box.appendChild(tb);
+      box.appendChild(el('div',{class:'qh-kv'},(c.lb?'สำรองเป็นไฟล์ล่าสุด '+new Date(c.lb).toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'})+(c.changed?' · มี '+c.changed+' ฉบับแก้ไขหลังจากนั้น':' · ไม่มีอะไรแก้หลังจากนั้น'):'ยังไม่เคยสำรองเป็นไฟล์')+(c.online?' (โหมดออนไลน์: ไฟล์สำรองใช้กับสิ่งที่ยังไม่ซิงก์)':'')));
+    });
+    return box;
+  }
   function openBackup(){
     openSheet('สำรอง / กู้คืนข้อมูล',[
+      coverageView(),
       el('div',{class:'qh-kv'},'ไฟล์สำรองเก็บทุกฉบับ โฟลเดอร์ และรูป เก็บไว้ในที่ปลอดภัย (เช่น Drive, LINE Keep) เผื่อเครื่องหาย'),
       big('db','สำรองข้อมูลทั้งหมด (ZIP)','บันทึกไฟล์ลงเครื่อง',function(){closeSheet();openList();setTimeout(function(){click('#bk-export')},60)}),
       big('inbox','กู้คืนจากไฟล์ ZIP','เลือกไฟล์สำรองหรือไฟล์ส่งงาน',openFile)
